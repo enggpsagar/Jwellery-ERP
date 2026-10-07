@@ -1,6 +1,8 @@
 // FILE PATH: components/karigars/karigar-ledger-summary-table.tsx
 import Link from "next/link"
 
+import { WeightText } from "@/components/shared/weight-text"
+
 import type { KarigarLedgerSummaryRow } from "@/lib/actions/ledger-actions"
 import { toTitleCase } from "@/lib/utils"
 import { RecordHoverCard } from "@/components/shared/record-hover-card"
@@ -48,7 +50,7 @@ export function KarigarLedgerSummaryTable({ rows, totals }: KarigarLedgerSummary
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-xl font-semibold">{totals.outstandingGold.toFixed(3)}g</div>
+            <div className="text-xl font-semibold"><WeightText value={totals.outstandingGold} /></div>
           </CardContent>
         </Card>
 
@@ -117,12 +119,12 @@ export function KarigarLedgerSummaryTable({ rows, totals }: KarigarLedgerSummary
                       sections={[
                         {
                           fields: [
-                            { label: "Opening gold", value: `${row.openingGold.toFixed(3)} g` },
-                            { label: "Gold issued", value: `${row.goldIssued.toFixed(3)} g` },
-                            { label: "Gold used", value: `${row.goldUsed.toFixed(3)} g` },
+                            { label: "Opening gold", value: <WeightText value={row.openingGold} /> },
+                            { label: "Gold issued", value: <WeightText value={row.goldIssued} /> },
+                            { label: "Gold used", value: <WeightText value={row.goldUsed} /> },
                             {
                               label: "Gold outstanding",
-                              value: `${row.outstandingGold.toFixed(3)} g`,
+                              value: <WeightText value={row.outstandingGold} />,
                             },
                           ],
                         },
@@ -143,10 +145,10 @@ export function KarigarLedgerSummaryTable({ rows, totals }: KarigarLedgerSummary
                       <span className="ml-1 text-xs text-muted-foreground">({row.code})</span>
                     ) : null}
                   </TableCell>
-                  <TableCell className="text-right">{row.goldIssued.toFixed(3)}g</TableCell>
-                  <TableCell className="text-right">{row.goldUsed.toFixed(3)}g</TableCell>
+                  <TableCell className="text-right"><WeightText value={row.goldIssued} /></TableCell>
+                  <TableCell className="text-right"><WeightText value={row.goldUsed} /></TableCell>
                   <TableCell className="text-right font-medium">
-                    {row.outstandingGold.toFixed(3)}g
+                    <WeightText value={row.outstandingGold} />
                   </TableCell>
                   <TableCell className="text-right">{row.itemsDelivered}</TableCell>
                   <TableCell className="text-right">

@@ -2,6 +2,7 @@ import { Badge } from "@/components/ui/badge"
 import { ActiveBadge } from "@/components/shared/active-badge"
 import { FinishBadge } from "@/components/inventory/shared/finish-badge"
 import { ProductStatusToggle } from "@/components/inventory/products/product-status-toggle"
+import { WeightText } from "@/components/shared/weight-text"
 import { formatShortDate } from "@/lib/utils"
 import type { getProductById } from "@/lib/actions/inventory/product-actions"
 
@@ -134,7 +135,7 @@ export function ProductDetailContent({
                   <span>
                     {component.metalTypeName}
                     {component.storeMetalPurityLabel ? ` (${component.storeMetalPurityLabel})` : ""}
-                    {component.netWeight ? ` — ${formatWeight(component.netWeight)} net` : ""}
+                    {component.netWeight ? <> — {formatWeight(component.netWeight)} net</> : ""}
                   </span>
                 }
               />
@@ -338,15 +339,15 @@ function formatCharge(
 }
 
 /**
- * Three decimals to match the column, and a unit, because a bare number on a
- * jewellery record is ambiguous between grams and carats.
+ * The store's weight decimals (Settings > Weights), and a unit, because a
+ * bare number on a jewellery record is ambiguous between grams and carats.
  */
 function formatWeight(value: unknown) {
   if (value === null || value === undefined || value === "") return null
-  return `${Number(value).toFixed(3)} g`
+  return <WeightText value={Number(value)} />
 }
 
 function formatCarat(value: unknown) {
   if (value === null || value === undefined || value === "") return null
-  return `${Number(value).toFixed(3)} ct`
+  return <WeightText value={Number(value)} unit="CARAT" />
 }

@@ -18,6 +18,7 @@ import { requireStoreScope } from "@/lib/store-context"
 import { omitHiddenKeys } from "@/lib/sheet-features"
 import { getSheetFeatures } from "@/lib/sheet-features.server"
 import { invoiceStatusLabel, stockStatusLabel } from "@/lib/status-labels"
+import { getActiveWeightFormat } from "@/lib/weight-settings.server"
 
 /**
  * Extracted from what was originally app/(dashboard)/reports/export/route.ts's
@@ -65,6 +66,10 @@ export const REPORT_LABELS: Record<ReportType, string> = {
 }
 
 export async function getReportRows(type: ReportType, range: DateRange) {
+  // Weight cells stay numbers, rounded to the store's Settings > Weights
+  // decimals (what the report table shows).
+  const wf = await getActiveWeightFormat()
+  const g = (value: number | string | null | undefined) => (value == null || value === "" ? "" : wf.gNum(Number(value)))
   switch (type) {
     case "sales": {
       const report = await getSalesReport(range)
@@ -95,7 +100,7 @@ export async function getReportRows(type: ReportType, range: DateRange) {
         Vendor: row.vendorName,
         Purchases: row.purchaseCount,
         Qty: row.totalQuantity,
-        "Fine Wt 24K (g)": row.totalWeight,
+        "Fine Wt 24K (g)": g(row.totalWeight),
         "Amount (₹)": row.totalAmount,
         "Paid (₹)": row.paidAmount,
         "Balance (₹)": row.balanceAmount,
@@ -108,7 +113,7 @@ export async function getReportRows(type: ReportType, range: DateRange) {
       return report.byStatus.map((row) => ({
         Status: stockStatusLabel(row.status),
         Count: row.count,
-        "Fine Wt 24K (g)": row.netWeight,
+        "Fine Wt 24K (g)": g(row.netWeight),
         "Estimated Value (₹)": row.estimatedValue,
       }))
     }
@@ -127,10 +132,10 @@ export async function getReportRows(type: ReportType, range: DateRange) {
         Availability: row.availability === "AVAILABLE" ? "Available" : "Out of Stock",
         Status: stockStatusLabel(row.status),
         "Qty on Hand": row.quantity,
-        "Net Weight / pc (g)": row.netWeight,
-        "Total Net Weight (g)": row.totalNetWeight,
-        "Fine Wt 24K / pc (g)": row.fineWeight,
-        "Total Fine Wt 24K (g)": row.totalFineWeight,
+        "Net Weight / pc (g)": g(row.netWeight),
+        "Total Net Weight (g)": g(row.totalNetWeight),
+        "Fine Wt 24K / pc (g)": g(row.fineWeight),
+        "Total Fine Wt 24K (g)": g(row.totalFineWeight),
         "Estimated Value (₹)": row.estimatedValue,
         Location: row.location,
         "Purchase Date": row.purchaseDate ? formatShortDate(row.purchaseDate) : "",
@@ -144,8 +149,8 @@ export async function getReportRows(type: ReportType, range: DateRange) {
         "Issue Date": formatShortDate(job.issueDate),
         "Expected Date": job.expectedDate ? formatShortDate(job.expectedDate) : "",
         Metal: job.metalType ?? "",
-        "Issue Weight (g)": job.issueWeight ?? "",
-        "Issue Fine Wt 24K (g)": job.issueFineWeight ?? "",
+        "Issue Weight (g)": g(job.issueWeight),
+        "Issue Fine Wt 24K (g)": g(job.issueFineWeight),
       }))
     }
     case "dues": {
@@ -161,17 +166,17 @@ export async function getReportRows(type: ReportType, range: DateRange) {
       const report = await getGoldFlowReport(range)
       return [
         {
-          "Purchased (fine g)": report.purchasedFine,
-          "Issued to Artisan (fine g)": report.issuedToKarigarFine,
-          "Received from Artisan (fine g)": report.receivedFromKarigarFine,
-          "Wastage (fine g)": report.wastageFine,
-          "Sold (fine g)": report.soldFine,
-          "Remaining Stock (fine g)": report.remainingStockFine,
-          "Still with Artisan (fine g)": report.withKarigarFine,
+          "Purchased (fine g)": g(report.purchasedFine),
+          "Issued to Artisan (fine g)": g(report.issuedToKarigarFine),
+          "Received from Artisan (fine g)": g(report.receivedFromKarigarFine),
+          "Wastage (fine g)": g(report.wastageFine),
+          "Sold (fine g)": g(report.soldFine),
+          "Remaining Stock (fine g)": g(report.remainingStockFine),
+          "Still with Artisan (fine g)": g(report.withKarigarFine),
           "Items Sold": report.itemsSoldCount,
           "Items Created": report.itemsCreatedCount,
           "Items Remaining": report.itemsRemainingCount,
-          "Reconciliation Gap (fine g)": report.reconciliationGap,
+          "Reconciliation Gap (fine g)": g(report.reconciliationGap),
         },
       ]
     }
@@ -179,14 +184,14 @@ export async function getReportRows(type: ReportType, range: DateRange) {
       const report = await getMetalWiseReport(range)
       return report.metals.map((row) => ({
         Metal: row.metalName,
-        "Purchased Fine Wt 24K (g)": row.purchasedWeight,
+        "Purchased Fine Wt 24K (g)": g(row.purchasedWeight),
         "Purchased Amount (₹)": row.purchasedAmount,
-        "Sold Fine Wt 24K (g)": row.soldWeight,
+        "Sold Fine Wt 24K (g)": g(row.soldWeight),
         "Sold Amount (₹)": row.soldAmount,
-        "In Stock Fine Wt 24K (g)": row.inStockWeight,
+        "In Stock Fine Wt 24K (g)": g(row.inStockWeight),
         "In Stock Value (₹)": row.inStockValue,
-        "With Artisan Fine Wt 24K (g)": row.withKarigarWeight,
-        "Reconciliation Gap (fine g)": row.reconciliationGap,
+        "With Artisan Fine Wt 24K (g)": g(row.withKarigarWeight),
+        "Reconciliation Gap (fine g)": g(row.reconciliationGap),
       }))
     }
     case "itemLedger": {
@@ -196,8 +201,8 @@ export async function getReportRows(type: ReportType, range: DateRange) {
         Item: row.productName,
         Status: stockStatusLabel(row.status),
         "Qty On Hand": row.quantityRemaining,
-        "Net Weight (g)": row.netWeight,
-        "Fine Wt 24K (g)": row.fineWeight,
+        "Net Weight (g)": g(row.netWeight),
+        "Fine Wt 24K (g)": g(row.fineWeight),
         "Purchase Date": row.purchaseDate ? formatShortDate(row.purchaseDate) : "",
         "Purchase Qty": row.purchaseQuantity ?? "",
         Vendor: row.vendorName ?? "",

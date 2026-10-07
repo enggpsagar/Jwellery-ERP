@@ -1,5 +1,6 @@
 "use client"
 
+import { useWeightFormat } from "@/components/providers/weight-settings-provider"
 import { Badge } from "@/components/ui/badge"
 import { formatShortDate, cn } from "@/lib/utils"
 import type { MyJobRow } from "@/lib/actions/my-jobs-actions"
@@ -16,6 +17,7 @@ type MyJobsTableProps = {
  * only ever view their own jobs, never modify them from here.
  */
 export function MyJobsTable({ jobs, activeJobId, onActivate }: MyJobsTableProps) {
+  const wf = useWeightFormat()
   return (
     <div className="overflow-hidden rounded-xl border bg-card">
       <div className="overflow-x-auto">
@@ -55,7 +57,7 @@ export function MyJobsTable({ jobs, activeJobId, onActivate }: MyJobsTableProps)
                     </td>
                     <td className="px-4 py-3 text-muted-foreground">{formatShortDate(job.issueDate)}</td>
                     <td className="hidden px-4 py-3 text-muted-foreground sm:table-cell">
-                      {job.issueWeight ? `${job.issueWeight} g` : "-"}
+                      {job.issueWeight ? wf.grams(job.issueWeight) : "-"}
                     </td>
                     <td className="px-4 py-3">
                       <Badge variant="outline">{job.status}</Badge>

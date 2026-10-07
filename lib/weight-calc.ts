@@ -104,6 +104,63 @@ export function formatWeight(value: unknown, unit: WeightUnitValue | string | nu
   return num.toFixed(displayDecimals(unit, settings))
 }
 
+/**
+ * Display-only formatters bound to one store's decimals — THE way to show a
+ * weight on screen, in a report or in an export's text. Client components
+ * get one from useWeightFormat() (components/providers/weight-settings-
+ * provider), server code from getWeightFormat(storeId)
+ * (lib/weight-settings.server.ts). Never use these to round a stored value.
+ *
+ *   g(9.7)        → "9.700"        grams, fixed decimals, no unit
+ *   ct(0.28)      → "0.280"        carats, fixed decimals, no unit
+ *   grams(9.7)    → "9.700 g"      ("" for blank)
+ *   carats(0.28)  → "0.280 ct"
+ *   unit(v, u)    → grams or carats by unit ("CARAT" → ct)
+ *   gramsLocale / caratsLocale → en-IN grouping, up to the store's decimals
+ *                   (trailing zeros dropped — the style of the ledger/KPIs)
+ *   gNum(9.71234) → 9.712         a report/export number cell (stays a number)
+ *   stoneCt(0.28) → "0.28" — a stone row's carats, which have always been
+ *                   shown with 2 decimals: at most 2, fewer when the store
+ *                   chose fewer.
+ */
+export type WeightFormat = ReturnType<typeof weightFormatter>
+
+export function weightFormatter(settings: WeightSettings) {
+  const gramDecimals = settings.weightDecimalsGram
+  const caratDecimals = settings.weightDecimalsCarat
+  const stoneCaratDecimals = Math.min(2, caratDecimals)
+  const fixed = (value: unknown, decimals: number) => {
+    const num = toNumber(value)
+    return num === null ? "" : num.toFixed(decimals)
+  }
+  const locale = (value: unknown, decimals: number) => {
+    const num = toNumber(value)
+    return num === null ? "" : num.toLocaleString("en-IN", { maximumFractionDigits: decimals })
+  }
+  const withUnit = (text: string, suffix: string) => (text === "" ? "" : `${text} ${suffix}`)
+  return {
+    settings,
+    gramDecimals,
+    caratDecimals,
+    stoneCaratDecimals,
+    g: (value: unknown) => fixed(value, gramDecimals),
+    ct: (value: unknown) => fixed(value, caratDecimals),
+    stoneCt: (value: unknown) => fixed(value, stoneCaratDecimals),
+    grams: (value: unknown) => withUnit(fixed(value, gramDecimals), "g"),
+    carats: (value: unknown) => withUnit(fixed(value, caratDecimals), "ct"),
+    stoneCarats: (value: unknown) => withUnit(fixed(value, stoneCaratDecimals), "ct"),
+    unit: (value: unknown, unit: WeightUnitValue | string | null | undefined) =>
+      unit === "CARAT" ? withUnit(fixed(value, caratDecimals), "ct") : withUnit(fixed(value, gramDecimals), "g"),
+    gramsLocale: (value: unknown) => locale(value, gramDecimals),
+    caratsLocale: (value: unknown) => locale(value, caratDecimals),
+    /** A report/export cell that stays a number, rounded to what is shown. */
+    gNum: (value: number) => roundTo(value, gramDecimals),
+  }
+}
+
+/** Default-settings formatter (3 decimals) — for code with no store at hand. */
+export const DEFAULT_WEIGHT_FORMAT = weightFormatter(DEFAULT_WEIGHT_SETTINGS)
+
 export type NetWeightInput = {
   grossWeight: unknown
   stoneWeight?: unknown

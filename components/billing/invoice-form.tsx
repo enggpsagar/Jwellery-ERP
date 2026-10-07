@@ -2,7 +2,7 @@
 
 import { LineWastageField } from "@/components/shared/line-wastage-field"
 import { deriveNetWeight as calcNetWeight, normalizeWastagePercent, netWeightHint, type WeightSettings } from "@/lib/weight-calc"
-import { useWeightSettings } from "@/components/providers/weight-settings-provider"
+import { useWeightFormat, useWeightSettings } from "@/components/providers/weight-settings-provider"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useActionState } from "react"
@@ -500,6 +500,7 @@ export function InvoiceForm({
   clarities = [],
 }: InvoiceFormProps) {
   const weightSettings = useWeightSettings()
+  const wf = useWeightFormat()
   const router = useRouter()
   const searchParams = useSearchParams()
   const toast = useToast()
@@ -2271,7 +2272,7 @@ export function InvoiceForm({
                 {item.multiPart ? (
                   <div className="space-y-1">
                     <div className="flex h-8 items-center rounded-md border bg-muted px-2 text-sm" data-testid="sale-line-net">
-                      {pieceOf(item).metalNet.toFixed(3)} g
+                      {wf.g(pieceOf(item).metalNet)} g
                     </div>
                     <p className="text-[10px] leading-tight text-muted-foreground">All metals</p>
                   </div>

@@ -2,7 +2,7 @@
 
 import { LineWastageField } from "@/components/shared/line-wastage-field"
 import { deriveNetWeight as calcNetWeight, normalizeWastagePercent, netWeightHint, type WeightSettings } from "@/lib/weight-calc"
-import { useWeightSettings } from "@/components/providers/weight-settings-provider"
+import { useWeightFormat, useWeightSettings } from "@/components/providers/weight-settings-provider"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useActionState } from "react"
@@ -296,6 +296,7 @@ export function QuotationForm({
   clarities = [],
 }: QuotationFormProps) {
   const weightSettings = useWeightSettings()
+  const wf = useWeightFormat()
   // Every hand-typed line needs its source party — see sourcePartyId.
   const missingSourceParty = (lines: LineItem[]) =>
     lines.some((line) => !line.inventoryStockId && !line.sourcePartyId)
@@ -1227,7 +1228,7 @@ export function QuotationForm({
                   <div className="space-y-1">
                     <Label className="text-xs">Net Weight</Label>
                     <div className="flex h-9 items-center rounded-md border bg-muted px-3 text-sm" data-testid="quotation-line-net">
-                      {pieceOf(item).metalNet.toFixed(3)} g
+                      {wf.g(pieceOf(item).metalNet)} g
                     </div>
                     <p className="text-xs text-muted-foreground">All metals</p>
                   </div>

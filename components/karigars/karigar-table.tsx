@@ -2,6 +2,7 @@
 // REPLACES the existing file at this path
 "use client"
 
+import { useWeightFormat } from "@/components/providers/weight-settings-provider"
 import { RecordHoverCard } from "@/components/shared/record-hover-card"
 
 import { KarigarsPagination } from "@/components/karigars/karigars-pagination"
@@ -44,6 +45,7 @@ export function KarigarTable({
   activeKarigarId,
   onActivate,
 }: KarigarTableProps) {
+  const wf = useWeightFormat()
   const allSelected =
     karigars.length > 0 && karigars.every((k) => selectedKarigarIds.includes(k.id))
 
@@ -156,7 +158,7 @@ export function KarigarTable({
                 <td className="px-4 py-3">
                   {hasGold || hasCash ? (
                     <div className="flex flex-col gap-0.5">
-                      {hasGold && <span>{balance!.outstandingGold.toFixed(3)} g</span>}
+                      {hasGold && <span>{wf.g(balance!.outstandingGold)} g</span>}
                       {hasCash && (
                         <span className="text-red-600">
                           ₹{balance!.outstandingCash.toLocaleString("en-IN", { maximumFractionDigits: 0 })}

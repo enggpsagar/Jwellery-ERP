@@ -1,6 +1,7 @@
 // components/customers/ledger/customer-ledger-body.tsx
 "use client"
 
+import { useWeightFormat } from "@/components/providers/weight-settings-provider"
 import { useState } from "react"
 import Link from "next/link"
 import { ChevronDown, ChevronUp, Receipt } from "lucide-react"
@@ -20,17 +21,18 @@ function formatAmount(value: number) {
   })}`
 }
 
-function formatWeight(value: number) {
+/** Grams / carats with the store's Settings > Weights decimals. */
+function formatWeight(value: number, decimals: number) {
   return `${Number(value || 0).toLocaleString("en-IN", {
-    minimumFractionDigits: 3,
-    maximumFractionDigits: 3,
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
   })} g`
 }
 
-function formatCarat(value: number) {
+function formatCarat(value: number, decimals: number) {
   return `${Number(value || 0).toLocaleString("en-IN", {
-    minimumFractionDigits: 3,
-    maximumFractionDigits: 3,
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
   })} ct`
 }
 
@@ -53,6 +55,7 @@ export function CustomerLedgerBody({
   entries,
   summary,
 }: CustomerLedgerBodyProps) {
+  const wf = useWeightFormat()
   // Collapsed by default — the summary cards above already answer "where do
   // things stand," so the full transaction-by-transaction history (which
   // can run long) stays out of the way until someone actually asks for it.
@@ -175,7 +178,8 @@ export function CustomerLedgerBody({
           )}
 
           {summary.unitSummaries.map((unit) => {
-            const format = unit.isGemstone ? formatCarat : formatWeight
+            const format = (value: number) =>
+              unit.isGemstone ? formatCarat(value, wf.caratDecimals) : formatWeight(value, wf.gramDecimals)
 
             return (
               <div key={unit.unit} className="grid grid-cols-1 gap-4 md:grid-cols-3">

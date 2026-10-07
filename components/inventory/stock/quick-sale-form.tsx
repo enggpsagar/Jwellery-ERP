@@ -1,5 +1,6 @@
 "use client"
 
+import { useWeightFormat } from "@/components/providers/weight-settings-provider"
 import { useActionState, useEffect, useRef, useState } from "react"
 import Link from "next/link"
 import { usePathname, useSearchParams } from "next/navigation"
@@ -116,6 +117,7 @@ export function QuickSaleForm({
   /** Scan token: says which shop this sale is written to. */
   token: string
 }) {
+  const wf = useWeightFormat()
   const [state, formAction, pending] = useActionState(
     completeQuickSale,
     initialState,
@@ -322,13 +324,13 @@ export function QuickSaleForm({
           <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-4">
             {metalLabel ? <Spec label="Metal" value={metalLabel} /> : null}
             {target.netWeight ? (
-              <Spec label="Net weight" value={`${target.netWeight} g`} />
+              <Spec label="Net weight" value={wf.grams(target.netWeight)} />
             ) : null}
             {target.grossWeight ? (
-              <Spec label="Gross weight" value={`${target.grossWeight} g`} />
+              <Spec label="Gross weight" value={wf.grams(target.grossWeight)} />
             ) : null}
             {target.stoneWeight ? (
-              <Spec label="Stone weight" value={`${target.stoneWeight} g`} />
+              <Spec label="Stone weight" value={wf.grams(target.stoneWeight)} />
             ) : null}
             <Spec label="In stock" value={String(target.quantityAvailable)} />
           </dl>

@@ -1,5 +1,6 @@
 "use client"
 
+import { useWeightFormat } from "@/components/providers/weight-settings-provider"
 import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import {
@@ -15,6 +16,7 @@ import {
 
 import type { LedgerEntryRow, LedgerTotals } from "@/lib/actions/ledger-actions"
 import { classifyMetalName, formatUnitValue } from "@/lib/business-units"
+import type { WeightFormat } from "@/lib/weight-calc"
 import { cn } from "@/lib/utils"
 import {
   Card,
@@ -68,15 +70,15 @@ const PAYMENT_METHOD_LABELS: Record<string, string> = {
  * rupees — show the weight/carat quantity instead of ₹ for those rows.
  * metalWeight is already the fine (pure 24K/999) figure — see
  * getLedgerEntries. */
-function formatEntryValue(entry: LedgerEntryRow) {
+function formatEntryValue(entry: LedgerEntryRow, wf: WeightFormat) {
   const family = classifyMetalName(entry.metalType)
 
   if ((family === "GOLD" || family === "SILVER") && entry.metalWeight != null) {
-    return `${Math.abs(entry.metalWeight).toLocaleString("en-IN", { maximumFractionDigits: 3 })} g fine`
+    return `${wf.gramsLocale(Math.abs(entry.metalWeight))} g fine`
   }
 
   if (family === "DIAMOND" && entry.caratWeight != null) {
-    return `${Math.abs(entry.caratWeight).toLocaleString("en-IN", { maximumFractionDigits: 3 })} ct`
+    return `${wf.caratsLocale(Math.abs(entry.caratWeight))} ct`
   }
 
   return formatCurrency(entry.amount)
@@ -107,6 +109,7 @@ const POLARITY_TEXT: Record<"debit" | "credit" | "net", string> = {
 }
 
 export function LedgerView({ entries, totals }: LedgerViewProps) {
+  const wf = useWeightFormat()
   const [search, setSearch] = useState("")
   const [dateRange, setDateRange] = useState<DateRangeValue>({ from: "", to: "" })
   const [account, setAccount] = useState("all")
@@ -177,7 +180,7 @@ export function LedgerView({ entries, totals }: LedgerViewProps) {
   // for a gemstone unit — driven by the unit's own isGemstone flag) rather
   // than reimplementing the carat special-case locally.
   const formatUnitTotal = (unit: LedgerTotals["unitTotals"][number], value: number) =>
-    formatUnitValue({ value: unit.unit, isGemstone: unit.isGemstone }, value)
+    formatUnitValue({ value: unit.unit, isGemstone: unit.isGemstone }, value, wf)
 
   const summaryCards = [
     ...(totals.moneyActive
@@ -471,7 +474,7 @@ export function LedgerView({ entries, totals }: LedgerViewProps) {
                       {entry.type === "DEBIT" ? (
                         <span className="inline-flex items-center gap-1 text-destructive">
                           <ArrowUpRight className="size-3.5" />
-                          {formatEntryValue(entry)}
+                          {formatEntryValue(entry, wf)}
                         </span>
                       ) : (
                         <span className="text-muted-foreground">—</span>
@@ -481,7 +484,7 @@ export function LedgerView({ entries, totals }: LedgerViewProps) {
                       {entry.type === "CREDIT" ? (
                         <span className="inline-flex items-center gap-1 text-emerald-600">
                           <ArrowDownLeft className="size-3.5" />
-                          {formatEntryValue(entry)}
+                          {formatEntryValue(entry, wf)}
                         </span>
                       ) : (
                         <span className="text-muted-foreground">—</span>

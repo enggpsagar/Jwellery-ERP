@@ -1,5 +1,6 @@
 "use client"
 
+import { useWeightFormat } from "@/components/providers/weight-settings-provider"
 import Link from "next/link"
 import { useSearchParams } from "next/navigation"
 
@@ -253,6 +254,7 @@ export function ReportsTabs({
   itemLedger,
   financialYears,
 }: ReportsTabsProps) {
+  const wf = useWeightFormat()
   const [activeTab, setActiveTab] = useState<TabKey>("sales")
   const searchParams = useSearchParams()
   const toast = useToast()
@@ -821,7 +823,7 @@ export function ReportsTabs({
                           {row.totalQuantity}
                         </td>
                         <td className="px-4 py-3 text-right tabular-nums">
-                          {row.totalWeight.toFixed(3)} g
+                          {wf.g(row.totalWeight)} g
                         </td>
                         <td className="px-4 py-3 text-right tabular-nums">
                           ₹{row.totalAmount.toFixed(2)}
@@ -900,7 +902,7 @@ export function ReportsTabs({
                             {
                               fields: [
                                 { label: "Items", value: row.count },
-                                { label: "Fine wt (24K)", value: `${row.netWeight.toFixed(3)} g` },
+                                { label: "Fine wt (24K)", value: `${wf.g(row.netWeight)} g` },
                                 {
                                   label: "Estimated value",
                                   value: reportInr(row.estimatedValue),
@@ -920,7 +922,7 @@ export function ReportsTabs({
                         />
                       </td>
                       <td className="px-4 py-3">{row.count}</td>
-                      <td className="px-4 py-3">{row.netWeight.toFixed(3)}</td>
+                      <td className="px-4 py-3">{wf.g(row.netWeight)}</td>
                       <td className="px-4 py-3">₹{row.estimatedValue.toFixed(2)}</td>
                     </tr>
                   ))
@@ -945,7 +947,7 @@ export function ReportsTabs({
             <StatCard title="Out of Stock Items" value={stockReport.outOfStockCount} tone="outstanding" />
             <StatCard
               title="Available Qty / Fine Wt (24K)"
-              value={`${stockReport.availableQuantity} pcs · ${stockReport.availableFineWeight.toFixed(3)} g`}
+              value={`${stockReport.availableQuantity} pcs · ${wf.g(stockReport.availableFineWeight)} g`}
             />
             <StatCard title="Available Value (est.)" value={reportInr(stockReport.availableValue) ?? "₹0"} />
           </div>
@@ -1019,8 +1021,8 @@ export function ReportsTabs({
                                 { label: "Tag", value: row.tagNumber },
                                 { label: "Status", value: row.status.replace(/_/g, " ") },
                                 { label: "Location", value: row.location || null },
-                                { label: "Net weight / pc", value: `${row.netWeight.toFixed(3)} g` },
-                                { label: "Fine wt (24K) / pc", value: `${row.fineWeight.toFixed(3)} g` },
+                                { label: "Net weight / pc", value: `${wf.g(row.netWeight)} g` },
+                                { label: "Fine wt (24K) / pc", value: `${wf.g(row.fineWeight)} g` },
                               ],
                             },
                           ]}
@@ -1045,8 +1047,8 @@ export function ReportsTabs({
                         )}
                       </td>
                       <td className="px-4 py-3 tabular-nums">{row.quantity}</td>
-                      <td className="px-4 py-3 tabular-nums">{row.totalNetWeight.toFixed(3)}</td>
-                      <td className="px-4 py-3 tabular-nums">{row.totalFineWeight.toFixed(3)}</td>
+                      <td className="px-4 py-3 tabular-nums">{wf.g(row.totalNetWeight)}</td>
+                      <td className="px-4 py-3 tabular-nums">{wf.g(row.totalFineWeight)}</td>
                       <td className="px-4 py-3 tabular-nums">{row.availability === "AVAILABLE" ? reportInr(row.estimatedValue) : "-"}</td>
                     </tr>
                   ))
@@ -1105,13 +1107,13 @@ export function ReportsTabs({
                                 { label: "Open jobs", value: row.jobs },
                                 {
                                   label: "Fine wt out (24K)",
-                                  value: `${row.weightOut.toFixed(3)} g`,
+                                  value: `${wf.g(row.weightOut)} g`,
                                 },
                                 {
                                   label: "Average per job",
                                   value:
                                     row.jobs > 0
-                                      ? `${(row.weightOut / row.jobs).toFixed(3)} g`
+                                      ? `${wf.g(row.weightOut / row.jobs)} g`
                                       : null,
                                 },
                               ],
@@ -1120,7 +1122,7 @@ export function ReportsTabs({
                         />
                       </td>
                       <td className="px-4 py-3">{row.jobs}</td>
-                      <td className="px-4 py-3">{row.weightOut.toFixed(3)}</td>
+                      <td className="px-4 py-3">{wf.g(row.weightOut)}</td>
                     </tr>
                   ))
                 )}
@@ -1225,24 +1227,24 @@ export function ReportsTabs({
       {activeTab === "goldFlow" && (
         <div className="space-y-6">
           <div className="grid grid-cols-1 gap-4 md:grid-cols-3 lg:grid-cols-4">
-            <StatCard title="Purchased (fine)" value={`${goldFlow.purchasedFine.toFixed(3)}g`} />
+            <StatCard title="Purchased (fine)" value={`${wf.g(goldFlow.purchasedFine)}g`} />
             <StatCard
               title="Issued to Artisan (fine)"
-              value={`${goldFlow.issuedToKarigarFine.toFixed(3)}g`}
+              value={`${wf.g(goldFlow.issuedToKarigarFine)}g`}
             />
             <StatCard
               title="Received from Artisan (fine)"
-              value={`${goldFlow.receivedFromKarigarFine.toFixed(3)}g`}
+              value={`${wf.g(goldFlow.receivedFromKarigarFine)}g`}
             />
-            <StatCard title="Wastage (fine)" value={`${goldFlow.wastageFine.toFixed(3)}g`} />
-            <StatCard title="Sold (fine)" value={`${goldFlow.soldFine.toFixed(3)}g`} />
+            <StatCard title="Wastage (fine)" value={`${wf.g(goldFlow.wastageFine)}g`} />
+            <StatCard title="Sold (fine)" value={`${wf.g(goldFlow.soldFine)}g`} />
             <StatCard
               title="Remaining Stock (fine)"
-              value={`${goldFlow.remainingStockFine.toFixed(3)}g`}
+              value={`${wf.g(goldFlow.remainingStockFine)}g`}
             />
             <StatCard
               title="Still with Artisan (fine)"
-              value={`${goldFlow.withKarigarFine.toFixed(3)}g`}
+              value={`${wf.g(goldFlow.withKarigarFine)}g`}
             />
           </div>
 
@@ -1271,7 +1273,7 @@ export function ReportsTabs({
                 Math.abs(goldFlow.reconciliationGap) > 0.01 ? "text-red-700" : "text-green-700"
               }`}
             >
-              {goldFlow.reconciliationGap.toFixed(3)}g
+              {wf.g(goldFlow.reconciliationGap)}g
             </p>
             <p className="mt-1 text-xs text-muted-foreground">
               {Math.abs(goldFlow.reconciliationGap) > 0.01
@@ -1332,15 +1334,15 @@ export function ReportsTabs({
                               fields: [
                                 {
                                   label: "Purchased",
-                                  value: `${row.purchasedWeight.toFixed(3)} g · ${row.purchasedCount}`,
+                                  value: `${wf.g(row.purchasedWeight)} g · ${row.purchasedCount}`,
                                 },
                                 {
                                   label: "Sold",
-                                  value: `${row.soldWeight.toFixed(3)} g · ${row.soldCount}`,
+                                  value: `${wf.g(row.soldWeight)} g · ${row.soldCount}`,
                                 },
                                 {
                                   label: "In stock",
-                                  value: `${row.inStockWeight.toFixed(3)} g · ${row.inStockCount}`,
+                                  value: `${wf.g(row.inStockWeight)} g · ${row.inStockCount}`,
                                 },
                               ],
                             },
@@ -1355,24 +1357,24 @@ export function ReportsTabs({
                         />
                       </td>
                       <td className="px-4 py-3">
-                        <div>{row.purchasedWeight.toFixed(3)}g</div>
+                        <div>{wf.g(row.purchasedWeight)}g</div>
                         <div className="text-xs text-muted-foreground">
                           {row.purchasedCount} item(s) · ₹{row.purchasedAmount.toFixed(2)}
                         </div>
                       </td>
                       <td className="px-4 py-3">
-                        <div>{row.soldWeight.toFixed(3)}g</div>
+                        <div>{wf.g(row.soldWeight)}g</div>
                         <div className="text-xs text-muted-foreground">
                           {row.soldCount} item(s) · ₹{row.soldAmount.toFixed(2)}
                         </div>
                       </td>
                       <td className="px-4 py-3">
-                        <div>{row.inStockWeight.toFixed(3)}g</div>
+                        <div>{wf.g(row.inStockWeight)}g</div>
                         <div className="text-xs text-muted-foreground">
                           {row.inStockCount} item(s) · ₹{row.inStockValue.toFixed(2)}
                         </div>
                       </td>
-                      <td className="px-4 py-3">{row.withKarigarWeight.toFixed(3)}g</td>
+                      <td className="px-4 py-3">{wf.g(row.withKarigarWeight)}g</td>
                       <td className="px-4 py-3">
                         <span
                           className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ${
@@ -1382,7 +1384,7 @@ export function ReportsTabs({
                           }`}
                         >
                           {Math.abs(row.reconciliationGap) > 0.01
-                            ? `Gap: ${row.reconciliationGap.toFixed(3)}g`
+                            ? `Gap: ${wf.g(row.reconciliationGap)}g`
                             : "Reconciled"}
                         </span>
                       </td>
@@ -1453,8 +1455,8 @@ export function ReportsTabs({
                               fields: [
                                 { label: "Status", value: row.status },
                                 { label: "Qty on hand", value: row.quantityRemaining },
-                                { label: "Net weight", value: `${row.netWeight.toFixed(3)} g` },
-                                { label: "Fine wt (24K)", value: `${row.fineWeight.toFixed(3)} g` },
+                                { label: "Net weight", value: `${wf.g(row.netWeight)} g` },
+                                { label: "Fine wt (24K)", value: `${wf.g(row.fineWeight)} g` },
                               ],
                             },
                           ]}
@@ -1469,8 +1471,8 @@ export function ReportsTabs({
                           Qty on hand: {row.quantityRemaining}
                         </div>
                       </td>
-                      <td className="px-4 py-3 tabular-nums">{row.netWeight.toFixed(3)}</td>
-                      <td className="px-4 py-3 tabular-nums">{row.fineWeight.toFixed(3)}</td>
+                      <td className="px-4 py-3 tabular-nums">{wf.g(row.netWeight)}</td>
+                      <td className="px-4 py-3 tabular-nums">{wf.g(row.fineWeight)}</td>
                       <td className="px-4 py-3">
                         <div>{reportDate(row.purchaseDate)}</div>
                         <div className="text-xs text-muted-foreground">

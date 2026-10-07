@@ -1,5 +1,7 @@
 "use client"
 
+import { useWeightFormat } from "@/components/providers/weight-settings-provider"
+import type { WeightFormat } from "@/lib/weight-calc"
 import { useMemo, useState } from "react"
 import { Plus } from "lucide-react"
 
@@ -46,10 +48,10 @@ type StockItemBase = {
  * the internal stock code (STK-…); the stock code stays searchable, and is
  * the fallback only when the stock has no linked Product Code.
  */
-function defaultStockLabel(stock: StockItemBase, availableQty?: number) {
+function defaultStockLabel(stock: StockItemBase, wf: WeightFormat, availableQty?: number) {
   const code = stock.productCode || stock.stockCode
   const category = stock.categoryName ? ` · ${stock.categoryName}` : ""
-  const weight = stock.netWeight != null ? ` · ${stock.netWeight.toFixed(3)} g` : ""
+  const weight = stock.netWeight != null ? ` · ${wf.grams(stock.netWeight)}` : ""
   const qty = availableQty != null ? ` (${availableQty} Qty)` : ""
   return `${code} — ${stock.productName}${category}${weight}${qty}`
 }
@@ -90,6 +92,7 @@ export function StockItemSelect<T extends StockItemBase>({
   placeholder = "Not linked to stock",
   className,
 }: StockItemSelectProps<T>) {
+  const wf = useWeightFormat()
   const [search, setSearch] = useState("")
   const [open, setOpen] = useState(false)
 
@@ -154,7 +157,7 @@ export function StockItemSelect<T extends StockItemBase>({
             <SelectItem key={stock.id} value={stock.id} disabled={isDisabled?.(stock) ?? false}>
               {renderLabel
                 ? renderLabel(stock)
-                : defaultStockLabel(stock, availableQty?.(stock))}
+                : defaultStockLabel(stock, wf, availableQty?.(stock))}
             </SelectItem>
           ))
         )}

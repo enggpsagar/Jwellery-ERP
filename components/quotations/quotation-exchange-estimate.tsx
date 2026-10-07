@@ -1,6 +1,10 @@
 import { Coins } from "lucide-react"
 
+import { Fragment } from "react"
+
+import { WeightText } from "@/components/shared/weight-text"
 import type { QuotationExchangeEstimate, QuotationExchangeEstimateSummaryLine } from "@/lib/actions/quotation-actions"
+import { DEFAULT_WEIGHT_FORMAT, type WeightFormat } from "@/lib/weight-calc"
 
 // Display of a quotation's Customer Exchange ESTIMATE (Quotation.exchangeEstimate)
 // — what the customer says they'll trade in. Nothing is bought from a
@@ -15,10 +19,23 @@ export function estimateApplied(estimate: QuotationExchangeEstimate, total: numb
 }
 
 /** "Gold 22K 9.160 g pure" / "Diamond 0.50 ct". */
-export function estimateLineLabel(line: QuotationExchangeEstimateSummaryLine) {
+export function estimateLineLabel(line: QuotationExchangeEstimateSummaryLine, wf: WeightFormat = DEFAULT_WEIGHT_FORMAT) {
   return line.isGemstone
-    ? `${line.metalName} ${(line.caratWeight ?? 0).toFixed(2)} ct`
-    : `${[line.metalName, line.purity].filter(Boolean).join(" ")} ${line.fineWeight.toFixed(3)} g pure`
+    ? `${line.metalName} ${wf.stoneCarats(line.caratWeight ?? 0)}`
+    : `${[line.metalName, line.purity].filter(Boolean).join(" ")} ${wf.grams(line.fineWeight)} pure`
+}
+
+/** estimateLineLabel with the store's weight decimals (Settings > Weights). */
+function EstimateLineLabel({ line }: { line: QuotationExchangeEstimateSummaryLine }) {
+  return line.isGemstone ? (
+    <>
+      {line.metalName} <WeightText value={line.caratWeight ?? 0} stone />
+    </>
+  ) : (
+    <>
+      {[line.metalName, line.purity].filter(Boolean).join(" ")} <WeightText value={line.fineWeight} /> pure
+    </>
+  )
 }
 
 /** On-screen card: one row per estimated item, with pure weight / carats and value. */
@@ -57,11 +74,13 @@ export function QuotationExchangeEstimateCard({
               <tr key={index} className="border-b last:border-0">
                 <td className="px-3 py-2">{line.description || "—"}</td>
                 <td className="px-3 py-2">{[line.metalName, line.isGemstone ? null : line.purity].filter(Boolean).join(" ")}</td>
-                <td className="px-3 py-2 text-right tabular-nums">{line.isGemstone ? "—" : `${line.netWeight.toFixed(3)} g`}</td>
+                <td className="px-3 py-2 text-right tabular-nums">{line.isGemstone ? "—" : <WeightText value={line.netWeight} />}</td>
                 <td className="px-3 py-2 text-right tabular-nums">
-                  {line.isGemstone ? `${(line.caratWeight ?? 0).toFixed(2)} ct` : `${line.fineWeight.toFixed(3)} g`}
+                  {line.isGemstone ? <WeightText value={line.caratWeight ?? 0} stone /> : <WeightText value={line.fineWeight} />}
                   {!line.isGemstone && line.caratWeight ? (
-                    <span className="block text-xs text-muted-foreground">+ {line.caratWeight.toFixed(2)} ct stone</span>
+                    <span className="block text-xs text-muted-foreground">
+                      + <WeightText value={line.caratWeight} stone /> stone
+                    </span>
                   ) : null}
                 </td>
                 <td className="px-3 py-2 text-right tabular-nums">₹{fmt(line.value)}</td>
@@ -109,7 +128,12 @@ export function QuotationExchangeEstimateRows({
         <span>
           Less: old gold (estimate)
           <span className="block text-[0.85em] opacity-75">
-            {estimate.resolvedSummary.map((line) => `${estimateLineLabel(line)} ₹${fmt(line.value)}`).join(", ")}
+            {estimate.resolvedSummary.map((line, index) => (
+              <Fragment key={index}>
+                {index > 0 ? ", " : ""}
+                <EstimateLineLabel line={line} /> ₹{fmt(line.value)}
+              </Fragment>
+            ))}
           </span>
         </span>
         <span className="whitespace-nowrap">-₹{fmt(applied)}</span>

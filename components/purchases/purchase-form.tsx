@@ -2,7 +2,7 @@
 
 import { LineWastageField } from "@/components/shared/line-wastage-field"
 import { deriveNetWeight as calcNetWeight, normalizeWastagePercent, netWeightHint, type WeightSettings } from "@/lib/weight-calc"
-import { useWeightSettings } from "@/components/providers/weight-settings-provider"
+import { useWeightFormat, useWeightSettings } from "@/components/providers/weight-settings-provider"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useActionState } from "react"
@@ -393,6 +393,7 @@ export function PurchaseForm({
   defaultPaidAmount,
 }: PurchaseFormProps) {
   const weightSettings = useWeightSettings()
+  const wf = useWeightFormat()
   const [metals, setMetals] = useState(initialMetals)
   const [origins, setOrigins] = useState(initialOrigins)
   const router = useRouter()
@@ -1367,10 +1368,10 @@ export function PurchaseForm({
                     // here — each metal's own weight is typed in Details.
                     <div className="space-y-1">
                       <div className="flex h-8 items-center rounded-md border bg-muted px-2 text-sm text-muted-foreground">
-                        {piece.metalNet.toFixed(3)} g
+                        {wf.g(piece.metalNet)} g
                       </div>
                       {piece.stoneCarats > 0 && (
-                        <p className="text-[10px] leading-tight text-muted-foreground">+ {piece.stoneCarats.toFixed(2)} ct stones</p>
+                        <p className="text-[10px] leading-tight text-muted-foreground">+ {wf.stoneCt(piece.stoneCarats)} ct stones</p>
                       )}
                     </div>
                   ) : (

@@ -2,6 +2,7 @@ import { documentHeading, COMPOSITION_DISCLAIMER } from "@/lib/gst";
 import { APP_NAME } from "@/lib/constants/app";
 import { formatShortDate } from "@/lib/utils";
 import { describePieceComponentsText, type PieceComponentTextRow } from "@/lib/piece-components-text";
+import { DEFAULT_WEIGHT_FORMAT, type WeightFormat } from "@/lib/weight-calc";
 
 function formatCurrency(value: number) {
   return `₹${Number(value ?? 0).toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
@@ -24,8 +25,8 @@ function escapeHtml(value: string) {
  * under its item name in plain text — e.g. "Gold 22K 4.000 g · ₹28,000.00 +
  * Diamond 0.10 ct · ₹5,000.00". Nothing for an ordinary single-metal line.
  */
-function pieceComponentsLine(components: PieceComponentTextRow[] | null | undefined) {
-  const text = describePieceComponentsText(components);
+function pieceComponentsLine(components: PieceComponentTextRow[] | null | undefined, wf: WeightFormat) {
+  const text = describePieceComponentsText(components, wf);
   return text
     ? `<div style="margin-top: 2px; font-size: 10px; line-height: 1.4; color: #6b7280;">${escapeHtml(text)}</div>`
     : "";
@@ -64,14 +65,15 @@ function itemsTable(
     /** A multi-part piece's metal/stone rows (optional). */
     components?: PieceComponentTextRow[] | null;
   }[],
+  wf: WeightFormat = DEFAULT_WEIGHT_FORMAT,
 ) {
   const rows = items
     .map(
       (item) => `
       <tr>
-        <td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">${item.itemName}${pieceComponentsLine(item.components)}</td>
+        <td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">${item.itemName}${pieceComponentsLine(item.components, wf)}</td>
         <td style="padding: 8px; border-bottom: 1px solid #e5e7eb; text-align: center;">${item.quantity}</td>
-        <td style="padding: 8px; border-bottom: 1px solid #e5e7eb; text-align: right;">${item.netWeight ? item.netWeight.toFixed(3) + " g" : "-"}</td>
+        <td style="padding: 8px; border-bottom: 1px solid #e5e7eb; text-align: right;">${item.netWeight ? wf.grams(item.netWeight) : "-"}</td>
         <td style="padding: 8px; border-bottom: 1px solid #e5e7eb; text-align: right;">${item.rate ? formatCurrency(item.rate) : "-"}</td>
         <td style="padding: 8px; border-bottom: 1px solid #e5e7eb; text-align: right;">${formatCurrency(item.lineTotal)}</td>
       </tr>`,
@@ -676,6 +678,7 @@ function invoiceLineItemsTable(
     components?: PieceComponentTextRow[] | null;
   }[],
   isInterState: boolean,
+  wf: WeightFormat = DEFAULT_WEIGHT_FORMAT,
 ) {
   // A column with nothing to show across every line item is dead weight in
   // an emailed statement, not information — most invoices are metal-only
@@ -687,10 +690,10 @@ function invoiceLineItemsTable(
     .map(
       (item) => `
       <tr>
-        <td style="padding: 6px; border-bottom: 1px solid #e5e7eb;">${item.itemName}${pieceComponentsLine(item.components)}</td>
+        <td style="padding: 6px; border-bottom: 1px solid #e5e7eb;">${item.itemName}${pieceComponentsLine(item.components, wf)}</td>
         <td style="padding: 6px; border-bottom: 1px solid #e5e7eb;">${item.purity ?? "-"}</td>
         <td style="padding: 6px; border-bottom: 1px solid #e5e7eb; text-align: center;">${item.quantity}</td>
-        <td style="padding: 6px; border-bottom: 1px solid #e5e7eb; text-align: right;">${item.netWeight ? item.netWeight.toFixed(3) + " g" : "-"}</td>
+        <td style="padding: 6px; border-bottom: 1px solid #e5e7eb; text-align: right;">${item.netWeight ? wf.grams(item.netWeight) : "-"}</td>
         <td style="padding: 6px; border-bottom: 1px solid #e5e7eb; text-align: right;">${item.rate ? formatCurrency(item.rate) : "-"}</td>
         ${showMaking ? `<td style="padding: 6px; border-bottom: 1px solid #e5e7eb; text-align: right;">${item.makingCharge > 0 ? formatCurrency(item.makingCharge) : "-"}</td>` : ""}
         ${showStone ? `<td style="padding: 6px; border-bottom: 1px solid #e5e7eb; text-align: right;">${item.stoneCharge > 0 ? formatCurrency(item.stoneCharge) : "-"}</td>` : ""}
@@ -723,6 +726,8 @@ function invoiceLineItemsTable(
 
 export function invoiceEmail(params: {
   storeName: string;
+  /** Settings > Weights decimals (getWeightFormat); 3 when left out. */
+  weightFormat?: WeightFormat;
   invoiceNumber: string;
   invoiceDate: string;
   status: string;
@@ -808,7 +813,7 @@ export function invoiceEmail(params: {
       </tr>
     </table>
 
-    ${invoiceLineItemsTable(params.items, isInterState)}
+    ${invoiceLineItemsTable(params.items, isInterState, params.weightFormat)}
 
     <table style="width: 100%; max-width: 260px; margin-left: auto; font-size: 13px; border-collapse: collapse;">
       ${summaryRow("Subtotal", formatCurrency(params.subtotal))}
@@ -845,6 +850,8 @@ export function invoiceEmail(params: {
 
 export function kachaSlipEmail(params: {
   storeName: string;
+  /** Settings > Weights decimals (getWeightFormat); 3 when left out. */
+  weightFormat?: WeightFormat;
   slipNumber: string;
   invoiceDate: string;
   customerName: string;
@@ -860,7 +867,7 @@ export function kachaSlipEmail(params: {
   const body = `
     <p>Hi ${params.customerName || "Party"},</p>
     <p>Here is your Estimate <strong>${params.slipNumber}</strong> dated ${formatDate(params.invoiceDate)}.</p>
-    ${itemsTable(params.items)}
+    ${itemsTable(params.items, params.weightFormat)}
     <table style="width: 100%; max-width: 260px; margin-left: auto; font-size: 13px; border-collapse: collapse;">
       ${summaryRow("Subtotal", formatCurrency(params.subtotal))}
       ${params.makingCharges > 0 ? summaryRow("Making Charges", formatCurrency(params.makingCharges)) : ""}

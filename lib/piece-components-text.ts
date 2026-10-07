@@ -6,6 +6,7 @@
 // e.g. "Gold 22K 4.000 g · ₹28,000.00 + Silver 925 2.000 g · ₹200.00 + Diamond 0.10 ct · ₹5,000.00"
 
 import { stoneDetailsText } from "./piece-components"
+import { DEFAULT_WEIGHT_FORMAT, type WeightFormat } from "./weight-calc"
 
 export const METALS_AND_STONES_COLUMN = "Metals & Stones"
 
@@ -37,23 +38,29 @@ function rupees(value: number) {
 }
 
 /** One row, e.g. "Gold 22K 4.000 g · ₹28,000.00" or "Diamond 0.10 ct · ₹5,000.00". */
-export function describePieceComponentText(row: PieceComponentTextRow) {
+export function describePieceComponentText(row: PieceComponentTextRow, wf: WeightFormat = DEFAULT_WEIGHT_FORMAT) {
   const amount = num(row.amount)
   const value = amount != null && amount > 0 ? ` · ${rupees(amount)}` : ""
   if (row.kind === "METAL") {
     const name = [row.metalName ?? row.metalType?.name, row.purityLabel].filter(Boolean).join(" ") || "Metal"
-    return `${name} ${(num(row.netWeight) ?? 0).toFixed(3)} g${value}`
+    return `${name} ${wf.grams(num(row.netWeight) ?? 0)}${value}`
   }
   const name = [row.stoneMetalTypeName, row.stoneTypeNames].filter(Boolean).join(" ") || "Stone"
   const details = stoneDetailsText(row)
-  return `${name} ${(num(row.caratWeight) ?? 0).toFixed(2)} ct${details ? ` · ${details}` : ""}${value}`
+  return `${name} ${wf.stoneCarats(num(row.caratWeight) ?? 0)}${details ? ` · ${details}` : ""}${value}`
 }
 
-/** The whole piece, rows joined with " + "; "" for a single-metal line (no rows). */
-export function describePieceComponentsText(rows: PieceComponentTextRow[] | null | undefined) {
+/**
+ * The whole piece, rows joined with " + "; "" for a single-metal line (no
+ * rows). Weights use `wf` — the store's decimals (getWeightFormat) — or 3.
+ */
+export function describePieceComponentsText(
+  rows: PieceComponentTextRow[] | null | undefined,
+  wf: WeightFormat = DEFAULT_WEIGHT_FORMAT,
+) {
   if (!rows?.length) return ""
   return [...rows]
     .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
-    .map(describePieceComponentText)
+    .map((row) => describePieceComponentText(row, wf))
     .join(" + ")
 }

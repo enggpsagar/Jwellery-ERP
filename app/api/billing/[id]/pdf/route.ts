@@ -18,6 +18,7 @@ import { getInvoiceById } from "@/lib/actions/invoice-actions";
 import { getBusinessSettings } from "@/lib/actions/settings-actions";
 import { getInvoiceOldGoldExchange } from "@/lib/actions/old-gold-actions";
 import { describeComponents } from "@/lib/piece-components";
+import { normalizeWeightSettings, weightFormatter } from "@/lib/weight-calc";
 import { amountInWords } from "@/lib/number-to-words";
 import { formatShortDate } from "@/lib/utils";
 import { documentHeading, COMPOSITION_DISCLAIMER } from "@/lib/gst";
@@ -47,6 +48,8 @@ export async function GET(
     if (!invoice) {
       return NextResponse.json({ error: "Invoice not found" }, { status: 404 });
     }
+    // Settings > Weights decimals, as on the print page.
+    const wf = weightFormatter(normalizeWeightSettings(settings));
 
     const doc = new jsPDF({ unit: "pt", format: "a4" });
     const pageWidth = doc.internal.pageSize.getWidth();
@@ -156,11 +159,11 @@ export async function GET(
       body: invoice.items.map((item) => [
         // A piece of several metals/stones lists its rows under the name.
         item.components?.length
-          ? `${item.itemName}\n${describeComponents(item.components)}`
+          ? `${item.itemName}\n${describeComponents(item.components, wf)}`
           : item.itemName,
         item.purity ?? "-",
         `${item.quantity}N`,
-        (item.netWeight ?? 0).toFixed(3),
+        wf.g(item.netWeight ?? 0),
         fmt(item.rate ?? 0),
         ...(showMaking ? [fmt(item.makingCharge)] : []),
         ...(showStone ? [fmt(item.stoneCharge)] : []),

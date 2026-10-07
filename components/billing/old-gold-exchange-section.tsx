@@ -38,7 +38,7 @@ import {
 } from "@/lib/old-gold/value"
 import type { StoreMetalOriginRow, StoreMetalPurityRow, StoreMetalRow } from "@/lib/actions/taxonomy-actions"
 import { DEFAULT_WEIGHT_SETTINGS, type WeightSettings } from "@/lib/weight-calc"
-import { useWeightSettings } from "@/components/providers/weight-settings-provider"
+import { useWeightFormat, useWeightSettings } from "@/components/providers/weight-settings-provider"
 
 const PAYOUT_METHODS = [
   { value: "CASH", label: "Cash" },
@@ -214,6 +214,7 @@ export function OldGoldExchangeSection({
   const gemstones = metals.filter((metal) => metal.isGemstone && metal.isActive)
   const metalById = new Map(metals.map((metal) => [metal.id, metal]))
   const weightSettings = useWeightSettings()
+  const wf = useWeightFormat()
 
   const rateFor = (metalTypeId: string) => {
     const family = classifyPurityFamily(metalById.get(metalTypeId) ?? { name: "" })
@@ -283,7 +284,7 @@ export function OldGoldExchangeSection({
           {lines.length > 0 ? (
             <p className="text-xs text-muted-foreground" data-testid="old-gold-header-summary">
               {lines.length} item{lines.length === 1 ? "" : "s"}
-              {totalFine > 0 ? ` · ${totalFine.toFixed(3)} g pure` : ""} ·{" "}
+              {totalFine > 0 ? ` · ${wf.g(totalFine)} g pure` : ""} ·{" "}
               <span className="font-semibold text-foreground">{rupees(totalValue)}</span>
             </p>
           ) : null}
@@ -655,7 +656,7 @@ export function OldGoldExchangeSection({
               <div>
                 <dt className="text-xs text-muted-foreground">{isGem ? "Weight" : "Pure (24K / 999) weight"}</dt>
                 <dd className="font-medium" data-testid="old-gold-fine">
-                  {isGem ? `${(line.caratWeight || 0).toFixed(3)} ct` : `${fine.toFixed(3)} g`}
+                  {isGem ? wf.carats(line.caratWeight || 0) : wf.grams(fine)}
                   {line.multiPart ? <span className="ml-1 text-xs font-normal text-muted-foreground">all metals</span> : null}
                   {line.netWeight > 0 && fineness !== 100 ? (
                     <span className="ml-1 text-xs font-normal text-muted-foreground">@ {fineness}%</span>
@@ -684,10 +685,10 @@ export function OldGoldExchangeSection({
       {lines.length > 0 && (
         <div className="flex flex-wrap justify-end gap-x-6 gap-y-1 text-sm">
           <span>
-            Net metal: <span className="font-medium">{totalNet.toFixed(3)} g</span>
+            Net metal: <span className="font-medium">{wf.g(totalNet)} g</span>
           </span>
           <span>
-            Pure (24K / 999): <span className="font-medium">{totalFine.toFixed(3)} g</span>
+            Pure (24K / 999): <span className="font-medium">{wf.g(totalFine)} g</span>
           </span>
           <span>
             Bought for: <span className="font-semibold">{rupees(totalValue)}</span>

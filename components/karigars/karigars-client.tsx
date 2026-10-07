@@ -1,6 +1,9 @@
 // FILE PATH: components/karigars/karigars-client.tsx
 "use client"
 
+import { useWeightFormat } from "@/components/providers/weight-settings-provider"
+import type { WeightFormat } from "@/lib/weight-calc"
+
 import * as React from "react"
 import Link from "next/link"
 
@@ -39,13 +42,13 @@ function hasBalance(row: { outstandingGold: number; outstandingCash: number }) {
   return Math.abs(row.outstandingGold) >= 0.0005 || Math.abs(row.outstandingCash) >= 0.005
 }
 
-function buildArtisanOverviewStats(summary: KarigarLedgerSummary): DashboardStat[] {
+function buildArtisanOverviewStats(summary: KarigarLedgerSummary, wf: WeightFormat): DashboardStat[] {
   const withBalance = summary.rows.filter(hasBalance).length
 
   return [
     {
       label: "Gold with Artisans",
-      value: `${summary.totals.outstandingGold.toLocaleString("en-IN", { maximumFractionDigits: 3 })} g`,
+      value: `${wf.gramsLocale(summary.totals.outstandingGold)} g`,
       change: "",
       trend: "up",
       sub: "fine gold currently out, across every artisan",
@@ -98,9 +101,10 @@ export function KarigarsClient({
     () => new Map(ledgerSummary.rows.map((row) => [row.id, row])),
     [ledgerSummary.rows],
   )
+  const wf = useWeightFormat()
   const overviewStats = React.useMemo(
-    () => buildArtisanOverviewStats(ledgerSummary),
-    [ledgerSummary],
+    () => buildArtisanOverviewStats(ledgerSummary, wf),
+    [ledgerSummary, wf],
   )
 
   return (

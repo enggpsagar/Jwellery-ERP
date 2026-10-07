@@ -1,5 +1,6 @@
 "use client"
 
+import { useWeightFormat } from "@/components/providers/weight-settings-provider"
 import Link from "next/link"
 import { ArrowDownLeft, ArrowUpRight, Wallet, Receipt } from "lucide-react"
 
@@ -48,6 +49,7 @@ export function LedgerDetailDrawer({
   open: boolean
   onOpenChange: (open: boolean) => void
 }) {
+  const wf = useWeightFormat()
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="flex w-full flex-col gap-0 p-0 sm:max-w-md">
@@ -126,7 +128,7 @@ export function LedgerDetailDrawer({
                   <div className="flex items-center justify-between rounded-lg border bg-card p-4">
                     <span className="text-sm text-muted-foreground">Metal Weight</span>
                     <span className="text-sm font-medium tabular-nums">
-                      {entry.metalWeight.toLocaleString("en-IN", { maximumFractionDigits: 3 })} g
+                      {wf.gramsLocale(entry.metalWeight)} g
                       {entry.metalType ? ` (${entry.metalType})` : ""}
                     </span>
                   </div>
@@ -136,7 +138,7 @@ export function LedgerDetailDrawer({
                   <div className="flex items-center justify-between rounded-lg border bg-card p-4">
                     <span className="text-sm text-muted-foreground">Carat Weight</span>
                     <span className="text-sm font-medium tabular-nums">
-                      {entry.caratWeight.toLocaleString("en-IN", { maximumFractionDigits: 3 })} ct
+                      {wf.caratsLocale(entry.caratWeight)} ct
                       {entry.metalType ? ` (${entry.metalType})` : ""}
                     </span>
                   </div>

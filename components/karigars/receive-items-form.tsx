@@ -1,5 +1,6 @@
 "use client"
 
+import { useWeightFormat } from "@/components/providers/weight-settings-provider"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useActionState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
@@ -271,6 +272,7 @@ export function ReceiveItemsForm({
   defaultLocationId,
   draftOrderItems = [],
 }: ReceiveItemsFormProps) {
+  const wf = useWeightFormat()
   const showLocationField = useShowLocationField(locations.length)
   const activeMetals = useMemo(() => metals.filter((m) => m.isActive), [metals])
   // The job's own issued metal always wins when set — a karigar job can only
@@ -664,7 +666,7 @@ export function ReceiveItemsForm({
             {draftOrderItems.map((orderItem) => (
               <li key={orderItem.id}>
                 {orderItem.itemName} x{orderItem.quantity}
-                {orderItem.estimatedWeight ? ` (~${orderItem.estimatedWeight}g)` : ""}
+                {orderItem.estimatedWeight ? ` (~${wf.g(orderItem.estimatedWeight)}g)` : ""}
               </li>
             ))}
           </ul>
@@ -1055,7 +1057,7 @@ export function ReceiveItemsForm({
                     <div className="space-y-1">
                       <Label className="text-xs">Fine Weight (incl. wastage)</Label>
                       <div className="flex h-9 items-center rounded-md border bg-muted px-3 text-sm font-medium">
-                        {fineWeightOf(item).toFixed(3)}g
+                        {wf.g(fineWeightOf(item))}g
                       </div>
                     </div>
                   </div>
@@ -1214,11 +1216,11 @@ export function ReceiveItemsForm({
           <div className="rounded-lg border bg-muted/30 p-4 space-y-1 text-sm">
             <div className="flex justify-between">
               <span>Total Net Weight</span>
-              <span>{totalNetWeight.toFixed(3)}g</span>
+              <span>{wf.g(totalNetWeight)}g</span>
             </div>
             <div className="flex justify-between font-semibold">
               <span>Total Fine Weight (incl. wastage)</span>
-              <span>{totalFineWeight.toFixed(3)}g</span>
+              <span>{wf.g(totalFineWeight)}g</span>
             </div>
             <div className="flex justify-between">
               <span>Labour Charge</span>

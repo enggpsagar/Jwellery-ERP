@@ -2,6 +2,7 @@ import Link from "next/link"
 
 import type { Purchase, PurchaseItemComponent } from "@/lib/actions/purchase-actions"
 import { formatShortDate } from "@/lib/utils"
+import { WeightText } from "@/components/shared/weight-text"
 import { PurchaseStatusBadge } from "@/components/purchases/purchase-status-badge"
 
 const rupees = (value: number) =>
@@ -100,10 +101,12 @@ export function PurchaseDetailContent({
                                 {[component.metalName ?? "Metal", component.purityLabel ?? component.purity].filter(Boolean).join(" ")}
                               </span>
                               {" · "}
-                              {(component.netWeight ?? 0).toFixed(3)} g net
-                              {component.fineWeight != null && component.fineWeight !== component.netWeight
-                                ? ` · ${component.fineWeight.toFixed(3)} g pure`
-                                : ""}
+                              <WeightText value={component.netWeight ?? 0} /> net
+                              {component.fineWeight != null && component.fineWeight !== component.netWeight ? (
+                                <> · <WeightText value={component.fineWeight} /> pure</>
+                              ) : (
+                                ""
+                              )}
                             </>
                           ) : (
                             <>
@@ -112,7 +115,7 @@ export function PurchaseDetailContent({
                                 {component.stoneTypeNames ? ` (${component.stoneTypeNames})` : ""}
                               </span>
                               {" · "}
-                              {(component.caratWeight ?? 0).toFixed(2)} ct
+                              <WeightText value={component.caratWeight ?? 0} stone />
                             </>
                           )}
                           {" · "}
@@ -132,11 +135,11 @@ export function PurchaseDetailContent({
                 <td className="px-4 py-3">{item.quantity}</td>
                 <td className="px-4 py-3">{multiPart ? "Mixed" : item.purity ?? "-"}</td>
                 <td className="px-4 py-3">
-                  {multiPart
-                    ? item.netWeight != null ? `${item.netWeight.toFixed(3)} g` : "-"
-                    : item.purity === "DIAMOND"
-                    ? item.caratWeight != null ? `${item.caratWeight.toFixed(3)} ct` : "-"
-                    : item.netWeight != null ? `${item.netWeight.toFixed(3)} g` : "-"}
+                  {multiPart || item.purity !== "DIAMOND" ? (
+                    <WeightText value={item.netWeight} fallback="-" />
+                  ) : (
+                    <WeightText value={item.caratWeight} unit="CARAT" fallback="-" />
+                  )}
                 </td>
                 <td className="px-4 py-3">{multiPart ? "Mixed" : item.rate ? `₹${item.rate.toFixed(2)}` : "-"}</td>
                 <td className="px-4 py-3 font-medium">₹{item.lineTotal.toFixed(2)}</td>

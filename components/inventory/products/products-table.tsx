@@ -1,5 +1,6 @@
 "use client"
 
+import { useWeightFormat } from "@/components/providers/weight-settings-provider"
 import * as React from "react"
 
 import { RecordHoverCard } from "@/components/shared/record-hover-card"
@@ -56,6 +57,7 @@ export function ProductsTable({
   activeProductId,
   onActivate,
 }: ProductsTableProps) {
+  const wf = useWeightFormat()
   const allIds = React.useMemo(() => products.map((product) => product.id), [products])
 
   const allSelected =
@@ -175,21 +177,21 @@ export function ProductsTable({
                               label: "Gross weight",
                               value:
                                 product.defaultGrossWeight != null
-                                  ? `${product.defaultGrossWeight.toFixed(3)} g`
+                                  ? `${wf.g(product.defaultGrossWeight)} g`
                                   : null,
                             },
                             {
                               label: "Net weight",
                               value:
                                 product.defaultNetWeight != null
-                                  ? `${product.defaultNetWeight.toFixed(3)} g`
+                                  ? `${wf.g(product.defaultNetWeight)} g`
                                   : null,
                             },
                             {
                               label: "Stone weight",
                               value:
                                 product.defaultStoneWeight != null
-                                  ? `${product.defaultStoneWeight.toFixed(3)} g`
+                                  ? `${wf.g(product.defaultStoneWeight)} g`
                                   : null,
                             },
                             { label: "In stock", value: `${product.stockQty}` },
@@ -222,7 +224,7 @@ export function ProductsTable({
 
                   <td className="px-4 py-3 text-foreground">
                     {product.defaultGrossWeight != null ? (
-                      `${product.defaultGrossWeight.toFixed(3)} g`
+                      `${wf.g(product.defaultGrossWeight)} g`
                     ) : (
                       <span className="text-muted-foreground">—</span>
                     )}
@@ -230,7 +232,7 @@ export function ProductsTable({
 
                   <td className="px-4 py-3 text-foreground">
                     {product.defaultNetWeight != null ? (
-                      `${product.defaultNetWeight.toFixed(3)} g`
+                      `${wf.g(product.defaultNetWeight)} g`
                     ) : (
                       <span className="text-muted-foreground">—</span>
                     )}
@@ -238,7 +240,7 @@ export function ProductsTable({
 
                   <td className="px-4 py-3 text-foreground">
                     {product.fineWeight != null ? (
-                      `${product.fineWeight.toFixed(3)} g`
+                      `${wf.g(product.fineWeight)} g`
                     ) : (
                       <span className="text-muted-foreground">—</span>
                     )}
@@ -261,11 +263,11 @@ export function ProductsTable({
                 </td>
                 <td className="px-4 py-3" />
                 <td className="px-4 py-3 tabular-nums">
-                  {totals.grossWeight != null ? `${totals.grossWeight.toFixed(3)} g` : ""}
+                  {totals.grossWeight != null ? `${wf.g(totals.grossWeight)} g` : ""}
                 </td>
-                <td className="px-4 py-3 tabular-nums">{totals.netWeight.toFixed(3)} g</td>
+                <td className="px-4 py-3 tabular-nums">{wf.g(totals.netWeight)} g</td>
                 <td className="px-4 py-3 tabular-nums">
-                  {totals.fineWeight != null ? `${totals.fineWeight.toFixed(3)} g` : ""}
+                  {totals.fineWeight != null ? `${wf.g(totals.fineWeight)} g` : ""}
                 </td>
               </tr>
             </tfoot>

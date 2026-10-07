@@ -19,6 +19,7 @@ import {
 
 import { prisma } from "@/lib/prisma";
 import { METALS_AND_STONES_COLUMN, describePieceComponentsText } from "@/lib/piece-components-text";
+import { getWeightFormat } from "@/lib/weight-settings.server";
 import { getFineWeightResolver, lineWeights, storedLineWeights } from "@/lib/fine-weight";
 import { lookupPromotionCode } from "@/lib/promotions.server";
 import { computePromotion, type PromotionLine } from "@/lib/promotions";
@@ -847,6 +848,7 @@ export async function exportInvoicesToExcel(
 ): Promise<ExportInvoicesResult> {
   try {
     const storeId = await requireStoreScope();
+    const wf = await getWeightFormat(storeId);
     await assertPlanActiveForExport(storeId);
     const scope = await getLocationScope();
     const { where, orderBy } = buildInvoiceQuery(params, storeId, scope);
@@ -914,7 +916,7 @@ export async function exportInvoicesToExcel(
         // A piece of several metals/stones — its rows, per line.
         [METALS_AND_STONES_COLUMN]: raw.items
           .filter((item) => item.components.length)
-          .map((item) => `${item.itemName}: ${describePieceComponentsText(item.components)}`)
+          .map((item) => `${item.itemName}: ${describePieceComponentsText(item.components, wf)}`)
           .join(" | "),
       };
     }), INVOICE_EXPORT_GATED_COLUMNS, await getSheetFeatures(storeId));
@@ -3324,6 +3326,7 @@ export async function emailInvoiceAction(invoiceId: string): Promise<InvoiceForm
     }
 
     const { subject, html } = invoiceEmail({
+      weightFormat: await getWeightFormat(storeId),
       storeName,
       invoiceNumber: invoice.invoiceNumber,
       invoiceDate: invoice.invoiceDate.toISOString(),

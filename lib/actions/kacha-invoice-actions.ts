@@ -41,6 +41,7 @@ import { getCurrentUser, requireAuth, requireRole } from "@/lib/auth/auth";
 import { recordOldGoldExchange, resolveOldGoldLines, type OldGoldLineInput } from "@/lib/old-gold/exchange";
 import { round2, splitOldGoldValue } from "@/lib/old-gold/value";
 import { METALS_AND_STONES_COLUMN, describePieceComponentsText } from "@/lib/piece-components-text";
+import { getWeightFormat } from "@/lib/weight-settings.server";
 import { sendMail } from "@/lib/mailer";
 import { kachaSlipEmail, dataBackupEmail } from "@/lib/email-templates";
 import { formatShortDate } from "@/lib/utils";
@@ -884,6 +885,7 @@ export async function exportKachaInvoicesToExcel(
 ): Promise<ExportKachaInvoicesResult> {
   try {
     const storeId = await requireStoreScope();
+    const wf = await getWeightFormat(storeId);
     await assertPlanActiveForExport(storeId);
     const scope = await getLocationScope();
     const { where, orderBy } = buildKachaInvoiceQuery(params, storeId, scope);
@@ -918,7 +920,7 @@ export async function exportKachaInvoicesToExcel(
         // A piece of several metals/stones — its rows, per line.
         [METALS_AND_STONES_COLUMN]: kachaInvoice.items
           .filter((item) => item.components.length)
-          .map((item) => `${item.itemName}: ${describePieceComponentsText(item.components)}`)
+          .map((item) => `${item.itemName}: ${describePieceComponentsText(item.components, wf)}`)
           .join(" | "),
       }));
     // This store's columns only (lib/sheet-features.ts).
@@ -2452,6 +2454,7 @@ export async function emailKachaInvoiceAction(
     }
 
     const { subject, html } = kachaSlipEmail({
+      weightFormat: await getWeightFormat(storeId),
       storeName,
       slipNumber: kachaInvoice.slipNumber,
       invoiceDate: kachaInvoice.invoiceDate.toISOString(),

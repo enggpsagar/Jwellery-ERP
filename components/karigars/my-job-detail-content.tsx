@@ -1,6 +1,7 @@
 import { formatShortDate } from "@/lib/utils"
 import type { MyJobDetail } from "@/lib/actions/my-jobs-actions"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { WeightText } from "@/components/shared/weight-text"
 
 function Field({ label, value }: { label: string; value: React.ReactNode }) {
   return (
@@ -30,12 +31,12 @@ export function MyJobDetailContent({ job }: { job: MyJobDetail }) {
           <Field label="Location" value={job.locationName} />
           <Field label="Metal" value={job.metalName} />
           <Field label="Issue Purity" value={job.issuePurityLabel} />
-          <Field label="Issue Weight" value={job.issueWeight ? `${job.issueWeight} g` : "-"} />
-          <Field label="Issue Fine Weight" value={job.issueFineWeight ? `${job.issueFineWeight} g` : "-"} />
-          <Field label="Received Weight" value={job.receiveWeight ? `${job.receiveWeight} g` : "-"} />
+          <Field label="Issue Weight" value={job.issueWeight ? <WeightText value={job.issueWeight} /> : "-"} />
+          <Field label="Issue Fine Weight" value={job.issueFineWeight ? <WeightText value={job.issueFineWeight} /> : "-"} />
+          <Field label="Received Weight" value={job.receiveWeight ? <WeightText value={job.receiveWeight} /> : "-"} />
           <Field
             label="Received Fine Weight"
-            value={job.receiveFineWeight ? `${job.receiveFineWeight} g` : "-"}
+            value={job.receiveFineWeight ? <WeightText value={job.receiveFineWeight} /> : "-"}
           />
           <Field label="Labour Charge" value={`₹ ${job.labourCharge.toLocaleString("en-IN")}`} />
           <Field label="Finished Piece" value={job.finishedPieceLabel} />
@@ -61,7 +62,7 @@ export function MyJobDetailContent({ job }: { job: MyJobDetail }) {
                   <div className="font-medium">{item.itemName}</div>
                   <div className="mt-1 grid grid-cols-2 gap-2 text-muted-foreground sm:grid-cols-4">
                     <span>Qty: {item.quantity}</span>
-                    <span>Weight: {item.estimatedWeight ? `${item.estimatedWeight} g` : "-"}</span>
+                    <span>Weight: {item.estimatedWeight ? <WeightText value={item.estimatedWeight} /> : "-"}</span>
                     <span>Purity: {item.purityLabel ?? "-"}</span>
                   </div>
                   {item.designNotes ? (
@@ -86,9 +87,11 @@ export function MyJobDetailContent({ job }: { job: MyJobDetail }) {
                 <div className="mt-1 grid grid-cols-2 gap-2 text-muted-foreground sm:grid-cols-4">
                   <span>Qty: {item.quantity}</span>
                   <span>Purity: {item.purityLabel ?? "-"}</span>
-                  <span>Gross: {item.grossWeight ? `${item.grossWeight} g` : "-"}</span>
-                  <span>Net: {item.netWeight ? `${item.netWeight} g` : "-"}</span>
-                  <span>Fine: {item.fineWeight} g</span>
+                  <span>Gross: {item.grossWeight ? <WeightText value={item.grossWeight} /> : "-"}</span>
+                  <span>Net: {item.netWeight ? <WeightText value={item.netWeight} /> : "-"}</span>
+                  <span>
+                    Fine: <WeightText value={item.fineWeight} />
+                  </span>
                 </div>
               </div>
             ))}
@@ -110,7 +113,8 @@ export function MyJobDetailContent({ job }: { job: MyJobDetail }) {
                     {entry.metalWeightFine ? (
                       <div>
                         {entry.type === "DEBIT" ? "+" : "-"}
-                        {entry.metalWeightFine.toFixed(3)} g{entry.metalName ? ` ${entry.metalName}` : ""}
+                        <WeightText value={entry.metalWeightFine} />
+                        {entry.metalName ? ` ${entry.metalName}` : ""}
                       </div>
                     ) : null}
                     {entry.amount ? (

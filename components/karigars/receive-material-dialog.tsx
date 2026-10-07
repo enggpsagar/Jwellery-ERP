@@ -1,5 +1,6 @@
 "use client"
 
+import { useWeightFormat } from "@/components/providers/weight-settings-provider"
 import { useEffect, useMemo, useState } from "react"
 import { useActionState } from "react"
 import { useRouter } from "next/navigation"
@@ -69,6 +70,7 @@ export function ReceiveMaterialDialog({
   defaultLocationId = null,
   count,
 }: ReceiveMaterialDialogProps) {
+  const wf = useWeightFormat()
   const showLocationField = useShowLocationField(locations.length)
   const activeMetals = useMemo(
     () => metals.filter((m) => m.isActive && assignedMetalTypeIds.includes(m.id)),
@@ -149,7 +151,7 @@ export function ReceiveMaterialDialog({
       : Number(makingCharge) || 0
   const unitLabel = weightUnit === "CARAT" ? "ct" : "g"
   const showWeight = (grams: number) =>
-    `${toPrimaryUnit(grams, "GRAM", weightUnit, GRAMS_PER_CARAT).toFixed(3)}${unitLabel}`
+    `${(weightUnit === "CARAT" ? wf.ct : wf.g)(toPrimaryUnit(grams, "GRAM", weightUnit, GRAMS_PER_CARAT))}${unitLabel}`
 
   // Real per-Metal Purity options (Settings > Taxonomy > Purities),
   // replacing the old hardcoded PURITY_OPTIONS list — fetched for whichever

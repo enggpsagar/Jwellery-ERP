@@ -5,6 +5,7 @@ import { InventoryStockStatus, InvoiceStatus } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
 import { requireStoreScope, getStoreIdForRead } from "@/lib/store-context";
+import { getWeightFormat } from "@/lib/weight-settings.server";
 import { getLocationScope, locationWhere } from "@/lib/location-scope";
 import { formatShortDateTime } from "@/lib/utils";
 import { parseDateRangeBoundary } from "@/lib/date-range";
@@ -98,6 +99,7 @@ export type MetalStockStat = {
 
 export async function getDashboardStats(): Promise<DashboardStat[]> {
   const storeId = await requireStoreScope();
+  const wf = await getWeightFormat(storeId);
   const scope = await getLocationScope();
   const now = new Date();
   const todayStart = startOfDay(now);
@@ -235,7 +237,7 @@ export async function getDashboardStats(): Promise<DashboardStat[]> {
     },
     ...metalStats.map((metal) => ({
       label: `${metal.metalName} Stock`,
-      value: `${metal.grams.toLocaleString("en-IN", { maximumFractionDigits: 1 })} g`,
+      value: `${wf.gramsLocale(metal.grams)} g`,
       change: "",
       trend: "up" as const,
       sub: `fine (24K) ${metal.metalName.toLowerCase()} on hand, excluding sold`,
@@ -1003,6 +1005,7 @@ export async function getRecentTransactions(
 ): Promise<DashboardTransaction[]> {
   const storeId = await getStoreIdForRead();
   const scope = await getLocationScope();
+  const wf = await getWeightFormat(storeId);
   const rangeStart = recentTransactionsPeriodStart(period, new Date());
   const invoices = await prisma.invoice.findMany({
     where: { storeId, invoiceDate: { gte: rangeStart }, ...locationWhere(scope) },
@@ -1041,7 +1044,7 @@ export async function getRecentTransactions(
       customer: inv.customer.name,
       type: "Sale" as const,
       metal,
-      weight: totalWeight > 0 ? `${totalWeight.toFixed(1)} g fine` : "—",
+      weight: totalWeight > 0 ? `${wf.g(totalWeight)} g fine` : "—",
       amount: `₹${Number(inv.totalAmount).toLocaleString("en-IN")}`,
       status: STATUS_MAP[inv.status] ?? "Pending",
       date: formatShortDateTime(inv.invoiceDate),
@@ -1085,6 +1088,7 @@ export async function getRecentActivity(
   limit = 5
 ): Promise<DashboardActivity[]> {
   const storeId = await requireStoreScope();
+  const wf = await getWeightFormat(storeId);
   const scope = await getLocationScope();
   const entries = await prisma.ledgerEntry.findMany({
     where: { storeId, ...locationWhere(scope) },
@@ -1137,7 +1141,7 @@ export async function getRecentActivity(
     const entryWeight = entry.metalWeightFine ?? entry.metalWeight;
     const amountOrWeight =
       entryWeight && entry.metalType
-        ? `${entry.metalType.name} · ${Number(entryWeight).toFixed(1)} g${entry.metalWeightFine ? " fine" : ""}`
+        ? `${entry.metalType.name} · ${wf.g(Number(entryWeight))} g${entry.metalWeightFine ? " fine" : ""}`
         : `₹${Number(entry.amount).toLocaleString("en-IN")}`;
     // "by <staff name>" answers who actually recorded this — createdBy is
     // nullable (entries written before that column existed have none), so

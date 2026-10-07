@@ -1,11 +1,13 @@
 "use client"
 
+import { useWeightFormat } from "@/components/providers/weight-settings-provider"
 import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { ArrowDown, ArrowUp, ArrowUpDown, Receipt, Search } from "lucide-react"
 
 import type { CustomerLedgerEntryItem } from "@/lib/actions/customer-ledger-actions"
 import { classifyMetalName } from "@/lib/business-units"
+import type { WeightFormat } from "@/lib/weight-calc"
 import {
   Table,
   TableBody,
@@ -36,17 +38,18 @@ function formatAmount(value: number) {
   })}`
 }
 
-function formatWeight(value: number) {
+/** Grams / carats with the store's Settings > Weights decimals. */
+function formatWeight(value: number, decimals: number) {
   return `${Number(value || 0).toLocaleString("en-IN", {
-    minimumFractionDigits: 3,
-    maximumFractionDigits: 3,
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
   })} g`
 }
 
-function formatCarat(value: number) {
+function formatCarat(value: number, decimals: number) {
   return `${Number(value || 0).toLocaleString("en-IN", {
-    minimumFractionDigits: 3,
-    maximumFractionDigits: 3,
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
   })} ct`
 }
 
@@ -60,15 +63,15 @@ function formatShortDate(iso: string) {
   return `${dd}-${mm}-${yy}`
 }
 
-function formatEntryAmount(entry: CustomerLedgerEntryItem) {
+function formatEntryAmount(entry: CustomerLedgerEntryItem, wf: WeightFormat) {
   const family = classifyMetalName(entry.metalType)
 
   if ((family === "GOLD" || family === "SILVER") && entry.metalWeight != null) {
-    return formatWeight(entry.metalWeight)
+    return formatWeight(entry.metalWeight, wf.gramDecimals)
   }
 
   if (family === "DIAMOND" && entry.caratWeight != null) {
-    return formatCarat(entry.caratWeight)
+    return formatCarat(entry.caratWeight, wf.caratDecimals)
   }
 
   return formatAmount(entry.amount)
@@ -138,6 +141,7 @@ function SortableHead({
 }
 
 export function CustomerLedgerHistoryTable({ entries }: { entries: CustomerLedgerEntryItem[] }) {
+  const wf = useWeightFormat()
   const [search, setSearch] = useState("")
   const [sortKey, setSortKey] = useState<SortKey>("date")
   const [sortDir, setSortDir] = useState<SortDir>("desc")
@@ -270,7 +274,7 @@ export function CustomerLedgerHistoryTable({ entries }: { entries: CustomerLedge
                       entry.type === "DEBIT" ? "text-red-600" : "text-green-600",
                     )}
                   >
-                    {formatEntryAmount(entry)}
+                    {formatEntryAmount(entry, wf)}
                   </TableCell>
                 </TableRow>
               ))

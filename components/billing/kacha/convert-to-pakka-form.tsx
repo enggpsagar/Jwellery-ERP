@@ -1,5 +1,6 @@
 "use client"
 
+import { useWeightFormat } from "@/components/providers/weight-settings-provider"
 import { useEffect, useMemo, useState } from "react"
 import { useActionState } from "react"
 import { useRouter } from "next/navigation"
@@ -113,6 +114,7 @@ export function ConvertToPakkaForm({
   storeState,
   customerState,
 }: ConvertToPakkaFormProps) {
+  const wf = useWeightFormat()
   const router = useRouter()
   const toast = useToast()
 
@@ -199,7 +201,7 @@ export function ConvertToPakkaForm({
                 <tr key={item.id} className="border-b last:border-0">
                   <td className="px-4 py-2">{item.itemName}</td>
                   <td className="px-4 py-2">{item.quantity}</td>
-                  <td className="px-4 py-2">{item.netWeight?.toFixed(3) ?? "-"}</td>
+                  <td className="px-4 py-2">{item.netWeight != null ? wf.g(item.netWeight) : "-"}</td>
                   <td className="px-4 py-2">{item.rate ? `₹${item.rate.toFixed(2)}` : "-"}</td>
                   <td className="px-4 py-2 font-medium">₹{item.lineTotal.toFixed(2)}</td>
                 </tr>

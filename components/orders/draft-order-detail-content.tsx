@@ -5,6 +5,7 @@ import { getPurityLabel } from "@/lib/purity"
 import { formatShortDate } from "@/lib/utils"
 import { DraftOrderStatusBadge } from "@/components/orders/draft-order-status-badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { WeightText } from "@/components/shared/weight-text"
 
 type DraftOrderDetailContentProps = {
   order: DraftOrderDetail
@@ -118,7 +119,7 @@ export function DraftOrderDetailContent({ order }: DraftOrderDetailContentProps)
               <div className="mt-2 grid gap-1 text-sm text-muted-foreground md:grid-cols-4">
                 {item.metalName ? <div>Metal: {item.metalName}</div> : null}
                 {item.purity ? <div>Purity: {getPurityLabel(item.purity)}</div> : null}
-                {item.estimatedWeight ? <div>Est. Weight: {item.estimatedWeight}g</div> : null}
+                {item.estimatedWeight ? <div>Est. Weight: <WeightText value={item.estimatedWeight} suffix={false} />g</div> : null}
                 {item.estimatedRate ? <div>Est. Rate: ₹{item.estimatedRate}</div> : null}
               </div>
 

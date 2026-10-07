@@ -3326,6 +3326,7 @@ export async function emailInvoiceAction(invoiceId: string): Promise<InvoiceForm
     }
 
     const { subject, html } = invoiceEmail({
+      weightFormat: await getWeightFormat(storeId),
       storeName,
       invoiceNumber: invoice.invoiceNumber,
       invoiceDate: invoice.invoiceDate.toISOString(),

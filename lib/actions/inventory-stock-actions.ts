@@ -15,6 +15,7 @@ import {
 
 import { prisma } from "@/lib/prisma";
 import { requireStoreScope } from "@/lib/store-context";
+import { getWeightFormat } from "@/lib/weight-settings.server";
 import { actionErrorMessage } from "@/lib/action-error";
 import { getLocationScope, isLocationAllowed } from "@/lib/location-scope";
 import { toFineWeight, matchLegacyPurityType } from "@/lib/purity";
@@ -694,6 +695,7 @@ export async function receiveItemsFromKarigar(
 ): Promise<StockActionState> {
   try {
     const storeId = await requireStoreScope();
+    const wf = await getWeightFormat(storeId);
     const currentUser = await getCurrentUser();
 
     const job = await prisma.karigarJob.findFirst({
@@ -787,7 +789,7 @@ export async function receiveItemsFromKarigar(
         const remaining = Math.max(0, issueWeightNum - alreadyReceivedWeight);
         return {
           success: false,
-          message: `This receipt totals ${thisReceiptWeight.toFixed(3)}g, but only ${remaining.toFixed(3)}g is still outstanding on this job (${issueWeightNum.toFixed(3)}g issued, ${alreadyReceivedWeight.toFixed(3)}g already received). Check the weight entered.`,
+          message: `This receipt totals ${wf.g(thisReceiptWeight)}g, but only ${wf.g(remaining)}g is still outstanding on this job (${wf.g(issueWeightNum)}g issued, ${wf.g(alreadyReceivedWeight)}g already received). Check the weight entered.`,
         };
       }
     }
@@ -1047,7 +1049,7 @@ export async function receiveItemsFromKarigar(
     const remaining = Math.max(0, issueWeightNum - cumulativeReceiveWeight);
     const message = isFullyReceived
       ? "Items received — job fully closed"
-      : `Items received — ${cumulativeReceiveWeight.toFixed(3)}g of ${issueWeightNum.toFixed(3)}g received so far, ${remaining.toFixed(3)}g remaining. Job stays open for further receipts.`;
+      : `Items received — ${wf.g(cumulativeReceiveWeight)}g of ${wf.g(issueWeightNum)}g received so far, ${wf.g(remaining)}g remaining. Job stays open for further receipts.`;
 
     return { success: true, message };
   } catch (error) {

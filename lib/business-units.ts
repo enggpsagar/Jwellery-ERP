@@ -12,6 +12,8 @@
 // StoreMetal.id; see BusinessUnitOption in business-units.server.ts. The
 // MONEY sentinel is kept here as a plain string constant so both this file
 // and business-units.server.ts share one literal.
+import { DEFAULT_WEIGHT_FORMAT, type WeightFormat } from "@/lib/weight-calc"
+
 export const MONEY_UNIT = "MONEY" as const
 
 /**
@@ -111,15 +113,17 @@ export function classifyPurityFamily(metal: { name: string; isGemstone?: boolean
  * custom metal or a non-Diamond gemstone (Ruby, Emerald, ...) now formats
  * correctly too.
  */
-export function formatUnitValue(unit: UnitFormatHint, value: number) {
+export function formatUnitValue(unit: UnitFormatHint, value: number, wf: WeightFormat = DEFAULT_WEIGHT_FORMAT) {
   const abs = Math.abs(value)
 
+  // Weights: up to the store's Settings > Weights decimals (pass the
+  // store's formatter — useWeightFormat / getWeightFormat).
   if (unit !== MONEY_UNIT && unit.isGemstone) {
-    return `${abs.toLocaleString("en-IN", { maximumFractionDigits: 3 })} ct`
+    return `${wf.caratsLocale(abs)} ct`
   }
 
   if (unit !== MONEY_UNIT) {
-    return `${abs.toLocaleString("en-IN", { maximumFractionDigits: 3 })} g`
+    return `${wf.gramsLocale(abs)} g`
   }
 
   return `₹${abs.toLocaleString("en-IN", { maximumFractionDigits: 2 })}`

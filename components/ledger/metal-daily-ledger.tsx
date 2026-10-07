@@ -1,5 +1,6 @@
 "use client"
 
+import { useWeightFormat } from "@/components/providers/weight-settings-provider"
 import { Fragment, useMemo, useState } from "react"
 
 import type { MetalDailyLedgerResult } from "@/lib/actions/ledger-actions"
@@ -36,6 +37,7 @@ type MetalDailyLedgerProps = {
 }
 
 export function MetalDailyLedger({ data }: MetalDailyLedgerProps) {
+  const wf = useWeightFormat()
   const [dateRange, setDateRange] = useState<DateRangeValue>({ from: "", to: "" })
 
   const rows = useMemo(() => {
@@ -130,7 +132,7 @@ export function MetalDailyLedger({ data }: MetalDailyLedgerProps) {
                         <TableCell className="border-l text-right tabular-nums">
                           {entry && entry.purchasedValue > 0 ? (
                             <span className="text-emerald-600">
-                              {formatUnitValue(hint, entry.purchasedValue)}
+                              {formatUnitValue(hint, entry.purchasedValue, wf)}
                             </span>
                           ) : (
                             <span className="text-muted-foreground">—</span>
@@ -139,7 +141,7 @@ export function MetalDailyLedger({ data }: MetalDailyLedgerProps) {
                         <TableCell className="text-right tabular-nums">
                           {entry && entry.soldValue > 0 ? (
                             <span className="text-destructive">
-                              {formatUnitValue(hint, entry.soldValue)}
+                              {formatUnitValue(hint, entry.soldValue, wf)}
                             </span>
                           ) : (
                             <span className="text-muted-foreground">—</span>
@@ -149,10 +151,10 @@ export function MetalDailyLedger({ data }: MetalDailyLedgerProps) {
                           {entry ? (
                             entry.closingBalance < 0 ? (
                               <span className="text-destructive">
-                                -{formatUnitValue(hint, entry.closingBalance)}
+                                -{formatUnitValue(hint, entry.closingBalance, wf)}
                               </span>
                             ) : (
-                              formatUnitValue(hint, entry.closingBalance)
+                              formatUnitValue(hint, entry.closingBalance, wf)
                             )
                           ) : (
                             <span className="text-muted-foreground">—</span>

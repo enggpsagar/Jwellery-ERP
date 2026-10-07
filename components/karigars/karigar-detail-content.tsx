@@ -10,6 +10,7 @@ import { ExpandableCheckboxList } from "@/components/karigars/expandable-checkbo
 import { ExportMenu } from "@/components/shared/export-menu"
 import { classifyMetalName } from "@/lib/business-units"
 import { cn } from "@/lib/utils"
+import { WeightText } from "@/components/shared/weight-text"
 
 /** A ribbon-colored accent per metal family, so Gold/Silver/Diamond balance
  *  cards are tellable apart at a glance without reading the label — GOLD
@@ -94,7 +95,9 @@ export function KarigarDetailContent({
                 <CardTitle className="text-sm text-muted-foreground">Opening Gold</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-xl font-semibold">{karigar.openingGold}g</div>
+                <div className="text-xl font-semibold">
+                  <WeightText value={karigar.openingGold} suffix={false} />g
+                </div>
               </CardContent>
             </Card>
           )}
@@ -182,7 +185,7 @@ export function KarigarDetailContent({
                     isOwed ? "text-red-700" : isCredit ? "text-emerald-700" : "text-foreground",
                   )}
                 >
-                  {Math.abs(group.finalFineBalance).toFixed(3)}g
+                  <WeightText value={Math.abs(group.finalFineBalance)} suffix={false} />g
                 </p>
                 <p
                   className={cn(
@@ -237,13 +240,15 @@ export function KarigarDetailContent({
                       )}
                     </p>
                     <p className="text-muted-foreground">
-                      {[job.metalName, purity].filter(Boolean).join(" ")} · Issued {job.issueWeight.toFixed(3)}g on{" "}
+                      {[job.metalName, purity].filter(Boolean).join(" ")} · Issued <WeightText value={job.issueWeight} suffix={false} />g on{" "}
                       {job.issueDate}
                       {job.expectedDate ? ` · Due ${job.expectedDate}` : ""}
                     </p>
                     <p className="text-muted-foreground">
-                      Received {job.receiveWeight.toFixed(3)}g ·{" "}
-                      <span className="font-medium text-foreground">{remaining.toFixed(3)}g remaining</span>
+                      Received <WeightText value={job.receiveWeight} suffix={false} />g ·{" "}
+                      <span className="font-medium text-foreground">
+                        <WeightText value={remaining} suffix={false} />g remaining
+                      </span>
                     </p>
                   </div>
                   <Button asChild size="sm" className="shrink-0 gap-1.5">

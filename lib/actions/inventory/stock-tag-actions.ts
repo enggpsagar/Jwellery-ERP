@@ -4,6 +4,8 @@ import { PieceComponentKind } from "@prisma/client"
 
 import { prisma } from "@/lib/prisma"
 import { getStoreIdForRead } from "@/lib/store-context"
+import type { WeightFormat } from "@/lib/weight-calc"
+import { getWeightFormat } from "@/lib/weight-settings.server"
 import { resolveStoreName } from "@/lib/invite-email"
 import { formatShortDate } from "@/lib/utils"
 import { tagPurity } from "@/components/inventory/stock/stock-qr-label"
@@ -68,16 +70,17 @@ function karatLabel(purity: string | null) {
   return match[2] || Number(match[1]) <= 24 ? `${match[1]} KT` : match[1]
 }
 
-function grams(value: unknown) {
+// Settings > Weights decimals (grams; a stone's carats at most 2, as always).
+function grams(value: unknown, wf: WeightFormat) {
   if (value === null || value === undefined || value === "") return null
   const number = Number(value)
-  return number > 0 ? `${number.toFixed(3)}g` : null
+  return number > 0 ? `${wf.g(number)}g` : null
 }
 
-function carats(value: unknown) {
+function carats(value: unknown, wf: WeightFormat) {
   if (value === null || value === undefined || value === "") return null
   const number = Number(value)
-  return number > 0 ? `${number.toFixed(2)}ct` : null
+  return number > 0 ? `${wf.stoneCt(number)}ct` : null
 }
 
 /** Settings > Tags — which fields each layout prints. A store with no
@@ -104,6 +107,7 @@ export async function getStockTagSettings(): Promise<StockTagSettings> {
 export async function getStockTags(ids: string[]): Promise<StockTagData[]> {
   if (ids.length === 0) return []
   const storeId = await getStoreIdForRead()
+  const wf = await getWeightFormat(storeId)
 
   const [storeName, rows] = await Promise.all([
     resolveStoreName(storeId),
@@ -175,7 +179,7 @@ export async function getStockTags(ids: string[]): Promise<StockTagData[]> {
       return {
         name,
         types: types || match?.stoneTypeNames || null,
-        carat: carats(carat ?? match?.caratWeight),
+        carat: carats(carat ?? match?.caratWeight, wf),
         pieces: match?.pieces ?? null,
         clarity: match?.clarity ?? null,
         certificate: match?.certificateNumber ?? null,
@@ -186,14 +190,14 @@ export async function getStockTags(ids: string[]): Promise<StockTagData[]> {
     let metals: StockTagMetal[] = metalRows.map((row) => ({
       name: row.metalType?.name ?? "Metal",
       purity: karatLabel(tagPurity(row.purityLabel, row.purity)),
-      weight: grams(row.netWeight ?? row.grossWeight),
+      weight: grams(row.netWeight ?? row.grossWeight, wf),
     }))
     if (metals.length === 0 && stock.metalType) {
       metals = [
         {
           name: stock.metalType.name,
           purity: karatLabel(tagPurity(stock.purityLabel, stock.purity)),
-          weight: grams(stock.netWeight),
+          weight: grams(stock.netWeight, wf),
         },
       ]
     }
@@ -210,7 +214,7 @@ export async function getStockTags(ids: string[]): Promise<StockTagData[]> {
       stones = productStones.map((row) => ({
         name: row.stoneMetalTypeName,
         types: row.stoneTypeNames,
-        carat: carats(row.caratWeight),
+        carat: carats(row.caratWeight, wf),
         pieces: row.pieces,
         clarity: row.clarity,
         certificate: row.certificateNumber,
@@ -232,10 +236,10 @@ export async function getStockTags(ids: string[]): Promise<StockTagData[]> {
       category: category || null,
       metals,
       karat: metals[0]?.purity ?? null,
-      grossWeight: grams(stock.grossWeight),
-      netWeight: grams(stock.netWeight),
+      grossWeight: grams(stock.grossWeight, wf),
+      netWeight: grams(stock.netWeight, wf),
       stones,
-      stoneTotalCarat: totalCarat > 0 ? `${totalCarat.toFixed(2)}ct` : null,
+      stoneTotalCarat: totalCarat > 0 ? `${wf.stoneCt(totalCarat)}ct` : null,
       stoneTotalPieces: totalPieces > 0 ? totalPieces : null,
       manufactureDate: stock.manufactureDate ? formatShortDate(stock.manufactureDate) : null,
     }

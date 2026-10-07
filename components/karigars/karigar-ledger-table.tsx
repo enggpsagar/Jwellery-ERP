@@ -1,5 +1,6 @@
 "use client"
 
+import { useWeightFormat } from "@/components/providers/weight-settings-provider"
 import { useEffect, useMemo, useState } from "react"
 import { ArrowDown, ArrowUp, ArrowUpDown, Search } from "lucide-react"
 
@@ -221,6 +222,7 @@ type KarigarLedgerTableProps = {
 }
 
 function DateCell({ row, metalLabel }: { row: KarigarLedgerRow; metalLabel: string }) {
+  const wf = useWeightFormat()
   return (
     <RecordHoverCard
       label={row.date}
@@ -239,14 +241,14 @@ function DateCell({ row, metalLabel }: { row: KarigarLedgerRow; metalLabel: stri
           fields: [
             {
               label: `Fine ${row.metalType ?? metalLabel}`,
-              value: row.metalWeightFine !== null ? `${row.metalWeightFine.toFixed(3)} g` : null,
+              value: row.metalWeightFine !== null ? `${wf.g(row.metalWeightFine)} g` : null,
             },
             { label: "Amount", value: inr(row.amount) },
           ],
         },
         {
           fields: [
-            { label: `${metalLabel} balance`, value: `${row.runningFineGoldBalance.toFixed(3)} g` },
+            { label: `${metalLabel} balance`, value: `${wf.g(row.runningFineGoldBalance)} g` },
             { label: "Cash balance", value: inr(row.runningCashBalance) },
           ],
         },
@@ -272,6 +274,7 @@ function MaterialSideTable({
   sortDir: "asc" | "desc"
   onSort: (key: SortKey) => void
 }) {
+  const wf = useWeightFormat()
   const [page, setPage] = useState(1)
 
   const filteredSorted = useMemo(
@@ -306,7 +309,7 @@ function MaterialSideTable({
     <div className="min-w-0 flex-1 space-y-2">
       <div className="flex items-baseline justify-between">
         <h4 className="text-sm font-semibold">{title}</h4>
-        <span className="text-sm font-medium tabular-nums">{filteredTotal.toFixed(3)}g</span>
+        <span className="text-sm font-medium tabular-nums">{wf.g(filteredTotal)}g</span>
       </div>
 
       <div className="rounded-lg border">
@@ -348,7 +351,7 @@ function MaterialSideTable({
                     ) : null}
                   </TableCell>
                   <TableCell className="text-right">
-                    {row.metalWeightFine ? `${row.metalWeightFine.toFixed(3)}g` : "-"}
+                    {row.metalWeightFine ? `${wf.g(row.metalWeightFine)}g` : "-"}
                   </TableCell>
                 </TableRow>
               ))
@@ -383,6 +386,7 @@ function MetalGroupSection({
   sortDir: "asc" | "desc"
   onSort: (key: SortKey) => void
 }) {
+  const wf = useWeightFormat()
   const issuedRows = group.rows.filter((row) => row.type === "DEBIT")
   const receivedRows = group.rows.filter((row) => row.type === "CREDIT")
 
@@ -392,9 +396,9 @@ function MetalGroupSection({
   // case) means the reverse.
   const owesLabel =
     group.finalFineBalance > 0
-      ? `Artisan owes you ${group.finalFineBalance.toFixed(3)}g`
+      ? `Artisan owes you ${wf.g(group.finalFineBalance)}g`
       : group.finalFineBalance < 0
-        ? `You owe the artisan ${Math.abs(group.finalFineBalance).toFixed(3)}g`
+        ? `You owe the artisan ${wf.g(Math.abs(group.finalFineBalance))}g`
         : "Settled"
 
   return (
@@ -428,7 +432,7 @@ function MetalGroupSection({
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-lg font-semibold">{group.totalIssuedFine.toFixed(3)}g</div>
+            <div className="text-lg font-semibold">{wf.g(group.totalIssuedFine)}g</div>
           </CardContent>
         </Card>
 
@@ -439,7 +443,7 @@ function MetalGroupSection({
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-lg font-semibold">{group.totalReceivedFine.toFixed(3)}g</div>
+            <div className="text-lg font-semibold">{wf.g(group.totalReceivedFine)}g</div>
           </CardContent>
         </Card>
 

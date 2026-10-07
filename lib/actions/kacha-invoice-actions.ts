@@ -2454,6 +2454,7 @@ export async function emailKachaInvoiceAction(
     }
 
     const { subject, html } = kachaSlipEmail({
+      weightFormat: await getWeightFormat(storeId),
       storeName,
       slipNumber: kachaInvoice.slipNumber,
       invoiceDate: kachaInvoice.invoiceDate.toISOString(),

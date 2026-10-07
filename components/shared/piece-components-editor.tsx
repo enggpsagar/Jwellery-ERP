@@ -30,7 +30,7 @@ import {
 import type { GstRateRow } from "@/lib/actions/gst-rate-actions"
 import type { StoreMetalOriginRow, StoreMetalPurityRow, StoreMetalRow } from "@/lib/actions/taxonomy-actions"
 import { formatWeight, normalizeWastagePercent } from "@/lib/weight-calc"
-import { useWeightSettings } from "@/components/providers/weight-settings-provider"
+import { useWeightFormat, useWeightSettings } from "@/components/providers/weight-settings-provider"
 
 const rupees = (value: number) =>
   `₹${value.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
@@ -107,6 +107,7 @@ export function PieceComponentsEditor({
   const activeGst = (gstRates ?? []).filter((rate) => rate.isActive || rows.some((r) => r.gstRateId === rate.id))
 
   const weightSettings = useWeightSettings()
+  const wf = useWeightFormat()
   const finenessOf = (row: PieceMetalDraft) => metalRowFineness(row, puritiesByMetal[row.metalTypeId], enumFineness)
   const valueOptions = { valuation, finenessOf, weightSettings }
   // Wastage % per metal row (Settings > Weights): a sale / purchase only —
@@ -448,12 +449,12 @@ export function PieceComponentsEditor({
         <div className="flex flex-wrap items-center justify-end gap-x-4 gap-y-1 text-xs text-muted-foreground" data-testid={`${testIdPrefix}-totals`}>
           {[...pureByMetal.entries()].map(([metalId, pure]) => (
             <span key={metalId}>
-              {metalById.get(metalId)?.name ?? "Metal"}: <span className="font-medium text-foreground">{pure.toFixed(3)} g pure</span>
+              {metalById.get(metalId)?.name ?? "Metal"}: <span className="font-medium text-foreground">{wf.g(pure)} g pure</span>
             </span>
           ))}
           {totals.stoneCarats > 0 ? (
             <span>
-              Stones: <span className="font-medium text-foreground">{totals.stoneCarats.toFixed(2)} ct</span>
+              Stones: <span className="font-medium text-foreground">{wf.stoneCt(totals.stoneCarats)} ct</span>
             </span>
           ) : null}
           <span>

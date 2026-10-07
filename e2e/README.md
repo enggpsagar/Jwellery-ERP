@@ -48,7 +48,8 @@ No real secrets are used, and nothing talks to the shared Neon database —
 | `stone-details-edits.spec.ts` | Invoice quick edit of stone pcs / clarity / certificate (single and multi-part) without re-pricing; Purchase / Exchange clarity suggestions; editing an Add Stock piece re-splits its rows |
 | `weight-settings.spec.ts` | Settings › Weights: each option's effect on Add Stock and invoice lines, wastage default copied and editable, rounding, confirmation counts, recalculation changes fine but not issued invoices' net/amount, and another store stays untouched |
 | `icon-tooltips.spec.ts` | Hovering row / settings / sidebar / dialog icons shows their tooltip; a crawl of 8 main pages fails on any unlabelled icon-only control |
-| `search-focus.spec.ts` | Header search and stock picker keep the cursor while typing and after results load |
+| `search-focus.spec.ts` | Header search, stock picker and the list search on Products / Stock / Parties / Artisans / Invoices keep the cursor while typing and through the reload |
+| `igi-search.spec.ts` | Products and Stock are found by a partial IGI / certificate number |
 | `reports.spec.ts` | Every report tab renders; Stock report's Available / Out of Stock split; CSV export |
 
 **When you build a feature, add a test for it here** — that's what keeps

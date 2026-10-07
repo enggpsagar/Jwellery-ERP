@@ -490,6 +490,7 @@ selling price. Spec: `e2e/header-rates.spec.ts`.
 
 - An icon-size `<Button size="icon…">` with an `aria-label` gets a styled tooltip automatically (`components/ui/button.tsx`; skipped when the button shows its own text, e.g. calendar days). Anything else icon-only (raw `<button>`, `<Link>`, a `size="sm"` icon button) is wrapped in `<IconTooltip label=…>` (`components/ui/icon-tooltip.tsx`); for an `asChild` trigger wrap the outer element.
 - Label icon-only controls with `aria-label`, not `title` — Button drops `title` so tooltips don't double, so e2e must locate by role + name, never `getByTitle`. `e2e/icon-tooltips.spec.ts` crawls the main pages and fails on any unlabelled icon-only control.
+- The data-table search (`CollapsibleSearch`) is never disabled while the list reloads (a disabled input drops focus); it shows a spinner instead. Products search also matches any stone's IGI / certificate no.; Stock search matches product code and the IGI no. on the piece's or its product's stones.
 - Searchable selects use `SelectSearchInput` (`components/ui/select-search-input.tsx`), which keeps the cursor in the search box (Radix Select otherwise moves focus to its items).
 
 ### Added 2026-10-07: purity duplicates refused; fineness warning can be ignored

@@ -54,6 +54,9 @@ export type BusinessSettings = {
   // default is a placeholder that needs store confirmation, not a
   // guaranteed-current government rate.
   hallmarkChargePerPiece: number;
+  // Settings > Weights display decimals (lib/weight-calc.ts) — print templates.
+  weightDecimalsGram: number;
+  weightDecimalsCarat: number;
   // Whether the return window policy is switched on at all — see
   // prisma/schema.prisma's BusinessSettings.returnWindowEnabled doc comment.
   // Every consumer of returnWindowDays below must also check this.
@@ -153,6 +156,8 @@ function mapSettings(settings: any): BusinessSettings {
     bankAccountHolderName: settings.bankAccountHolderName ?? "",
     defaultGstRate: Number(settings.defaultGstRate ?? 3.0),
     hallmarkChargePerPiece: Number(settings.hallmarkChargePerPiece ?? 45),
+    weightDecimalsGram: Number(settings.weightDecimalsGram ?? 3),
+    weightDecimalsCarat: Number(settings.weightDecimalsCarat ?? 3),
     returnWindowEnabled: settings.returnWindowEnabled ?? true,
     sendToArtisanEnabled: settings.sendToArtisanEnabled ?? true,
     supplierModuleEnabled: settings.supplierModuleEnabled ?? false,

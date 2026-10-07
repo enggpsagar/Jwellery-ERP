@@ -83,11 +83,11 @@ export function KachaPrintThermal({ kachaInvoice, settings, exchange }: KachaPri
           return (
             <div key={item.id}>
               <p className="font-medium">{item.itemName}</p>
-              <PieceBreakdown components={item.components} showGst={false} className="mt-0.5 space-y-0 text-[10px] font-normal leading-snug text-gray-600" />
+              <PieceBreakdown components={item.components} weightDecimals={settings.weightDecimalsGram} showGst={false} className="mt-0.5 space-y-0 text-[10px] font-normal leading-snug text-gray-600" />
               <LineStoneDetails item={item} className="mt-0.5 text-[10px] font-normal leading-snug text-gray-600" />
               <div className="flex justify-between">
                 <span>
-                  {unit === "Pcs" ? qty : qty.toFixed(3)} {unit} x {item.components?.length ? "rate per row" : <>₹{fmt(Number(item.rate ?? 0))}</>}
+                  {unit === "Pcs" ? qty : qty.toFixed(unit === "Ct" ? settings.weightDecimalsCarat : settings.weightDecimalsGram)} {unit} x {item.components?.length ? "rate per row" : <>₹{fmt(Number(item.rate ?? 0))}</>}
                 </span>
                 <span>₹{fmt(item.lineTotal)}</span>
               </div>

@@ -13,12 +13,15 @@ export function PieceBreakdown({
   components,
   className = "mt-0.5 space-y-0.5 text-[11px] leading-snug text-muted-foreground",
   showGst = true,
+  weightDecimals = 3,
 }: {
   components?: StoredPieceComponent[] | null
   className?: string
   /** Off on a Kacha slip, which carries no GST (its rows may still keep a
    *  rate, for when the slip is converted to a Pakka invoice). */
   showGst?: boolean
+  /** Settings > Weights decimals for grams (print templates pass theirs). */
+  weightDecimals?: number
 }) {
   if (!components?.length) return null
   return (
@@ -29,8 +32,8 @@ export function PieceBreakdown({
           const pure = row.fineWeight != null && row.netWeight != null && round5(row.fineWeight) !== round5(row.netWeight)
           return (
             <li key={index}>
-              {[row.metalName, row.purityLabel].filter(Boolean).join(" ") || "Metal"} · {(row.netWeight ?? 0).toFixed(3)} g
-              {pure ? ` (${(row.fineWeight ?? 0).toFixed(3)} g pure)` : ""} · {rupees(row.amount)}
+              {[row.metalName, row.purityLabel].filter(Boolean).join(" ") || "Metal"} · {(row.netWeight ?? 0).toFixed(weightDecimals)} g
+              {pure ? ` (${(row.fineWeight ?? 0).toFixed(weightDecimals)} g pure)` : ""} · {rupees(row.amount)}
               {gst}
             </li>
           )

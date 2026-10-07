@@ -266,12 +266,12 @@ export function InvoicePrintModern({ invoice, settings, exchange }: InvoicePrint
                       <td>{index + 1}</td>
                       <td className="font-medium">
                     {item.itemName}
-                    <PieceBreakdown components={item.components} className="mt-0.5 space-y-0 text-[10px] font-normal leading-snug text-gray-600" />
+                    <PieceBreakdown components={item.components} weightDecimals={settings.weightDecimalsGram} className="mt-0.5 space-y-0 text-[10px] font-normal leading-snug text-gray-600" />
                     <LineStoneDetails item={item} className="mt-0.5 text-[10px] font-normal leading-snug text-gray-600" />
                   </td>
                       <td>{item.hsnCode ?? "-"}</td>
                       <td className="text-right whitespace-nowrap">
-                        {unit === "Pcs" ? qty : qty.toFixed(3)}
+                        {unit === "Pcs" ? qty : qty.toFixed(unit === "Ct" ? settings.weightDecimalsCarat : settings.weightDecimalsGram)}
                       </td>
                       <td>{unit}</td>
                       <td className="text-right whitespace-nowrap">₹{fmt(pricePerUnit)}</td>
@@ -291,7 +291,7 @@ export function InvoicePrintModern({ invoice, settings, exchange }: InvoicePrint
                       .map(lineQuantity)
                       .filter((line) => line.isWeighed)
                       .reduce((sum, line) => sum + line.qty, 0)
-                      .toFixed(3)}
+                      .toFixed(settings.weightDecimalsGram)}
                   </td>
                   <td />
                   <td />

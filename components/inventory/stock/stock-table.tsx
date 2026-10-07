@@ -1,5 +1,7 @@
 "use client"
 
+import { useWeightSettings } from "@/components/providers/weight-settings-provider"
+
 import { RecordHoverCard } from "@/components/shared/record-hover-card"
 import * as React from "react"
 
@@ -43,9 +45,9 @@ function formatNumber(value: number | string | null | undefined, digits = 3) {
   return Number(value).toFixed(digits)
 }
 
-function formatWeightCell(value: number | string | null | undefined) {
+function formatWeightCell(value: number | string | null | undefined, decimals = 3) {
   if (value === null || value === undefined || value === "") return "-"
-  return `${Number(value).toFixed(3)} g`
+  return `${Number(value).toFixed(decimals)} g`
 }
 
 export function StockTable({
@@ -58,6 +60,8 @@ export function StockTable({
   showLocation = true,
   totals,
 }: StockTableProps) {
+  // Settings > Weights decimals for grams.
+  const gramDecimals = useWeightSettings().weightDecimalsGram
   const allIds = React.useMemo(
     () => stockItems.map((item) => item.id),
     [stockItems]
@@ -217,13 +221,13 @@ export function StockTable({
                   </td>
 
                   <td className="hidden px-4 py-3 text-right tabular-nums sm:table-cell">
-                    {formatWeightCell(item.grossWeight)}
+                    {formatWeightCell(item.grossWeight, gramDecimals)}
                   </td>
                   <td className="px-4 py-3 text-right tabular-nums">
-                    {formatWeightCell(item.netWeight)}
+                    {formatWeightCell(item.netWeight, gramDecimals)}
                   </td>
                   <td className="px-4 py-3 text-right tabular-nums">
-                    {formatWeightCell(item.fineWeight)}
+                    {formatWeightCell(item.fineWeight, gramDecimals)}
                   </td>
                 </tr>
               )
@@ -242,10 +246,10 @@ export function StockTable({
                 </td>
                 <td className="px-4 py-3" />
                 <td className="hidden px-4 py-3 text-right tabular-nums sm:table-cell">
-                  {formatWeightCell(totals.grossWeight)}
+                  {formatWeightCell(totals.grossWeight, gramDecimals)}
                 </td>
-                <td className="px-4 py-3 text-right tabular-nums">{formatWeightCell(totals.netWeight)}</td>
-                <td className="px-4 py-3 text-right tabular-nums">{formatWeightCell(totals.fineWeight)}</td>
+                <td className="px-4 py-3 text-right tabular-nums">{formatWeightCell(totals.netWeight, gramDecimals)}</td>
+                <td className="px-4 py-3 text-right tabular-nums">{formatWeightCell(totals.fineWeight, gramDecimals)}</td>
               </tr>
             </tfoot>
           )}

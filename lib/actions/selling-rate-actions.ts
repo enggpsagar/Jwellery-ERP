@@ -1,11 +1,12 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, updateTag } from "next/cache";
 import { UserRole } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
 import { requireStoreScope, getEffectiveAccess } from "@/lib/store-context";
 import { logger } from "@/lib/logger";
+import { sellingRatesTag } from "@/lib/cache-tags";
 import { getCurrentUser } from "@/lib/auth/auth";
 import {
   describeSellingRate,
@@ -101,7 +102,8 @@ export async function updateSellingRates(
 
   // The header lives in the dashboard layout, so refresh that; Settings and
   // Metal Rates show the same data.
-  revalidatePath("/", "layout");
+  updateTag(sellingRatesTag(storeId));
+    revalidatePath("/", "layout");
 
   return { success: true, message: "Selling rates updated." };
 }
@@ -187,6 +189,7 @@ export async function addSellingRateOption(input: {
     });
 
     if (result) return { success: false, message: result };
+    updateTag(sellingRatesTag(storeId));
     revalidatePath("/", "layout");
     return { success: true, message: `${label} added.` };
   } catch (error) {

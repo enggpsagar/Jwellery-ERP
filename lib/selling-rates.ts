@@ -2,7 +2,10 @@ import "server-only";
 
 import type { Prisma, WeightUnit } from "@prisma/client";
 
+import { unstable_cache } from "next/cache";
+
 import { prisma } from "@/lib/prisma";
+import { sellingRatesTag } from "@/lib/cache-tags";
 
 /**
  * One editable selling rate in the header's Today's Rates popover. Each
@@ -39,7 +42,7 @@ const num = (value: { toString(): string } | null) => (value != null ? Number(va
  * Plain helper (not a server action) so the storeId can't be supplied by a
  * client — only the dashboard layout calls it, with the session's own store.
  */
-export async function getSellingRateGroups(storeId: string): Promise<SellingRateGroup[]> {
+async function loadSellingRateGroups(storeId: string): Promise<SellingRateGroup[]> {
   const metals = await prisma.storeMetal.findMany({
     where: { storeId, isActive: true },
     orderBy: [{ isGemstone: "asc" }, { name: "asc" }],
@@ -200,7 +203,7 @@ export async function getSellingRateHistory(storeId: string, take = 200): Promis
 export type SellingRateLastUpdate = { at: string; by: string | null } | null;
 
 /** When the store's selling rates last changed, and who changed them. */
-export async function getLastSellingRateUpdate(storeId: string): Promise<SellingRateLastUpdate> {
+async function loadLastSellingRateUpdate(storeId: string): Promise<SellingRateLastUpdate> {
   const last = await prisma.sellingRateEntry.findFirst({
     where: { storeId },
     orderBy: { createdAt: "desc" },
@@ -211,4 +214,31 @@ export async function getLastSellingRateUpdate(storeId: string): Promise<Selling
     ? await prisma.user.findUnique({ where: { id: last.changedById }, select: { name: true } })
     : null;
   return { at: last.createdAt.toISOString(), by: user?.name ?? null };
+}
+
+// The rates chip sits in the dashboard layout, which renders on every page
+// load, so its two reads are cached per store. Unlike the sidebar counts
+// (TTL-only) this must never show a stale rate after a change — billing
+// reads the same columns — so every action that changes a rate, purity or
+// stone type calls updateTag(sellingRatesTag(storeId)) (rates chip actions,
+// Settings › Taxonomy saves and imports). The 5-minute TTL is only a backstop.
+const RATES_CACHE_SECONDS = 300;
+
+/**
+ * Plain helper (not a server action) so the storeId can't be supplied by a
+ * client — only the dashboard layout calls it, with the session's own store.
+ */
+export function getSellingRateGroups(storeId: string): Promise<SellingRateGroup[]> {
+  return unstable_cache(loadSellingRateGroups, ["selling-rate-groups"], {
+    revalidate: RATES_CACHE_SECONDS,
+    tags: [sellingRatesTag(storeId)],
+  })(storeId);
+}
+
+/** When the store's selling rates last changed, and who changed them. */
+export function getLastSellingRateUpdate(storeId: string): Promise<SellingRateLastUpdate> {
+  return unstable_cache(loadLastSellingRateUpdate, ["selling-rate-last-update"], {
+    revalidate: RATES_CACHE_SECONDS,
+    tags: [sellingRatesTag(storeId)],
+  })(storeId);
 }

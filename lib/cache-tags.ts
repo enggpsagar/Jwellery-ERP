@@ -6,3 +6,9 @@
 export function sidebarCountsTag(storeId: string): string {
   return `sidebar-counts:${storeId}`;
 }
+
+/** The top bar rates chip's data for one store (its purities, stone types,
+ * selling prices and last change). Updated by every action that changes one. */
+export function sellingRatesTag(storeId: string): string {
+  return `selling-rates:${storeId}`;
+}

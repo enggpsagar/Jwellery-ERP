@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, updateTag } from "next/cache";
 import { UserRole, WeightUnit, Prisma } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
@@ -8,6 +8,7 @@ import { requireStoreScope, getStoreIdForRead, assertPlanActiveForExport } from 
 import { actionErrorMessage } from "@/lib/action-error";
 import { requireRole } from "@/lib/auth/auth";
 import { logger } from "@/lib/logger";
+import { sellingRatesTag } from "@/lib/cache-tags";
 import { earlierRowHint, namesAsCandidates, suggestFrom } from "@/lib/import-suggest";
 import { parseExcelWorkbook } from "@/lib/excel-export";
 import { buildMultiSheetTemplate } from "@/lib/excel-multi-sheet-template";
@@ -228,6 +229,8 @@ export async function upsertStoreMetal(
 
     revalidatePath(TAXONOMY_PATH);
 
+    updateTag(sellingRatesTag(storeId));
+
     return {
       success: true,
       id: savedId,
@@ -278,6 +281,8 @@ export async function toggleStoreMetalActive(
     }
 
     revalidatePath(TAXONOMY_PATH);
+
+    updateTag(sellingRatesTag(storeId));
 
     return {
       success: true,
@@ -348,6 +353,7 @@ export async function deleteStoreMetal(id: string): Promise<TaxonomyFormState> {
 
     await prisma.storeMetal.delete({ where: { id } });
     revalidatePath(TAXONOMY_PATH);
+    updateTag(sellingRatesTag(storeId));
 
     return { success: true, message: "Metal type deleted" };
   } catch (error) {
@@ -408,6 +414,7 @@ export async function moveStoreMetalToStones(id: string): Promise<TaxonomyFormSt
       data: { isGemstone: true, hasPurity: false, primaryUnit: WeightUnit.CARAT },
     });
     revalidatePath(TAXONOMY_PATH);
+    updateTag(sellingRatesTag(storeId));
 
     return { success: true, message: `"${metal.name}" moved to Stones — add its Stone Types next` };
   } catch (error) {
@@ -561,6 +568,8 @@ export async function upsertStoreMetalOrigin(
 
     revalidatePath(TAXONOMY_PATH);
 
+    updateTag(sellingRatesTag(storeId));
+
     return {
       success: true,
       id: savedId,
@@ -608,6 +617,8 @@ export async function toggleStoreMetalOriginActive(
 
     revalidatePath(TAXONOMY_PATH);
 
+    updateTag(sellingRatesTag(storeId));
+
     return {
       success: true,
       message: isActive ? "Stone Type activated" : "Stone Type deactivated",
@@ -644,6 +655,7 @@ export async function deleteStoreMetalOrigin(id: string): Promise<TaxonomyFormSt
 
     await prisma.storeMetalOrigin.delete({ where: { id } });
     revalidatePath(TAXONOMY_PATH);
+    updateTag(sellingRatesTag(storeId));
 
     return { success: true, message: "Stone Type deleted" };
   } catch (error) {
@@ -782,6 +794,8 @@ export async function upsertStoreMetalPurity(
 
     revalidatePath(TAXONOMY_PATH);
 
+    updateTag(sellingRatesTag(storeId));
+
     return {
       success: true,
       id: savedId,
@@ -829,6 +843,8 @@ export async function toggleStoreMetalPurityActive(
 
     revalidatePath(TAXONOMY_PATH);
 
+    updateTag(sellingRatesTag(storeId));
+
     return {
       success: true,
       message: isActive ? "Purity activated" : "Purity deactivated",
@@ -865,6 +881,7 @@ export async function deleteStoreMetalPurity(id: string): Promise<TaxonomyFormSt
 
     await prisma.storeMetalPurity.delete({ where: { id } });
     revalidatePath(TAXONOMY_PATH);
+    updateTag(sellingRatesTag(storeId));
 
     return { success: true, message: "Purity deleted" };
   } catch (error) {
@@ -950,6 +967,8 @@ export async function fixPurityFineness(id: string): Promise<TaxonomyFormState> 
     if (count === 0) return { success: false, message: "Purity not found" };
 
     revalidatePath(TAXONOMY_PATH);
+
+    updateTag(sellingRatesTag(storeId));
 
     return { success: true, id, message: `${row.storeMetal.name} ${row.label} set to ${expected}% fine` };
   } catch (error) {
@@ -2387,6 +2406,8 @@ export async function importMetalsAndCategoriesFromExcel(
 
     revalidatePath(TAXONOMY_PATH);
 
+    updateTag(sellingRatesTag(storeId));
+
     const createdCount = counts.metalsCreated + counts.puritiesCreated + counts.categoriesCreated;
     const updatedCount = counts.metalsUpdated + counts.puritiesUpdated + counts.categoriesUpdated;
     return {
@@ -2617,6 +2638,8 @@ export async function importStonesAndStoneTypesFromExcel(
     );
 
     revalidatePath(TAXONOMY_PATH);
+
+    updateTag(sellingRatesTag(storeId));
 
     return {
       success: true,

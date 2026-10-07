@@ -95,3 +95,58 @@ test("the rates popover adds a purity to Settings with its rate", async ({ page 
     await db().storeMetalPurity.deleteMany({ where: { id: { in: extra.map((p) => p.id) } } })
   }
 })
+
+/**
+ * The rates chip is cached per store (lib/selling-rates.ts). A write that
+ * skips the app's actions stays invisible until the cache expires — proof
+ * the cache is in use — while a change made in Settings (here, a Purities
+ * import) shows on the chip at once, because that action updates the tag.
+ */
+test("rates chip is cached, and a Settings change shows on it at once", async ({ page }) => {
+  const XLSX = await import("xlsx")
+  const { PURITIES_SHEET, METALS_SHEET, CATEGORIES_SHEET, sheetHeaders } = await import("../lib/inventory/taxonomy-sheet")
+  const storeId = await demoStoreId()
+  const gold = await db().storeMetal.findFirstOrThrow({ where: { storeId, name: "Gold" }, select: { id: true } })
+  const purity = await db().storeMetalPurity.findFirstOrThrow({ where: { storeMetalId: gold.id, label: "22K" } })
+  const before = purity.sellingPrice
+  const openChip = async () => {
+    await page.goto("/dashboard")
+    await page.getByRole("button", { name: "Today's selling rates" }).click()
+    return page.getByLabel("Gold 22K", { exact: true })
+  }
+
+  try {
+    // A Purities import through Settings sets 6200 and must show at once.
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet([], { header: sheetHeaders(METALS_SHEET) }), METALS_SHEET.name)
+    XLSX.utils.book_append_sheet(
+      wb,
+      XLSX.utils.json_to_sheet(
+        [{ Metal: "Gold", Label: "22K", "SKU Code": purity.skuCode, "Fineness %": Number(purity.finenessPercent), "Selling Price": 6200, Hallmarkable: purity.isHallmarkable ? "Yes" : "No" }],
+        { header: sheetHeaders(PURITIES_SHEET) },
+      ),
+      PURITIES_SHEET.name,
+    )
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet([], { header: sheetHeaders(CATEGORIES_SHEET) }), CATEGORIES_SHEET.name)
+    const file = "test-results/rates-cache-purities.xlsx"
+    XLSX.writeFile(wb, file)
+
+    // Prime the cache, then write behind the app's back: the chip keeps
+    // showing the cached value.
+    const primed = await (await openChip()).inputValue()
+    await db().storeMetalPurity.update({ where: { id: purity.id }, data: { sellingPrice: 6150 } })
+    expect(await (await openChip()).inputValue()).toBe(primed)
+
+    await page.goto("/settings/taxonomy")
+    await page.getByRole("button", { name: "Import Metals & Categories" }).click()
+    await page.locator("#metal-category-import-file").setInputFiles(file)
+    await page.getByRole("button", { name: "Import", exact: true }).click()
+    await expect
+      .poll(async () => Number((await db().storeMetalPurity.findUnique({ where: { id: purity.id } }))?.sellingPrice))
+      .toBe(6200)
+    await expect(await openChip()).toHaveValue("6200")
+  } finally {
+    await db().storeMetalPurity.update({ where: { id: purity.id }, data: { sellingPrice: before } })
+    await db().sellingRateEntry.deleteMany({ where: { storeId, refId: purity.id, sellingPrice: 6200 } })
+  }
+})

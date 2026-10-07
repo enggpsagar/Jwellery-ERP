@@ -473,7 +473,7 @@ with neither — so billing picks the change up directly. Read: `lib/selling-rat
 deliberately not a server action, so a client can't pass another storeId). Write:
 `updateSellingRates` (`lib/actions/selling-rate-actions.ts`), gated on the role in the
 **active store** (`getEffectiveAccess`), one transaction, every id matched by
-`{ id, storeId }`. Hidden for KARIGAR. The popover lists exactly the store's active Settings purities / stone types (no fixed list — an earlier "add standard purities" link was removed after it duplicated a store's own "18" as "18K"); "+ Add purity / stone type" adds one there with its first rate, and the header shows when and by whom rates last changed.
+`{ id, storeId }`. Hidden for KARIGAR. Its two reads are **cached per store** (`unstable_cache`, tag `sellingRatesTag(storeId)` in `lib/cache-tags.ts`, 5-min TTL as a backstop) because the layout renders on every page load; every action that changes a rate, metal, purity or stone type (rates chip actions + the 13 Settings › Taxonomy saves/imports) calls `updateTag(sellingRatesTag(storeId))` — add that call to any new action that changes them, or the chip shows a stale rate. The popover lists exactly the store's active Settings purities / stone types (no fixed list — an earlier "add standard purities" link was removed after it duplicated a store's own "18" as "18K"); "+ Add purity / stone type" adds one there with its first rate, and the header shows when and by whom rates last changed.
 
 **Two kinds of rate, kept apart (user decision 2026-10-06):** `MetalRate` is the
 *market* rate — fetched by `/api/cron/metal-rates` (goldapi.io; more APIs planned) and

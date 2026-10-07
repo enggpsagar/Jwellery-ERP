@@ -459,6 +459,8 @@ function getProductWhere(
             { name: { contains: query, mode: "insensitive" as const } },
             { productCode: { contains: query, mode: "insensitive" as const } },
             { designCode: { contains: query, mode: "insensitive" as const } },
+            // IGI / lab certificate number on any of the product's stones.
+            { stoneComponents: { some: { certificateNumber: { contains: query, mode: "insensitive" as const } } } },
           ],
         }
       : {}),

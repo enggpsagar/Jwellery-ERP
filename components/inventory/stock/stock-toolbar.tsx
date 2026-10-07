@@ -34,7 +34,7 @@ export function StockToolbar({ selectedIds, metals, categoryFilter, bulkActions 
 
   return (
     <DataTableToolbar
-      searchPlaceholder="Search by stock code, tag number, product..."
+      searchPlaceholder="Search by stock code, tag, product, IGI no..."
       sortOptions={[
         { value: "createdAt", label: "Sort by Created Date" },
         { value: "stockCode", label: "Sort by Stock Code" },

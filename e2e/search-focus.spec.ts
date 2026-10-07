@@ -37,3 +37,38 @@ test("the stock picker search keeps the cursor while the list filters", async ({
   await page.keyboard.type("x")
   await expect(box).toHaveValue("goldx")
 })
+
+/**
+ * List pages (Products, Stock, Parties, Artisans...) search through the URL:
+ * a pause in typing reloads the list. The box must keep the cursor while
+ * it reloads and after the results arrive, so typing can simply continue.
+ */
+for (const path of ["/inventory/products", "/inventory/stock", "/customers", "/karigars", "/billing"]) {
+  test(`the ${path} list search keeps the cursor through a reload`, async ({ page }) => {
+    await page.goto(path)
+    await page.waitForLoadState("networkidle")
+    // CollapsibleSearch starts as an icon button labelled with its placeholder.
+    // (The header's global search also starts with "Search" — skip it.)
+    const listSearch = "input[placeholder^='Search']:not([aria-controls='global-search-results'])"
+    // The collapsed list search is an icon button labelled with its
+    // placeholder ("Search by …..."); open it. Otherwise it's already open.
+    const opener = page.getByRole("button", { name: /^Search .+\.\.\.$/ }).first()
+    if (await opener.isVisible().catch(() => false)) await opener.click()
+    else await page.locator(listSearch).first().click()
+    // The list's own search is the one that took the cursor (a page can
+    // have other "Search…" boxes further down, e.g. Artisans' ledger).
+    const placeholder = await page.locator(`${listSearch}:focus`).getAttribute("placeholder")
+    const box = page.getByPlaceholder(placeholder!, { exact: true })
+    await expect(box).toBeFocused()
+    await page.keyboard.type("go")
+    // Let the debounced search reload the list (URL changes), then keep typing.
+    await expect(page).toHaveURL(/search=go/)
+    await page.waitForLoadState("networkidle")
+    await expect(box).toBeFocused()
+    await page.keyboard.type("ld")
+    await expect(page).toHaveURL(/search=gold/)
+    await page.waitForLoadState("networkidle")
+    await expect(box).toBeFocused()
+    await expect(box).toHaveValue("gold")
+  })
+}

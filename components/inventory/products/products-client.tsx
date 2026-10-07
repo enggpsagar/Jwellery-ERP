@@ -110,7 +110,7 @@ export function ProductsClient({
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)] xl:items-start">
         <div className="space-y-4">
           <DataTableToolbar
-            searchPlaceholder="Search by name, product code, design code..."
+            searchPlaceholder="Search by name, product code, design code, IGI no..."
             sortOptions={[
               { value: "name", label: "Sort by Name" },
               { value: "productCode", label: "Sort by Product Code" },

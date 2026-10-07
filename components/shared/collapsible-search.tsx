@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { Search, X } from "lucide-react"
+import { Loader2, Search, X } from "lucide-react"
 
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
@@ -11,6 +11,12 @@ type CollapsibleSearchProps = {
   value: string
   onChange: (value: string) => void
   placeholder: string
+  /**
+   * The list is reloading for the current search. The input is NOT disabled
+   * for this — a disabled input drops focus, so the cursor left the box
+   * every time results came back while the user was still typing. It shows
+   * a spinner instead and stays typeable.
+   */
   disabled?: boolean
   /** Accessible label for the collapsed icon-only button — defaults to the placeholder. */
   label?: string
@@ -62,7 +68,11 @@ export function CollapsibleSearch({
 
   return (
     <div className="relative min-w-[120px] flex-1 sm:max-w-44">
-      <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+      {disabled ? (
+        <Loader2 className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-muted-foreground" />
+      ) : (
+        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+      )}
       <Input
         ref={inputRef}
         value={value}
@@ -72,7 +82,7 @@ export function CollapsibleSearch({
         }}
         placeholder={placeholder}
         className="h-9 pl-9 pr-8"
-        disabled={disabled}
+        aria-busy={disabled || undefined}
       />
       {value ? (
         <IconTooltip label="Clear search">

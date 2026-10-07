@@ -12,6 +12,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Input } from "@/components/ui/input"
+import { SelectSearchInput } from "@/components/ui/select-search-input"
 
 /**
  * Sentinel value for the "Add New Product" row. It is a real SelectItem rather
@@ -125,12 +126,10 @@ export function ProductSelect({
 
         <SelectContent>
           <div className="p-2">
-            <Input
+            <SelectSearchInput
               placeholder="Search by name or code..."
               value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              onKeyDown={(event) => event.stopPropagation()}
-            />
+              onChange={(event) => setSearch(event.target.value)}            />
           </div>
 
           {filtered.length === 0 ? (

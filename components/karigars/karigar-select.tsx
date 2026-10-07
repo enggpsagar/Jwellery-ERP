@@ -11,6 +11,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Input } from "@/components/ui/input"
+import { SelectSearchInput } from "@/components/ui/select-search-input"
 import { Button } from "@/components/ui/button"
 import { AddKarigarDialog } from "@/components/karigars/add-karigar-dialog"
 
@@ -93,12 +94,10 @@ export function KarigarSelect({
 
           <SelectContent>
             <div className="p-2">
-              <Input
+              <SelectSearchInput
                 placeholder="Search by name or mobile..."
                 value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                onKeyDown={(event) => event.stopPropagation()}
-              />
+                onChange={(event) => setSearch(event.target.value)}              />
             </div>
 
             {filtered.length === 0 ? (

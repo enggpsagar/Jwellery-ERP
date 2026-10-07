@@ -13,6 +13,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Input } from "@/components/ui/input"
+import { SelectSearchInput } from "@/components/ui/select-search-input"
 import { getCurrentUserRole } from "@/lib/actions/store-location-actions"
 
 const UNRESTRICTED_ROLES: readonly UserRole[] = [UserRole.ADMIN, UserRole.SUPER_ADMIN]
@@ -155,12 +156,10 @@ export function LocationSelect({
         <SelectContent>
           {locations.length > 3 && (
             <div className="p-2">
-              <Input
+              <SelectSearchInput
                 placeholder="Search locations..."
                 value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                onKeyDown={(event) => event.stopPropagation()}
-              />
+                onChange={(event) => setSearch(event.target.value)}              />
             </div>
           )}
 

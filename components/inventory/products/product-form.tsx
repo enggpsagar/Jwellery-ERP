@@ -28,7 +28,8 @@ import { AddPurityDialog } from "@/components/inventory/shared/add-purity-dialog
 import { AddClarityDialog } from "@/components/inventory/shared/add-clarity-dialog";
 
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Input } from "@/components/ui/input"
+import { SelectSearchInput } from "@/components/ui/select-search-input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 
@@ -1070,12 +1071,10 @@ export function ProductForm({
 
                   <SelectContent>
                     <div className="p-2">
-                      <Input
+                      <SelectSearchInput
                         placeholder="Search categories..."
                         value={categorySearch}
-                        onChange={(event) => setCategorySearch(event.target.value)}
-                        onKeyDown={(event) => event.stopPropagation()}
-                      />
+                        onChange={(event) => setCategorySearch(event.target.value)}                      />
                     </div>
 
                     {filteredCategories.length === 0 ? (
@@ -1153,12 +1152,10 @@ export function ProductForm({
                   <SelectContent>
                     {types.length > 3 && (
                       <div className="p-2">
-                        <Input
+                        <SelectSearchInput
                           placeholder="Search types..."
                           value={typeSearch}
-                          onChange={(event) => setTypeSearch(event.target.value)}
-                          onKeyDown={(event) => event.stopPropagation()}
-                        />
+                          onChange={(event) => setTypeSearch(event.target.value)}                        />
                       </div>
                     )}
 
@@ -1616,12 +1613,10 @@ export function ProductForm({
                         </SelectTrigger>
                         <SelectContent>
                           <div className="p-2">
-                            <Input
+                            <SelectSearchInput
                               placeholder="Search or type a new clarity..."
                               value={claritySearch}
-                              onChange={(event) => setClaritySearch(event.target.value)}
-                              onKeyDown={(event) => event.stopPropagation()}
-                            />
+                              onChange={(event) => setClaritySearch(event.target.value)}                            />
                           </div>
                           {claritySearch.trim() &&
                             !clarities.some((item) => item.name.toLowerCase() === claritySearch.trim().toLowerCase()) && (

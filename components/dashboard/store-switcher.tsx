@@ -14,6 +14,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Input } from "@/components/ui/input"
+import { SelectSearchInput } from "@/components/ui/select-search-input"
 import { useToast } from "@/components/providers/toast-provider"
 
 type StoreOption = {
@@ -100,12 +101,10 @@ export function StoreSwitcher({ stores, activeStoreId }: StoreSwitcherProps) {
       </SelectTrigger>
       <SelectContent position="popper" align="start" className="w-96">
         <div className="p-2">
-          <Input
+          <SelectSearchInput
             placeholder="Search stores..."
             value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            onKeyDown={(event) => event.stopPropagation()}
-          />
+            onChange={(event) => setSearch(event.target.value)}          />
         </div>
 
         {/* Pinned above the search-filtered list (same convention as every

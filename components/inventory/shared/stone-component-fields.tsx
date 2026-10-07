@@ -9,6 +9,7 @@ import { AddStoneTypeDialog } from "@/components/inventory/shared/add-stone-type
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { SelectSearchInput } from "@/components/ui/select-search-input"
 import { Label } from "@/components/ui/label"
 import { RequiredMark } from "@/components/shared/required-mark"
 import {
@@ -211,12 +212,10 @@ export function StoneComponentFields({
       </SelectTrigger>
       <SelectContent>
         <div className="p-2">
-          <Input
+          <SelectSearchInput
             placeholder="Search stones..."
             value={stoneSearch}
-            onChange={(event) => setStoneSearch(event.target.value)}
-            onKeyDown={(event) => event.stopPropagation()}
-          />
+            onChange={(event) => setStoneSearch(event.target.value)}          />
         </div>
 
         {filteredStones.length === 0 ? (

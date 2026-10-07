@@ -10,6 +10,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Input } from "@/components/ui/input"
+import { SelectSearchInput } from "@/components/ui/select-search-input"
 
 export type SourcePartyOption = { id: string; name: string; phone: string | null }
 
@@ -56,12 +57,10 @@ export function SourcePartySelect({
       </SelectTrigger>
       <SelectContent>
         <div className="p-2">
-          <Input
+          <SelectSearchInput
             placeholder="Search by name or phone..."
             value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            onKeyDown={(event) => event.stopPropagation()}
-          />
+            onChange={(event) => setSearch(event.target.value)}          />
         </div>
         <SelectItem value={NONE_VALUE}>Not recorded</SelectItem>
         {filtered.length === 0 ? (

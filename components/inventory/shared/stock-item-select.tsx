@@ -11,6 +11,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Input } from "@/components/ui/input"
+import { SelectSearchInput } from "@/components/ui/select-search-input"
 
 /**
  * Sentinel value for the "Create New Line Item" row — a real SelectItem
@@ -131,12 +132,10 @@ export function StockItemSelect<T extends StockItemBase>({
           at the top while the list scrolls. */}
       <SelectContent position="popper" className="max-h-80">
         <div className="sticky top-0 z-10 bg-popover p-2">
-          <Input
+          <SelectSearchInput
             placeholder="Search by product code, name, category or stock code..."
             value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            onKeyDown={(event) => event.stopPropagation()}
-          />
+            onChange={(event) => setSearch(event.target.value)}          />
         </div>
 
         <SelectItem value={CREATE_NEW_VALUE} className="font-medium text-primary">

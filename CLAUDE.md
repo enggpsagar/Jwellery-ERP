@@ -486,6 +486,13 @@ it as "Your Selling Rates" above the "Market Rates" table. Store export and Forc
 Delete include the table (its FK is RESTRICT). Don't make a market API fill the
 selling price. Spec: `e2e/header-rates.spec.ts`.
 
+### Added 2026-10-07: Settings › Weights (net / fine weight calculation per store)
+
+Migration `20261012100000_weight_calculation_settings` (additive, defaults = previous behaviour, no data change). `BusinessSettings` gains `netDeductStoneWeight` / `netDeductDmoWeight` (net = gross − stone − DMO by default), `fineWeightBasis` (NET default, or GROSS — falls back to net without a gross), `addWastageToFineWeight` (off), `weightDecimalsGram` / `weightDecimalsCarat` (3). `StoreMetalPurity.wastagePercent` is a per-purity default copied onto lines (`wastagePercent` on InvoiceItem, KachaInvoiceItem, QuotationItem, PurchaseItem, PieceComponent; InventoryStock already had it) and stays editable; it's only added to fine (net × (fineness + wastage)%) when the toggle is on.
+- **`lib/weight-calc.ts` is the only calculator** (pure, client-safe: `deriveNetWeight`, `calcFineWeight`, `formatWeight`); `lib/fine-weight.ts` resolves it per store (`fineOf.line()`, `storedLineWeights`, `deriveNet`). Any new write path must use these. Forms read settings via `useWeightSettings()` (dashboard layout, cached per store under `weightSettingsTag`).
+- **Changing them needs a confirmed recalculation** (`lib/weight-recalc.server.ts`): dry-run counts → confirm → client-driven batches of 500 with a cursor in `BusinessSettings.weightRecalcJob` (resumable, row-locked), **strictly the acting store, Store Owner only, never automatic**. Fine weight is recomputed everywhere it's stored (+ "Stock added" ledger entries still equal to the piece's old figure); net weight only on unsold single stock pieces and unlinked lines of DRAFT estimates / open quotations, and only where the stored net still equals the old derivation (hand-typed nets are kept). Issued / paid / converted documents keep net, amounts and GST. Runs are logged in `BusinessSettings.weightRecalcLog` (newest 20) and shown as History. e2e proves another store's rows stay byte-identical.
+- Not yet following the decimals setting: on-screen weights outside prints and the stock list (detail pages, reports, ledger, form hints). Karigar issue/receipt keep their own wastage maths.
+
 ### Fixed 2026-10-06: picking a stock piece brings every metal and stone
 
 Add Stock (and the stock import) store only the Product's first metal / first stone on the stock row and write no `PieceComponent` rows, so a multi-part piece used to open on a sale as one metal + one stone (no pcs, no stone rate) and the save collapsed it again. Now:

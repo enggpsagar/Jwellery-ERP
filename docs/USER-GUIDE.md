@@ -323,6 +323,20 @@ wastage, sold, remaining. Filter by financial year or dates. Reports and Ledger 
 Sales trend by metal, best sellers, metal stock and money KPIs, with Daily/Monthly
 toggles. Cards can be dragged and resized; your layout is remembered.
 
+### Weight calculation (Settings → Weights)
+
+The Store Owner decides how weights are worked out:
+- **Net weight** — whether it subtracts Stone weight and/or DMO / Less weight from Gross.
+- **Fine weight** — Net × Fineness % (usual) or Gross × Fineness %.
+- **Wastage / touch %** — set a default per purity in Metals & Categories; it's filled on
+  each line (and can be changed there), and is added to fine weight if you turn that on.
+- **Decimals** — how many decimals weights are rounded and printed to.
+
+A live example shows the result as you change options. When you save a change you'll see
+how many of your records will be recalculated: fine weight is updated everywhere, net
+weight only on unsold stock and draft estimates / open quotations. **Issued bills keep the
+weights, amounts and GST they were printed with.** Only your own store is changed.
+
 ### Stone details on bills
 
 Under every stone on a Tax Invoice, Estimate or Quotation you can fill **Pcs**, **Clarity**

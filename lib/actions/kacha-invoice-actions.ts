@@ -17,7 +17,7 @@ import {
 } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
-import { getFineWeightResolver, type FineWeightResolver } from "@/lib/fine-weight";
+import { getFineWeightResolver, type FineWeightResolver, storedLineWeights } from "@/lib/fine-weight";
 import {
   getPieceResolver,
   resolveLineStoneDetails,
@@ -115,6 +115,8 @@ export type KachaInvoiceLineItemInput = {
   stoneClarity?: string | null;
   stoneCertificateNumber?: string | null;
   dmoWeight?: number | null;
+  // Wastage / touch % (Settings > Weights): absent = the purity's default, null = none.
+  wastagePercent?: number | null;
   // Hallmarking charge, folded into the slip's Making Charges total — same
   // convention as InvoiceLineItemInput.hmCharge's own doc comment.
   hmCharge?: number;
@@ -278,6 +280,8 @@ async function resolvePieceRows(
           purity: row.purity,
           grossWeight: row.grossWeight,
           netWeight: row.netWeight,
+          // Wastage stays editable on a stock piece's row (the form's value).
+          wastagePercent: sent && sent.wastagePercent !== undefined ? sent.wastagePercent : row.wastagePercent ?? undefined,
           stoneMetalTypeName: row.stoneMetalTypeName,
           stoneTypeNames: row.stoneTypeNames,
           caratWeight: row.caratWeight,
@@ -448,7 +452,7 @@ async function writeKachaSlip(tx: Prisma.TransactionClient, input: WriteKachaSli
           quantity: item.quantity || 1,
           grossWeight: item.grossWeight ?? undefined,
           netWeight: item.netWeight ?? undefined,
-          fineWeight: (item.piece ? item.piece.summary.fineWeight : fineOf(item)) ?? undefined,
+          ...storedLineWeights(item, fineOf),
           components: item.piece ? { create: pieceComponentCreates(item.piece.components) } : undefined,
           stoneWeight: item.stoneWeight ?? undefined,
           caratWeight: item.caratWeight ?? undefined,
@@ -1444,6 +1448,7 @@ export async function convertKachaToPakka(
               grossWeight: item.grossWeight ?? undefined,
               netWeight: item.netWeight ?? undefined,
               fineWeight: item.fineWeight ?? undefined,
+              wastagePercent: item.wastagePercent ?? undefined,
               stoneWeight: item.stoneWeight ?? undefined,
               caratWeight: item.caratWeight ?? undefined,
               rate: item.rate ?? undefined,
@@ -1475,6 +1480,7 @@ export async function convertKachaToPakka(
                       grossWeight: row.grossWeight,
                       netWeight: row.netWeight,
                       fineWeight: row.fineWeight,
+                      wastagePercent: row.wastagePercent,
                       stoneMetalTypeName: row.stoneMetalTypeName,
                       stoneTypeNames: row.stoneTypeNames,
                       caratWeight: row.caratWeight,
@@ -2010,10 +2016,10 @@ export async function importKachaInvoicesFromExcel(
         const stoneWeight = amount(row, "Stone Weight", where);
         const dmoWeight = amount(row, "DMO Weight", where);
         const netGiven = amount(row, "Net Weight", where);
-        // Blank Net = Gross − Stone − DMO, the form's deriveNetWeight.
+        // Blank Net = Gross − Stone − DMO per Settings > Weights — the
+        // form's deriveNetWeight (lib/weight-calc.ts), never below 0.
         const netWeight =
-          netGiven ??
-          (grossWeight ? Math.max(0, Number((grossWeight - (stoneWeight ?? 0) - (dmoWeight ?? 0)).toFixed(5))) : null);
+          netGiven ?? (grossWeight ? fineOf.deriveNet({ grossWeight, stoneWeight, dmoWeight }) ?? 0 : null);
         const caratWeight = amount(row, "Carat Weight", where);
         const stoneRate = amount(row, "Stone Rate", where);
         const stoneChargeGiven = amount(row, "Stone Charge", where);

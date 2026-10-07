@@ -17,7 +17,7 @@ import {
 
 import { prisma } from "@/lib/prisma";
 import { METALS_AND_STONES_COLUMN, describePieceComponentsText } from "@/lib/piece-components-text";
-import { getFineWeightResolver } from "@/lib/fine-weight";
+import { getFineWeightResolver, storedLineWeights } from "@/lib/fine-weight";
 import { requirePermission } from "@/lib/auth/auth";
 import { PERMISSIONS } from "@/lib/permissions";
 import { requireStoreScope, getStoreIdForRead, assertPlanActiveForExport } from "@/lib/store-context";
@@ -83,6 +83,8 @@ export type PurchaseLineItemInput = {
   stoneMetalTypeName?: string | null;
   stoneTypeNames?: string | null;
   dmoWeight?: number | null;
+  // Wastage / touch % (Settings > Weights): absent = the purity's default, null = none.
+  wastagePercent?: number | null;
   hsnCode?: string | null;
   sgstAmount?: number;
   cgstAmount?: number;
@@ -1423,7 +1425,7 @@ export async function createPurchase(
             finish: InventoryFinish.PAKKA,
             grossWeight: toDecimal(item.grossWeight),
             netWeight: toDecimal(item.netWeight),
-            fineWeight: (item.piece ? item.piece.summary.fineWeight : fineOf(item)) ?? undefined,
+            ...storedLineWeights(item, fineOf),
             dmoWeight: toDecimal(item.dmoWeight),
             stoneWeight: toDecimal(item.stoneWeight),
             // Previously dropped here even though it's saved onto the
@@ -1492,7 +1494,7 @@ export async function createPurchase(
               quantity: item.quantity || 1,
               grossWeight: item.grossWeight ?? undefined,
               netWeight: item.netWeight ?? undefined,
-              fineWeight: (item.piece ? item.piece.summary.fineWeight : fineOf(item)) ?? undefined,
+              ...storedLineWeights(item, fineOf),
               stoneWeight: item.stoneWeight ?? undefined,
               caratWeight: item.caratWeight ?? undefined,
               rate: item.rate ?? undefined,
@@ -1964,7 +1966,7 @@ export async function updatePurchase(
             finish: InventoryFinish.PAKKA,
             grossWeight: toDecimal(item.grossWeight),
             netWeight: toDecimal(item.netWeight),
-            fineWeight: (item.piece ? item.piece.summary.fineWeight : fineOf(item)) ?? undefined,
+            ...storedLineWeights(item, fineOf),
             dmoWeight: toDecimal(item.dmoWeight),
             stoneWeight: toDecimal(item.stoneWeight),
             caratWeight: toDecimal(item.caratWeight),
@@ -2024,7 +2026,7 @@ export async function updatePurchase(
               quantity: item.quantity || 1,
               grossWeight: item.grossWeight ?? undefined,
               netWeight: item.netWeight ?? undefined,
-              fineWeight: (item.piece ? item.piece.summary.fineWeight : fineOf(item)) ?? undefined,
+              ...storedLineWeights(item, fineOf),
               stoneWeight: item.stoneWeight ?? undefined,
               caratWeight: item.caratWeight ?? undefined,
               rate: item.rate ?? undefined,

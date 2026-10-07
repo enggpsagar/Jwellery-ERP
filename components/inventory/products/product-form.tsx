@@ -1,5 +1,7 @@
 "use client";
 
+import { deriveNetWeight as calcNetWeight } from "@/lib/weight-calc";
+import { useWeightSettings } from "@/components/providers/weight-settings-provider";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
 
@@ -692,6 +694,7 @@ export function ProductForm({
   );
   const [netWeight, setNetWeight] = useState(product?.defaultNetWeight ?? "");
   const [netTouched, setNetTouched] = useState(false);
+  const weightSettings = useWeightSettings();
 
   // Diamonds and loose Stones are weighed by carat, not gram, but this form
   // only has one Weight field (Net Weight, shared with every other metal) —
@@ -764,7 +767,7 @@ export function ProductForm({
   const derivedNet =
     productKind === "METAL"
       ? metalGrossWeightSum > 0
-        ? String(Number(Math.max(0, metalGrossWeightSum - stoneWeightSum).toFixed(5)))
+        ? String(calcNetWeight({ grossWeight: metalGrossWeightSum, stoneWeight: stoneWeightSum }, weightSettings) ?? 0)
         : null
       : // Trailing zeros trimmed so the box reads 5.5 rather than 5.500,
         // while still respecting the column's three decimals.

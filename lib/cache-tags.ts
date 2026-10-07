@@ -12,3 +12,8 @@ export function sidebarCountsTag(storeId: string): string {
 export function sellingRatesTag(storeId: string): string {
   return `selling-rates:${storeId}`;
 }
+
+/** Settings > Weights for one store (lib/weight-settings.server.ts). */
+export function weightSettingsTag(storeId: string): string {
+  return `weight-settings:${storeId}`;
+}

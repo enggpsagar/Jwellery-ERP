@@ -1,5 +1,8 @@
 "use client"
 
+import { LineWastageField } from "@/components/shared/line-wastage-field"
+import { deriveNetWeight as calcNetWeight, normalizeWastagePercent, netWeightHint, type WeightSettings } from "@/lib/weight-calc"
+import { useWeightSettings } from "@/components/providers/weight-settings-provider"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useActionState } from "react"
@@ -102,6 +105,9 @@ type ProductOption = {
 
 export type LineItem = {
   key: string
+  /** Wastage / touch % (Settings > Weights) — the purity's default on
+   *  pick, editable; undefined = not set (the server applies the default). */
+  wastagePercent?: number | null
   productId: string
   itemName: string
   /** Explicit "what is this line" choice, shown as the "Metals & Stones"
@@ -278,10 +284,10 @@ function startingComponents(item: LineItem): PieceComponentDraft[] {
   return [metal, stone]
 }
 
-function deriveNetWeight(grossWeight: number, stoneWeight: number, dmoWeight: number) {
-  if (!grossWeight) return null
-  const net = grossWeight - stoneWeight - dmoWeight
-  return net >= 0 ? Number(net.toFixed(3)) : null
+/** Net = Gross − stone − DMO per Settings > Weights (lib/weight-calc.ts —
+ *  the one calculator the server and every form share). */
+function deriveNetWeight(grossWeight: number, stoneWeight: number, dmoWeight: number, settings: WeightSettings) {
+  return calcNetWeight({ grossWeight, stoneWeight, dmoWeight }, settings)
 }
 
 const initialState: PurchaseFormState = { success: false, message: "" }
@@ -385,6 +391,7 @@ export function PurchaseForm({
   defaultNotes,
   defaultPaidAmount,
 }: PurchaseFormProps) {
+  const weightSettings = useWeightSettings()
   const [metals, setMetals] = useState(initialMetals)
   const [origins, setOrigins] = useState(initialOrigins)
   const router = useRouter()
@@ -811,6 +818,7 @@ export function PurchaseForm({
     updateItem(item.key, {
       purityLabel: selected?.label ?? "",
       purity: matchLegacyPurityType(family, selected?.label) ?? "",
+      wastagePercent: normalizeWastagePercent(selected?.wastagePercent),
     })
   }
 
@@ -851,7 +859,7 @@ export function PurchaseForm({
         patch.stoneWeightInput = stoneWeightInput
 
         if (!item.netTouched) {
-          const derived = deriveNetWeight(item.grossWeight, stoneWeightInput, item.dmoWeight)
+          const derived = deriveNetWeight(item.grossWeight, stoneWeightInput, item.dmoWeight, weightSettings)
           if (derived !== null) patch.netWeight = derived
         }
       }
@@ -884,7 +892,7 @@ export function PurchaseForm({
     const stoneWeightInput = toPrimaryUnit(Number(value) || 0, item.stoneWeightUnit, "GRAM", gramsPerCarat)
     const derived = item.netTouched
       ? undefined
-      : deriveNetWeight(item.grossWeight, stoneWeightInput, item.dmoWeight)
+      : deriveNetWeight(item.grossWeight, stoneWeightInput, item.dmoWeight, weightSettings)
     updateItem(item.key, {
       stoneWeightInput,
       netStoneWeightTouched: true,
@@ -1053,6 +1061,7 @@ export function PurchaseForm({
         metalTypeId: item.metalTypeId || null,
         purity: item.purity || null,
         purityLabel: item.purityLabel || null,
+        wastagePercent: item.multiPart || item.wastagePercent === undefined ? undefined : normalizeWastagePercent(item.wastagePercent),
         quantity: item.quantity || 1,
         grossWeight: toUnit(item.grossWeight) || null,
         netWeight: toUnit(item.netWeight) || null,
@@ -1395,7 +1404,7 @@ export function PurchaseForm({
                       </Select>
                     </div>
                     {!item.netTouched && (
-                      <p className="text-[10px] leading-tight text-muted-foreground">Gross − stone</p>
+                      <p className="text-[10px] leading-tight text-muted-foreground">{netWeightHint(weightSettings)}</p>
                     )}
                   </div>
                   )}
@@ -1640,6 +1649,21 @@ export function PurchaseForm({
                       )}
 
                       {item.itemKind === "METAL" && (
+                      <>
+                      {!item.multiPart && (
+                        <LineWastageField
+                          value={item.wastagePercent}
+                          onChange={(wastagePercent) => updateItem(item.key, { wastagePercent })}
+                          grossWeight={item.grossWeight || 0}
+                          netWeight={item.netWeight || 0}
+                          finenessPercent={(metalPuritiesCache[item.metalTypeId] ?? []).find((option) => option.label === item.purityLabel)?.finenessPercent ?? null}
+                          hasPurity={Boolean(metalById.get(item.metalTypeId)?.hasPurity)}
+                        />
+                      )}
+                      </>
+                      )}
+
+                      {item.itemKind === "METAL" && (
                       <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
                         <Label className="text-xs">Gross Weight</Label>
                         <div className="flex gap-1">
@@ -1663,7 +1687,7 @@ export function PurchaseForm({
                               const grossWeight = toPrimaryUnit(Number(e.target.value) || 0, item.grossWeightUnit, "GRAM", gramsPerCarat)
                               const derived = item.netTouched
                                 ? undefined
-                                : deriveNetWeight(grossWeight, item.stoneWeightInput, item.dmoWeight)
+                                : deriveNetWeight(grossWeight, item.stoneWeightInput, item.dmoWeight, weightSettings)
                               updateItem(item.key, {
                                 grossWeight,
                                 ...(derived !== null && derived !== undefined

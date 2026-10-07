@@ -63,10 +63,11 @@ export const PURITIES_SHEET: TaxonomySheet = {
     { header: "Fineness %", required: "No", help: "Pure-metal content, more than 0 and up to 100 (22K = 91.6). Blank on a new purity is worked out from the label (22K → 91.6, 925 → 92.5).", example: 91.6 },
     { header: "Selling Price", required: "No", help: `Your selling rate per gram (per the metal's Primary Unit) for this purity, a plain number. ${BLANK_KEEPS} Every change is logged in the selling-rate history.`, example: 6800 },
     { header: "Hallmarkable", required: "No (default No)", help: `Yes if pieces of this purity get a hallmark charge. ${BLANK_KEEPS}`, example: "Yes" },
+    { header: "Wastage %", required: "No", help: `Default wastage / touch % copied onto new sale and purchase lines of this purity, 0 to 100 (0 = none). ${BLANK_KEEPS}`, example: 2 },
   ],
   examples: [
-    { Metal: "Gold", Label: "22K", "SKU Code": "G22", "Fineness %": 91.6, "Selling Price": 6800, Hallmarkable: "Yes" },
-    { Metal: "Gold", Label: "18K", "SKU Code": "G18", "Fineness %": 75, "Selling Price": "", Hallmarkable: "Yes" },
+    { Metal: "Gold", Label: "22K", "SKU Code": "G22", "Fineness %": 91.6, "Selling Price": 6800, Hallmarkable: "Yes", "Wastage %": 2 },
+    { Metal: "Gold", Label: "18K", "SKU Code": "G18", "Fineness %": 75, "Selling Price": "", Hallmarkable: "Yes", "Wastage %": "" },
   ],
 }
 

@@ -260,12 +260,14 @@ export async function createStockForManualSaleLine(
     /** Pure-metal weight of the line (getFineWeightResolver), resolved by
      *  the caller before its transaction. */
     fineWeight?: number | null;
+    /** The line's wastage % (lib/fine-weight.ts lineWeights) — the piece's. */
+    wastagePercent?: number | null;
     /** A piece made of several metals/stones — its resolved rows become the
      *  stock row's PieceComponents and the Product's metal/stone components. */
     piece?: ResolvedPiece;
   },
 ): Promise<string> {
-  const { storeId, line, actor, locationId, referenceType, fineWeight, piece } = params;
+  const { storeId, line, actor, locationId, referenceType, fineWeight, wastagePercent, piece } = params;
 
   // Every id below is re-resolved against this store (a stale or foreign
   // id is dropped, never attached) — validateManualSaleLines has already
@@ -447,6 +449,7 @@ export async function createStockForManualSaleLine(
       grossWeight: toDecimal(line.grossWeight),
       netWeight: toDecimal(line.netWeight),
       fineWeight: toDecimal(fineWeight),
+      wastagePercent: toDecimal(wastagePercent),
       caratWeight: toDecimal(line.caratWeight),
       stoneWeight: toDecimal(line.stoneWeight),
       dmoWeight: toDecimal(line.dmoWeight),

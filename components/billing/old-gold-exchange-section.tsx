@@ -37,6 +37,8 @@ import {
   type OldGoldLineDraft,
 } from "@/lib/old-gold/value"
 import type { StoreMetalOriginRow, StoreMetalPurityRow, StoreMetalRow } from "@/lib/actions/taxonomy-actions"
+import { DEFAULT_WEIGHT_SETTINGS, type WeightSettings } from "@/lib/weight-calc"
+import { useWeightSettings } from "@/components/providers/weight-settings-provider"
 
 const PAYOUT_METHODS = [
   { value: "CASH", label: "Cash" },
@@ -99,11 +101,15 @@ export function oldGoldLineAmounts(
   isGemstone = false,
   /** Several metals/stones: every row's metal purities, for pure weights. */
   puritiesByMetal: Record<string, StoreMetalPurityRow[]> = {},
+  /** Settings > Weights (useWeightSettings) — basis / rounding of the fine weight. */
+  weightSettings: WeightSettings = DEFAULT_WEIGHT_SETTINGS,
 ) {
   if (line.multiPart) {
     const finenessOf = (row: PieceMetalDraft) => metalRowFineness(row, puritiesByMetal[row.metalTypeId], enumFineness)
-    const totals = pieceTotals(line.components, { valuation: "fine", finenessOf })
-    const fine = line.components.reduce((sum, row) => (row.kind === "METAL" ? sum + metalRowFine(row, finenessOf) : sum), 0)
+    // No wastage on an exchange (the server stores none either).
+    const components = line.components.map((row) => (row.kind === "METAL" ? { ...row, wastagePercent: null } : row))
+    const totals = pieceTotals(components, { valuation: "fine", finenessOf, weightSettings })
+    const fine = components.reduce((sum, row) => (row.kind === "METAL" ? sum + metalRowFine(row, finenessOf, weightSettings) : sum), 0)
     const deduction = Math.min(Math.max(line.deductionPercent || 0, 0), 100)
     const metalValue = round2(totals.metalValue * (1 - deduction / 100))
     return { fineness: 100, fine, metalValue, stoneValue: totals.stoneValue, total: oldGoldLineTotal(metalValue, totals.stoneValue) }
@@ -115,7 +121,7 @@ export function oldGoldLineAmounts(
     return { fineness: 100, fine: 0, metalValue: value, stoneValue: 0, total: value }
   }
   const fineness = oldGoldLineFineness(line, purities, enumFineness)
-  const fine = oldGoldFineWeight(line.netWeight, fineness)
+  const fine = oldGoldFineWeight(line.netWeight, fineness, weightSettings, line.grossWeight)
   const metalValue = oldGoldLineValue(fine, line.rate, line.deductionPercent)
   const stoneValue = line.hasStone ? round2(line.stoneCharge || 0) : 0
   return { fineness, fine, metalValue, stoneValue, total: oldGoldLineTotal(metalValue, stoneValue) }
@@ -207,6 +213,7 @@ export function OldGoldExchangeSection({
   const purityMetals = metals.filter((metal) => metal.hasPurity && !metal.isGemstone && metal.isActive)
   const gemstones = metals.filter((metal) => metal.isGemstone && metal.isActive)
   const metalById = new Map(metals.map((metal) => [metal.id, metal]))
+  const weightSettings = useWeightSettings()
 
   const rateFor = (metalTypeId: string) => {
     const family = classifyPurityFamily(metalById.get(metalTypeId) ?? { name: "" })
@@ -223,7 +230,7 @@ export function OldGoldExchangeSection({
         if (line.key !== key) return line
         const next = { ...line, ...patch }
         if (!next.netTouched && next.grossWeight > 0) {
-          next.netWeight = netAfterStone(next.grossWeight, next.hasStone ? next.stoneWeightGrams : 0)
+          next.netWeight = netAfterStone(next.grossWeight, next.hasStone ? next.stoneWeightGrams : 0, weightSettings)
         }
         if (next.hasStone && !next.stoneChargeTouched) {
           next.stoneCharge = round2((next.stoneRate || 0) * (next.caratWeight || 0))
@@ -239,6 +246,7 @@ export function OldGoldExchangeSection({
       enumFineness,
       Boolean(metalById.get(line.metalTypeId)?.isGemstone),
       puritiesByMetal,
+      weightSettings,
     ),
   )
   const totalNet = lines.reduce(

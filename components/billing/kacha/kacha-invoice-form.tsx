@@ -1,5 +1,8 @@
 "use client"
 
+import { LineWastageField } from "@/components/shared/line-wastage-field"
+import { deriveNetWeight as calcNetWeight, normalizeWastagePercent, netWeightHint, type WeightSettings } from "@/lib/weight-calc"
+import { useWeightSettings } from "@/components/providers/weight-settings-provider"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useActionState } from "react"
@@ -109,6 +112,9 @@ type StockOption = {
 
 type LineItem = {
   key: string
+  /** Wastage / touch % (Settings > Weights) — the purity's default on
+   *  pick, editable; undefined = not set (the server applies the default). */
+  wastagePercent?: number | null
   itemName: string
   metalTypeId: string
   purity: string
@@ -212,10 +218,10 @@ function emptyLineItem(key: string = crypto.randomUUID()): LineItem {
   }
 }
 
-function deriveNetWeight(grossWeight: number, stoneWeight: number, dmoWeight: number) {
-  if (!grossWeight) return null
-  const net = grossWeight - stoneWeight - dmoWeight
-  return net >= 0 ? Number(net.toFixed(3)) : null
+/** Net = Gross − stone − DMO per Settings > Weights (lib/weight-calc.ts —
+ *  the one calculator the server and every form share). */
+function deriveNetWeight(grossWeight: number, stoneWeight: number, dmoWeight: number, settings: WeightSettings) {
+  return calcNetWeight({ grossWeight, stoneWeight, dmoWeight }, settings)
 }
 
 const initialState: KachaInvoiceFormState = { success: false, message: "" }
@@ -291,6 +297,7 @@ export function KachaInvoiceForm({
   gstRates = [],
   clarities = [],
 }: KachaInvoiceFormProps) {
+  const weightSettings = useWeightSettings()
   // A new metal/stone row's "GST if billed" starts at the store's default rate.
   const defaultGstRateId =
     gstRates.find((rate) => rate.isDefault && rate.isActive)?.id ?? gstRates.find((rate) => rate.isActive)?.id ?? ""
@@ -351,7 +358,11 @@ export function KachaInvoiceForm({
     const metal = metalById.get(item.metalTypeId)
     const family = metal ? classifyPurityFamily(metal) : null
     const legacyPurity = matchLegacyPurityType(family, selected?.label) ?? ""
-    const patch: Partial<LineItem> = { purityLabel: selected?.label ?? "", purity: legacyPurity }
+    const patch: Partial<LineItem> = {
+      purityLabel: selected?.label ?? "",
+      purity: legacyPurity,
+      wastagePercent: normalizeWastagePercent(selected?.wastagePercent),
+    }
     if (!item.hmChargeTouched && (selected?.isHallmarkable || isHallmarkablePurity(legacyPurity))) {
       patch.hmCharge = hallmarkChargePerPiece
     }
@@ -712,7 +723,7 @@ export function KachaInvoiceForm({
         patch.stoneWeightInput = stoneWeightInput
 
         if (!item.netTouched) {
-          const derived = deriveNetWeight(item.grossWeight, stoneWeightInput, item.dmoWeight)
+          const derived = deriveNetWeight(item.grossWeight, stoneWeightInput, item.dmoWeight, weightSettings)
           if (derived !== null) patch.netWeight = derived
         }
       }
@@ -745,7 +756,7 @@ export function KachaInvoiceForm({
     const stoneWeightInput = toPrimaryUnit(Number(value) || 0, item.stoneWeightUnit, "GRAM", gramsPerCarat)
     const derived = item.netTouched
       ? null
-      : deriveNetWeight(item.grossWeight, stoneWeightInput, item.dmoWeight)
+      : deriveNetWeight(item.grossWeight, stoneWeightInput, item.dmoWeight, weightSettings)
     updateItem(item.key, {
       stoneWeightInput,
       netStoneWeightTouched: true,
@@ -829,6 +840,7 @@ export function KachaInvoiceForm({
         enumFineness,
         Boolean(metalById.get(line.metalTypeId)?.isGemstone),
         metalPuritiesCache,
+        weightSettings,
       ).total,
     0,
   )
@@ -851,6 +863,7 @@ export function KachaInvoiceForm({
         metalTypeId: item.metalTypeId || null,
         purity: item.purity || null,
         purityLabel: item.purityLabel || null,
+        wastagePercent: item.multiPart || item.wastagePercent === undefined ? undefined : normalizeWastagePercent(item.wastagePercent),
         quantity: item.quantity || 1,
         grossWeight: toUnit(item.grossWeight) || null,
         netWeight: toUnit(item.netWeight) || null,
@@ -1263,6 +1276,17 @@ export function KachaInvoiceForm({
                   </div>
                 </div>
 
+                {!item.multiPart && (
+                  <LineWastageField
+                    value={item.wastagePercent}
+                    onChange={(wastagePercent) => updateItem(item.key, { wastagePercent })}
+                    grossWeight={item.grossWeight || 0}
+                    netWeight={item.netWeight || 0}
+                    finenessPercent={(metalPuritiesCache[item.metalTypeId] ?? []).find((option) => option.label === item.purityLabel)?.finenessPercent ?? null}
+                    hasPurity={Boolean(metalById.get(item.metalTypeId)?.hasPurity)}
+                  />
+                )}
+
                 <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
                   <Label className="text-xs">Gross Weight</Label>
                   <div className="flex gap-1">
@@ -1286,7 +1310,7 @@ export function KachaInvoiceForm({
                         const grossWeight = toPrimaryUnit(Number(e.target.value) || 0, item.grossWeightUnit, "GRAM", gramsPerCarat)
                         const derived = item.netTouched
                           ? null
-                          : deriveNetWeight(grossWeight, item.stoneWeightInput, item.dmoWeight)
+                          : deriveNetWeight(grossWeight, item.stoneWeightInput, item.dmoWeight, weightSettings)
                         updateItem(item.key, {
                           grossWeight,
                           ...(derived !== null ? { netWeight: derived } : {}),
@@ -1344,7 +1368,7 @@ export function KachaInvoiceForm({
                     </Select>
                   </div>
                   {!item.netTouched && (
-                    <p className="text-xs text-muted-foreground">Gross − stone − dust/other</p>
+                    <p className="text-xs text-muted-foreground">{netWeightHint(weightSettings, "dust/other")}</p>
                   )}
                 </div>
 
@@ -1434,7 +1458,7 @@ export function KachaInvoiceForm({
                         const dmoWeight = toPrimaryUnit(Number(e.target.value) || 0, item.dmoWeightUnit, "GRAM", gramsPerCarat)
                         const derived = item.netTouched
                           ? null
-                          : deriveNetWeight(item.grossWeight, item.stoneWeightInput, dmoWeight)
+                          : deriveNetWeight(item.grossWeight, item.stoneWeightInput, dmoWeight, weightSettings)
                         updateItem(item.key, {
                           dmoWeight,
                           ...(derived !== null ? { netWeight: derived } : {}),

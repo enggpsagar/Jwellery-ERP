@@ -28,6 +28,9 @@ import { AppSidebar } from "@/components/dashboard/app-sidebar";
 import { SessionProvider } from "@/components/providers/session-provider";
 import { TopBar } from "@/components/dashboard/top-bar";
 import { getSellingRateGroups, getLastSellingRateUpdate } from "@/lib/selling-rates";
+import { getCachedWeightSettings } from "@/lib/weight-settings.server";
+import { DEFAULT_WEIGHT_SETTINGS } from "@/lib/weight-calc";
+import { WeightSettingsProvider } from "@/components/providers/weight-settings-provider";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -166,7 +169,7 @@ export default async function DashboardLayout({
   // Karigars see only their own jobs, never store prices.
   const showRates = Boolean(activeStoreId) && activeRole !== UserRole.KARIGAR;
 
-  const [storeInfo, sidebarCounts, brandingSettings, sellingRates, ratesUpdated] = await Promise.all([
+  const [storeInfo, sidebarCounts, brandingSettings, sellingRates, ratesUpdated, weightSettings] = await Promise.all([
     activeStoreId
       ? prisma.store.findUnique({
           where: { id: activeStoreId },
@@ -186,6 +189,8 @@ export default async function DashboardLayout({
       : Promise.resolve(null),
     showRates && activeStoreId ? getSellingRateGroups(activeStoreId) : Promise.resolve([]),
     showRates && activeStoreId ? getLastSellingRateUpdate(activeStoreId) : Promise.resolve(null),
+    // Settings > Weights for every form's live net / fine preview (cached per store).
+    activeStoreId ? getCachedWeightSettings(activeStoreId) : Promise.resolve(DEFAULT_WEIGHT_SETTINGS),
   ]);
 
   // Resolved fresh on every layout render, not read off the session token —
@@ -367,6 +372,7 @@ export default async function DashboardLayout({
         `}</style>
       )}
       <SessionProvider session={session}>
+        <WeightSettingsProvider value={weightSettings}>
         <SidebarProvider side={sidebarSide}>
           {/* DOM order, not just <Sidebar side=...>, is what actually moves
               the sidebar to the right — see sidebarSide's own comment above. */}
@@ -382,6 +388,7 @@ export default async function DashboardLayout({
             </>
           )}
         </SidebarProvider>
+        </WeightSettingsProvider>
       </SessionProvider>
     </div>
   );

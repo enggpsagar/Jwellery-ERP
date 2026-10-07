@@ -126,6 +126,7 @@ export default async function EditInvoicePage({ params }: Props) {
     stoneCertificateNumber: item.stoneCertificateNumber,
     dmoWeight: toGrams(item.dmoWeight),
     dmoWeightUnit: unit,
+    wastagePercent: item.wastagePercent != null ? Number(item.wastagePercent) : null,
     stoneWeightInput: toGrams(item.stoneWeight),
     stoneWeightUnit: unit,
     hmCharge: item.hmCharge,

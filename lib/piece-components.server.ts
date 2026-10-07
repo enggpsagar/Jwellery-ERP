@@ -20,6 +20,7 @@ export type ResolvedPieceComponent = {
   grossWeight: number | null;
   netWeight: number | null;
   fineWeight: number | null;
+  wastagePercent: number | null;
   stoneMetalTypeName: string | null;
   stoneTypeNames: string | null;
   caratWeight: number | null;
@@ -46,6 +47,8 @@ export type ResolvedPiece = {
     grossWeight: number | null;
     netWeight: number | null;
     fineWeight: number | null;
+    /** The first metal's wastage % (the parent's fineWeight is its pure weight). */
+    wastagePercent: number | null;
     stoneCharge: number;
     caratWeight: number | null;
     stoneWeight: number | null;
@@ -112,6 +115,7 @@ export async function getPieceResolver(storeId: string, options: { valuation: Pi
           grossWeight: null,
           netWeight: null,
           fineWeight: null,
+          wastagePercent: null,
           stoneMetalTypeName: name,
           stoneTypeNames: row.stoneTypeNames?.trim() || null,
           caratWeight: caratWeight || null,
@@ -139,7 +143,13 @@ export async function getPieceResolver(storeId: string, options: { valuation: Pi
       }
       const rate = toNumber(row.rate);
       if (rate < 0) return { error: `Rate on ${label} can't be negative.` };
-      const fineWeight = fineOf({ metalTypeId: metal.id, purityLabel, purity, netWeight }) ?? netWeight;
+      // Wastage: the row's own (blank = none); its purity's default when the
+      // payload doesn't carry the field at all (e.g. an imported row).
+      const wastagePercent = metal.hasPurity
+        ? fineOf.wastageFor({ metalTypeId: metal.id, purityLabel, wastagePercent: row.wastagePercent })
+        : null;
+      const fineWeight =
+        fineOf({ metalTypeId: metal.id, purityLabel, purity, netWeight, grossWeight, wastagePercent }) ?? netWeight;
       const valued = options.valuation === "fine" ? fineWeight : netWeight;
       components.push({
         kind: "METAL",
@@ -151,6 +161,7 @@ export async function getPieceResolver(storeId: string, options: { valuation: Pi
         grossWeight: grossWeight && grossWeight > 0 ? grossWeight : null,
         netWeight,
         fineWeight,
+        wastagePercent,
         stoneMetalTypeName: null,
         stoneTypeNames: null,
         caratWeight: null,
@@ -186,6 +197,7 @@ export async function getPieceResolver(storeId: string, options: { valuation: Pi
         fineWeight: primary
           ? sum(metalRows.filter((row) => row.metalTypeId === primary.metalTypeId).map((row) => row.fineWeight))
           : null,
+        wastagePercent: primary?.wastagePercent ?? null,
         stoneCharge: round2(stoneRows.reduce((acc, row) => acc + row.amount, 0)),
         caratWeight: stoneRows.length ? sum(stoneRows.map((row) => row.caratWeight)) : null,
         stoneWeight: stoneRows.length ? stoneGrams : null,
@@ -234,6 +246,7 @@ export function pieceComponentCreates(components: ResolvedPieceComponent[]) {
     grossWeight: row.grossWeight,
     netWeight: row.netWeight,
     fineWeight: row.fineWeight,
+    wastagePercent: row.wastagePercent,
     stoneMetalTypeName: row.stoneMetalTypeName,
     stoneTypeNames: row.stoneTypeNames,
     caratWeight: row.caratWeight,
@@ -260,6 +273,7 @@ export function serializeStoredComponents(
     grossWeight: Prisma.Decimal | null;
     netWeight: Prisma.Decimal | null;
     fineWeight: Prisma.Decimal | null;
+    wastagePercent?: Prisma.Decimal | null;
     stoneMetalTypeName: string | null;
     stoneTypeNames: string | null;
     caratWeight: Prisma.Decimal | null;
@@ -287,6 +301,7 @@ export function serializeStoredComponents(
       grossWeight: n(row.grossWeight),
       netWeight: n(row.netWeight),
       fineWeight: n(row.fineWeight),
+      wastagePercent: row.wastagePercent != null ? Number(row.wastagePercent) : null,
       stoneMetalTypeName: row.stoneMetalTypeName,
       stoneTypeNames: row.stoneTypeNames,
       caratWeight: n(row.caratWeight),

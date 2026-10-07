@@ -392,6 +392,10 @@ model StoreMetalPurity {
   sellingPrice    Decimal?   @db.Decimal(12, 2)
   // Replaces the hardcoded isHallmarkablePurity() purity list.
   isHallmarkable  Boolean    @default(false)
+  // Default wastage / touch % copied onto each new sale and purchase line of
+  // this purity (editable there). null / 0 = none. Added to the fineness for
+  // the fine weight only when BusinessSettings.addWastageToFineWeight is on.
+  wastagePercent  Decimal?   @db.Decimal(5, 2)
   sortOrder       Int        @default(0)
   isActive        Boolean    @default(true)
   createdAt       DateTime   @default(now())
@@ -1250,6 +1254,8 @@ model KachaInvoiceItem {
   // metal balance/report totals this, never raw netWeight (see
   // lib/fine-weight.ts). Physical netWeight stays what's printed.
   fineWeight         Decimal?        @db.Decimal(12, 5)
+  // Wastage / touch % (default from the purity, editable) — lib/weight-calc.ts.
+  wastagePercent     Decimal?        @db.Decimal(5, 2)
   dmoWeight          Decimal?        @db.Decimal(12, 5)
   stoneWeight        Decimal?        @db.Decimal(12, 5)
   caratWeight        Decimal?        @db.Decimal(10, 3)
@@ -1307,6 +1313,8 @@ model InvoiceItem {
   // metal balance/report totals this, never raw netWeight (see
   // lib/fine-weight.ts). Physical netWeight stays what's printed.
   fineWeight         Decimal?         @db.Decimal(12, 5)
+  // Wastage / touch % (default from the purity, editable) — lib/weight-calc.ts.
+  wastagePercent     Decimal?         @db.Decimal(5, 2)
   dmoWeight          Decimal?         @db.Decimal(12, 5)
   // Net stone weight (carats or grams, store's choice — same free-typed
   // convention as every other weight field), separate from dmoWeight (which
@@ -1642,6 +1650,8 @@ model PurchaseItem {
   // metal balance/report totals this, never raw netWeight (see
   // lib/fine-weight.ts). Physical netWeight stays what's printed.
   fineWeight         Decimal?        @db.Decimal(12, 5)
+  // Wastage / touch % (default from the purity, editable) — lib/weight-calc.ts.
+  wastagePercent     Decimal?        @db.Decimal(5, 2)
   dmoWeight          Decimal?        @db.Decimal(12, 5)
   stoneWeight        Decimal?        @db.Decimal(12, 5)
   caratWeight        Decimal?        @db.Decimal(10, 3)
@@ -2020,6 +2030,8 @@ model QuotationItem {
   // metal balance/report totals this, never raw netWeight (see
   // lib/fine-weight.ts). Physical netWeight stays what's printed.
   fineWeight         Decimal?        @db.Decimal(12, 5)
+  // Wastage / touch % (default from the purity, editable) — lib/weight-calc.ts.
+  wastagePercent     Decimal?        @db.Decimal(5, 2)
   stoneWeight        Decimal?        @db.Decimal(12, 5)
   caratWeight        Decimal?        @db.Decimal(10, 3)
   rate               Decimal?        @db.Decimal(12, 2)
@@ -2195,6 +2207,26 @@ model BusinessSettings {
   // current hallmarking-centre invoice. Settings UI must tell the store to
   // verify/correct this figure, not present it as an authoritative rate.
   hallmarkChargePerPiece Decimal @default(45) @db.Decimal(12, 2)
+
+  // Settings > Weights (lib/weight-calc.ts is the one calculator). Every
+  // default reproduces how net / fine weight were worked out before these
+  // settings existed.
+  // Net weight = Gross − (stone weight, when on) − (DMO / Less weight, when on).
+  netDeductStoneWeight   Boolean         @default(true)
+  netDeductDmoWeight     Boolean         @default(true)
+  // Which weight the purity fineness % is applied to for the fine (24K) figure.
+  fineWeightBasis        FineWeightBasis @default(NET)
+  // On: fine = basis × (fineness % + the line's wastage %) / 100.
+  addWastageToFineWeight Boolean         @default(false)
+  // Decimals weights are shown / printed with. Calculated net / fine weights
+  // keep the column precision (5 for grams) unless fewer than 3 are chosen,
+  // when they are rounded to what is shown (lib/weight-calc.ts calcDecimals).
+  weightDecimalsGram     Int             @default(3)
+  weightDecimalsCarat    Int             @default(3)
+  // In-progress "recalculate existing records" run (resumable), and the log
+  // of finished runs (newest first) — lib/weight-recalc.server.ts.
+  weightRecalcJob        Json?
+  weightRecalcLog        Json?
 
   // Whether the return window policy is active at all — a store can turn
   // returns off entirely without losing whatever returnWindowDays it had
@@ -3004,6 +3036,12 @@ enum SkuFormat {
 // bands) for stores that bill at a counter with a receipt printer instead
 // of a full-page one. Store-wide (BusinessSettings.printLayout), not
 // per-invoice — matches SkuFormat's own "one store-wide choice" convention.
+/// Settings > Weights: what the purity fineness % is applied to.
+enum FineWeightBasis {
+  NET
+  GROSS
+}
+
 enum PrintLayout {
   A4
   THERMAL
@@ -3274,6 +3312,8 @@ model PieceComponent {
   netWeight          Decimal?           @db.Decimal(12, 5)
   // Pure (24K / 999) weight of netWeight — lib/fine-weight.ts.
   fineWeight         Decimal?           @db.Decimal(12, 5)
+  // Wastage / touch % (default from the purity, editable) — lib/weight-calc.ts.
+  wastagePercent     Decimal?           @db.Decimal(5, 2)
   // STONE (denormalized names, same as InventoryStock.stoneMetalTypeName)
   stoneMetalTypeName String?
   stoneTypeNames     String?

@@ -21,6 +21,7 @@ import { round2, round5, type StoredPieceComponent } from "@/lib/piece-component
 import { serializeStoredComponents } from "@/lib/piece-components.server";
 import { stockOptionProductDetailsSelect, type ProductDetails } from "@/lib/inventory/stock-option-details";
 import type { LinkedStoneDetails } from "@/lib/inventory/stock-pick-rates";
+import type { FineWeightResolver } from "@/lib/fine-weight";
 
 type Decimalish = Prisma.Decimal | null;
 
@@ -37,6 +38,7 @@ type StockWithRows = {
     grossWeight: Decimalish;
     netWeight: Decimalish;
     fineWeight: Decimalish;
+    wastagePercent?: Decimalish;
     stoneMetalTypeName: string | null;
     stoneTypeNames: string | null;
     caratWeight: Decimalish;
@@ -248,7 +250,8 @@ export function newStockPieceRows(
   product: NewStockProduct,
   entered: { netWeight: number | null; caratWeight: number | null },
   options: {
-    fineOf: (line: { metalTypeId: string; purityLabel: string | null; purity: PurityType | null; netWeight: number }) => number | null;
+    /** lib/fine-weight.ts — fine weight + the purity's default wastage. */
+    fineOf: FineWeightResolver;
     gstById: Map<string, { name: string; ratePercent: Prisma.Decimal | number }>;
   },
 ): NewStockPieceRows | null {
@@ -280,16 +283,22 @@ export function newStockPieceRows(
     const gross = productGross != null ? round5(productGross * metalFactor) : null;
     const purityLabel = row.storeMetalPurity?.label ?? null;
     const purity = matchLegacyPurityType(classifyPurityFamily(row.metalType), purityLabel) as PurityType | null;
-    const fineWeight = net != null && net > 0 ? options.fineOf({ metalTypeId: row.metalTypeId, purityLabel, purity, netWeight: net }) : null;
+    const rowGross = gross != null && net != null ? Math.max(gross, net) : gross ?? net;
+    const weights =
+      net != null && net > 0
+        ? options.fineOf.line({ metalTypeId: row.metalTypeId, purityLabel, purity, netWeight: net, grossWeight: rowGross })
+        : { fineWeight: null, wastagePercent: null };
+    const fineWeight = weights.fineWeight;
     components.push({
       kind: "METAL",
       sortOrder: components.length,
       metalTypeId: row.metalTypeId,
       purity,
       purityLabel,
-      grossWeight: gross != null && net != null ? Math.max(gross, net) : gross ?? net,
+      grossWeight: rowGross,
       netWeight: net,
       fineWeight,
+      wastagePercent: weights.wastagePercent,
       amount: 0,
       ...gstFields(row.gstRateId),
     });

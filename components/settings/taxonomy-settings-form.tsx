@@ -1208,6 +1208,7 @@ function PuritiesSection({
                       <span className="ml-2 text-xs text-muted-foreground">
                         SKU "{option.skuCode}" &middot; {option.finenessPercent}% fine
                         {option.sellingPrice != null ? ` · ₹${option.sellingPrice}` : ""}
+                        {option.wastagePercent ? ` · ${option.wastagePercent}% wastage` : ""}
                         {option.isHallmarkable ? " · Hallmarkable" : ""}
                       </span>
                       {(() => {
@@ -1385,6 +1386,26 @@ function PurityFormRow({
           defaultValue={option?.sellingPrice ?? ""}
           placeholder="Optional"
         />
+      </div>
+
+      {/* Default wastage / touch % copied onto new sale and purchase lines
+          of this purity (Settings > Weights decides whether it counts in
+          the fine weight). */}
+      <div className="w-28 space-y-1.5 rounded-lg transition-colors focus-within:bg-accent/40">
+        <Label htmlFor="purity-wastage">Wastage %</Label>
+        <Input
+          id="purity-wastage"
+          name="wastagePercent"
+          type="number"
+          step="0.01"
+          min="0"
+          max="100"
+          defaultValue={option?.wastagePercent ?? ""}
+          placeholder="None"
+        />
+        {state.errors?.wastagePercent?.[0] ? (
+          <p className="text-sm text-red-600">{state.errors.wastagePercent[0]}</p>
+        ) : null}
       </div>
 
       <label className="flex items-center gap-2 pb-2 text-sm">

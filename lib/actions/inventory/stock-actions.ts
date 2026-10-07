@@ -879,9 +879,17 @@ export async function createInventoryStock(
       return rows ? { rows, hasPurity: new Map(storeMetals.map((metal) => [metal.id, metal.hasPurity])) } : null
     })()
 
-    const fineWeight = pieceRows
-      ? pieceRows.rows.fineWeight
-      : await resolveFineWeight(storeId, { metalTypeId, purityLabel, purity, netWeight })
+    // Wastage: Add Stock doesn't ask for it — the purity's default (Settings ›
+    // Metals & Categories) unless a value was posted.
+    const weights = (await getFineWeightResolver(storeId)).line({
+      metalTypeId,
+      purityLabel,
+      purity,
+      netWeight,
+      grossWeight,
+      wastagePercent: formData.has("wastagePercent") ? wastagePercent : undefined,
+    })
+    const fineWeight = pieceRows ? pieceRows.rows.fineWeight : weights.fineWeight
     const metalWeightFine = storeMetal?.hasPurity && fineWeight ? fineWeight : undefined
     const stockAddedDescription = `Stock added — ${stockCode}${tagNumber ? ` (Tag ${tagNumber})` : ""}`
     const ledgerMetals = pieceRows
@@ -917,7 +925,7 @@ export async function createInventoryStock(
           stoneWeight: toDecimal(stoneWeight),
           caratWeight: toDecimal(caratWeight),
           dmoWeight: toDecimal(dmoWeight),
-          wastagePercent: toDecimal(wastagePercent),
+          wastagePercent: toDecimal(weights.wastagePercent),
           purchaseRate: toDecimal(purchaseRate),
           saleRate: toDecimal(saleRate),
           makingCharge,
@@ -1279,7 +1287,9 @@ export async function updateInventoryStock(
     const summary = pieceRowsPlan?.summary
     const fineWeight = summary
       ? summary.fineWeight
-      : toDecimal(await resolveFineWeight(storeId, { metalTypeId, purityLabel, purity, netWeight })) ?? null
+      : toDecimal(
+          await resolveFineWeight(storeId, { metalTypeId, purityLabel, purity, netWeight, grossWeight, wastagePercent }),
+        ) ?? null
 
     await prisma.$transaction([
       ...(pieceRowsPlan?.writes ?? []),
@@ -1772,11 +1782,13 @@ export async function importInventoryStockFromExcel(
       const grossWeight = grossTyped ?? decimalOrNull(product.defaultGrossWeight)
       const stoneWeight = stoneTyped ?? decimalOrNull(product.defaultStoneWeight)
       const caratWeight = caratTyped ?? decimalOrNull(product.defaultCaratWeight)
+      // Blank Net = Gross − Less − Stone per Settings > Weights (the
+      // form's deriveNetWeight, lib/weight-calc.ts), never below 0.
       const netWeight =
         netTyped ??
         (grossTyped !== null || lessWeight !== null || stoneTyped !== null
           ? grossWeight !== null
-            ? Number(Math.max(0, grossWeight - (lessWeight ?? 0) - (stoneWeight ?? 0)).toFixed(5))
+            ? fineOf.deriveNet({ grossWeight, lessWeight, stoneWeight }) ?? 0
             : null
           : decimalOrNull(product.defaultNetWeight))
       if (grossWeight === null) rowErrors.push("Gross Weight (g) is required (the product has none to fall back on)")
@@ -1825,9 +1837,14 @@ export async function importInventoryStockFromExcel(
           ? new Prisma.Decimal(product.defaultStoneRate).mul(caratWeight)
           : product.defaultStoneCharge
       const pieceRows = newStockPieceRows(product, { netWeight, caratWeight }, { fineOf, gstById })
-      const fineWeight = pieceRows
-        ? pieceRows.fineWeight
-        : fineOf({ metalTypeId: product.metalTypeId, purity: product.defaultPurity, purityLabel, netWeight })
+      const weights = fineOf.line({
+        metalTypeId: product.metalTypeId,
+        purity: product.defaultPurity,
+        purityLabel,
+        netWeight,
+        grossWeight,
+      })
+      const fineWeight = pieceRows ? pieceRows.fineWeight : weights.fineWeight
       const stockId = randomUUID()
       if (pieceRows) {
         for (const component of pieceRows.components) componentRows.push({ ...component, inventoryStockId: stockId })
@@ -1849,6 +1866,7 @@ export async function importInventoryStockFromExcel(
         lessWeight,
         netWeight: netWeight!,
         fineWeight,
+        wastagePercent: weights.wastagePercent,
         stoneWeight,
         caratWeight,
         purchaseRate,

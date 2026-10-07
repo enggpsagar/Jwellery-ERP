@@ -1,5 +1,8 @@
 "use client"
 
+import { LineWastageField } from "@/components/shared/line-wastage-field"
+import { deriveNetWeight as calcNetWeight, normalizeWastagePercent, netWeightHint, type WeightSettings } from "@/lib/weight-calc"
+import { useWeightSettings } from "@/components/providers/weight-settings-provider"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useActionState } from "react"
@@ -102,6 +105,9 @@ type StockOption = {
 
 type LineItem = {
   key: string
+  /** Wastage / touch % (Settings > Weights) — the purity's default on
+   *  pick, editable; undefined = not set (the server applies the default). */
+  wastagePercent?: number | null
   itemName: string
   metalTypeId: string
   purity: string
@@ -289,6 +295,7 @@ export function QuotationForm({
   fineRates = { gold: null, silver: null },
   clarities = [],
 }: QuotationFormProps) {
+  const weightSettings = useWeightSettings()
   // Every hand-typed line needs its source party — see sourcePartyId.
   const missingSourceParty = (lines: LineItem[]) =>
     lines.some((line) => !line.inventoryStockId && !line.sourcePartyId)
@@ -349,7 +356,11 @@ export function QuotationForm({
     const metal = metalById.get(item.metalTypeId)
     const family = metal ? classifyPurityFamily(metal) : null
     const legacyPurity = matchLegacyPurityType(family, selected?.label) ?? ""
-    const patch: Partial<LineItem> = { purityLabel: selected?.label ?? "", purity: legacyPurity }
+    const patch: Partial<LineItem> = {
+      purityLabel: selected?.label ?? "",
+      purity: legacyPurity,
+      wastagePercent: normalizeWastagePercent(selected?.wastagePercent),
+    }
     if (!item.hmChargeTouched && (selected?.isHallmarkable || isHallmarkablePurity(legacyPurity))) {
       patch.hmCharge = hallmarkChargePerPiece
     }
@@ -838,6 +849,7 @@ export function QuotationForm({
         enumFineness,
         Boolean(metalById.get(line.metalTypeId)?.isGemstone),
         metalPuritiesCache,
+        weightSettings,
       ).total,
     0,
   )
@@ -856,6 +868,7 @@ export function QuotationForm({
         metalTypeId: item.metalTypeId || null,
         purity: item.purity || null,
         purityLabel: item.purityLabel || null,
+        wastagePercent: item.multiPart || item.wastagePercent === undefined ? undefined : normalizeWastagePercent(item.wastagePercent),
         quantity: item.quantity || 1,
         grossWeight: item.grossWeight || null,
         netWeight: toUnit(item.netWeight) || null,
@@ -1196,6 +1209,17 @@ export function QuotationForm({
                     </Button>
                   </div>
                 </div>
+
+                {!item.multiPart && (
+                  <LineWastageField
+                    value={item.wastagePercent}
+                    onChange={(wastagePercent) => updateItem(item.key, { wastagePercent })}
+                    grossWeight={0}
+                    netWeight={item.netWeight || 0}
+                    finenessPercent={(metalPuritiesCache[item.metalTypeId] ?? []).find((option) => option.label === item.purityLabel)?.finenessPercent ?? null}
+                    hasPurity={Boolean(metalById.get(item.metalTypeId)?.hasPurity)}
+                  />
+                )}
                 </>
                 )}
 

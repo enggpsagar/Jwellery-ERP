@@ -1,5 +1,7 @@
 "use client";
 
+import { deriveNetWeight as calcNetWeight, netWeightHint } from "@/lib/weight-calc";
+import { useWeightSettings } from "@/components/providers/weight-settings-provider";
 import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 
@@ -227,16 +229,19 @@ export function StockForm({
   // Weight even over an existing saved value); stops only once Net
   // Weight itself is edited directly in this session.
   const [netTouched, setNetTouched] = useState(false);
+  const weightSettings = useWeightSettings();
 
   function toNum(value: string) {
     const trimmed = value.trim();
     return trimmed === "" ? 0 : Number(trimmed);
   }
 
+  // Settings > Weights decides which deductions count (lib/weight-calc.ts,
+  // the same calculator the server's stock import uses).
   function deriveNet(gross: string, less: string, stone: string) {
     if (gross.trim() === "" || !Number.isFinite(Number(gross))) return null;
-    const net = toNum(gross) - toNum(less) - toNum(stone);
-    return net >= 0 ? String(Number(net.toFixed(3))) : null;
+    const net = calcNetWeight({ grossWeight: toNum(gross), lessWeight: toNum(less), stoneWeight: toNum(stone) }, weightSettings);
+    return net !== null ? String(net) : toNum(gross) === 0 ? "0" : null;
   }
 
   function editGrossWeight(value: string) {
@@ -839,7 +844,7 @@ export function StockForm({
             />
             {!netTouched && (
               <p className="mt-1 text-xs text-muted-foreground">
-                Gross − less − stone − dust/other. Type to override.
+                {netWeightHint(weightSettings, "less")}. Type to override.
               </p>
             )}
 

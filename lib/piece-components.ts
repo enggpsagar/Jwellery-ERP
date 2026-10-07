@@ -10,6 +10,11 @@
 // a sale or purchase, or on its pure (24K / 999) weight on a Customer
 // Exchange ("fine" valuation). GST is per row, at the row's own rate; the
 // line's making/HM charge is taxed at the line's rate.
+//
+// A metal row's pure weight follows Settings > Weights (lib/weight-calc.ts
+// calcFineWeight): basis net / gross, plus the row's wastage % when that's on.
+
+import { calcFineWeight, DEFAULT_WEIGHT_SETTINGS, normalizeWastagePercent, type WeightSettings } from "@/lib/weight-calc"
 
 export type PieceMetalDraft = {
   key: string
@@ -24,6 +29,8 @@ export type PieceMetalDraft = {
   /** Per gram (per gram of pure metal for "fine" valuation). */
   rate: number
   gstRateId: string
+  /** Wastage / touch % (default from the purity, editable). */
+  wastagePercent?: number | null
 }
 
 export type PieceStoneDraft = {
@@ -64,6 +71,7 @@ export type PieceComponentPayload = {
   purity?: string | null
   grossWeight?: number | null
   netWeight?: number | null
+  wastagePercent?: number | null
   stoneMetalTypeName?: string | null
   stoneTypeNames?: string | null
   caratWeight?: number | null
@@ -85,6 +93,7 @@ export type StoredPieceComponent = {
   grossWeight: number | null
   netWeight: number | null
   fineWeight: number | null
+  wastagePercent?: number | null
   stoneMetalTypeName: string | null
   stoneTypeNames: string | null
   caratWeight: number | null
@@ -159,12 +168,34 @@ export type PieceValueOptions = {
   valuation: PieceValuation
   /** Fineness % of a metal row's purity (only used for "fine" valuation). */
   finenessOf?: (row: PieceMetalDraft) => number
+  /** Settings > Weights (useWeightSettings); defaults when absent. */
+  weightSettings?: WeightSettings
 }
 
-/** Pure weight of a metal row (net × fineness), for display. */
-export function metalRowFine(row: PieceMetalDraft, finenessOf?: (row: PieceMetalDraft) => number) {
-  const fineness = finenessOf ? finenessOf(row) : 100
-  return row.netWeight > 0 ? round5((row.netWeight * fineness) / 100) : 0
+/**
+ * Pure weight of a metal row — lib/weight-calc.ts calcFineWeight with the
+ * store's settings (the server computes the same in getFineWeightResolver).
+ * A row with no purity (a metal without one) counts its net weight.
+ */
+export function metalRowFine(
+  row: PieceMetalDraft,
+  finenessOf?: (row: PieceMetalDraft) => number,
+  settings: WeightSettings = DEFAULT_WEIGHT_SETTINGS,
+) {
+  if (!(row.netWeight > 0)) return 0
+  const hasPurity = Boolean(row.purityLabel || row.purity)
+  return (
+    calcFineWeight(
+      {
+        netWeight: row.netWeight,
+        grossWeight: row.grossWeight,
+        finenessPercent: finenessOf ? finenessOf(row) : 100,
+        wastagePercent: row.wastagePercent,
+        hasPurity,
+      },
+      settings,
+    ) ?? 0
+  )
 }
 
 /** One row's value per piece, before GST. */
@@ -172,7 +203,7 @@ export function componentAmount(row: PieceComponentDraft, options: PieceValueOpt
   if (row.kind === "STONE") {
     return row.amountTouched ? round2(Math.max(row.amount || 0, 0)) : round2((row.caratWeight || 0) * (row.rate || 0))
   }
-  const weight = options.valuation === "fine" ? metalRowFine(row, options.finenessOf) : row.netWeight || 0
+  const weight = options.valuation === "fine" ? metalRowFine(row, options.finenessOf, options.weightSettings) : row.netWeight || 0
   return round2(Math.max(weight, 0) * Math.max(row.rate || 0, 0))
 }
 
@@ -243,6 +274,7 @@ export function toComponentPayload(rows: PieceComponentDraft[], options: PieceVa
           purity: row.purity || null,
           grossWeight: row.grossWeight || null,
           netWeight: row.netWeight || null,
+          wastagePercent: normalizeWastagePercent(row.wastagePercent),
           rate: row.rate || null,
           amount: componentAmount(row, options),
           gstRateId: row.gstRateId || null,
@@ -278,6 +310,7 @@ export function fromStoredComponents(rows: StoredPieceComponent[]): PieceCompone
           netTouched: true,
           rate: row.rate ?? 0,
           gstRateId: row.gstRateId ?? "",
+          wastagePercent: row.wastagePercent ?? null,
         }
       : {
           key: newKey(),

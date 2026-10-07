@@ -17,7 +17,7 @@ import {
 
 import { prisma } from "@/lib/prisma";
 import { METALS_AND_STONES_COLUMN, describePieceComponentsText } from "@/lib/piece-components-text";
-import { getFineWeightResolver } from "@/lib/fine-weight";
+import { getFineWeightResolver, storedLineWeights } from "@/lib/fine-weight";
 import {
   getPieceResolver,
   resolveLineStoneDetails,
@@ -110,6 +110,8 @@ export type QuotationLineItemInput = {
   grossWeight?: number | null;
   netWeight?: number | null;
   stoneWeight?: number | null;
+  // Wastage / touch % (Settings > Weights): absent = the purity's default, null = none.
+  wastagePercent?: number | null;
   caratWeight?: number | null;
   rate?: number | null;
   makingCharge: number;
@@ -243,6 +245,8 @@ async function resolvePieceRows(
           purity: row.purity,
           grossWeight: row.grossWeight,
           netWeight: row.netWeight,
+          // Wastage stays editable on a stock piece's row (the form's value).
+          wastagePercent: sent && sent.wastagePercent !== undefined ? sent.wastagePercent : row.wastagePercent ?? undefined,
           stoneMetalTypeName: row.stoneMetalTypeName,
           stoneTypeNames: row.stoneTypeNames,
           caratWeight: row.caratWeight,
@@ -983,7 +987,7 @@ export async function createQuotation(
             quantity: item.quantity || 1,
             grossWeight: item.grossWeight ?? undefined,
             netWeight: item.netWeight ?? undefined,
-            fineWeight: (item.piece ? item.piece.summary.fineWeight : fineOf(item)) ?? undefined,
+            ...storedLineWeights(item, fineOf),
             components: item.piece ? { create: pieceComponentCreates(item.piece.components) } : undefined,
             stoneWeight: item.stoneWeight ?? undefined,
             caratWeight: item.caratWeight ?? undefined,
@@ -1330,6 +1334,7 @@ export async function convertQuotationToInvoice(
               grossWeight: item.grossWeight ?? undefined,
               netWeight: item.netWeight ?? undefined,
               fineWeight: item.fineWeight ?? undefined,
+              wastagePercent: item.wastagePercent ?? undefined,
               stoneWeight: item.stoneWeight ?? undefined,
               caratWeight: item.caratWeight ?? undefined,
               rate: item.rate ?? undefined,
@@ -1357,6 +1362,7 @@ export async function convertQuotationToInvoice(
                       grossWeight: row.grossWeight,
                       netWeight: row.netWeight,
                       fineWeight: row.fineWeight,
+                      wastagePercent: row.wastagePercent,
                       stoneMetalTypeName: row.stoneMetalTypeName,
                       stoneTypeNames: row.stoneTypeNames,
                       caratWeight: row.caratWeight,

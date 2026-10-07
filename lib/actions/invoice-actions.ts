@@ -19,7 +19,7 @@ import {
 
 import { prisma } from "@/lib/prisma";
 import { METALS_AND_STONES_COLUMN, describePieceComponentsText } from "@/lib/piece-components-text";
-import { getFineWeightResolver } from "@/lib/fine-weight";
+import { getFineWeightResolver, lineWeights, storedLineWeights } from "@/lib/fine-weight";
 import { lookupPromotionCode } from "@/lib/promotions.server";
 import { computePromotion, type PromotionLine } from "@/lib/promotions";
 import {
@@ -95,6 +95,9 @@ export type InvoiceLineItemInput = {
   stoneCertificateNumber?: string | null;
   dmoWeight?: number | null;
   stoneWeight?: number | null;
+  // Wastage / touch % (Settings > Weights; default from the purity).
+  // Absent = the purity's default, null = none.
+  wastagePercent?: number | null;
   hmCharge?: number;
   schemeDiscount?: number;
   // The part of schemeDiscount that is an offer / voucher (lib/promotions.ts)
@@ -313,6 +316,8 @@ async function resolvePieceRows(
           purity: row.purity,
           grossWeight: row.grossWeight,
           netWeight: row.netWeight,
+          // Wastage stays editable on a stock piece's row (the form's value).
+          wastagePercent: sent && sent.wastagePercent !== undefined ? sent.wastagePercent : row.wastagePercent ?? undefined,
           stoneMetalTypeName: row.stoneMetalTypeName,
           stoneTypeNames: row.stoneTypeNames,
           caratWeight: row.caratWeight,
@@ -558,6 +563,7 @@ export type InvoiceItemView = {
   stoneClarity: string | null;
   stoneCertificateNumber: string | null;
   dmoWeight: number | null;
+  wastagePercent: number | null;
   stoneWeight: number | null;
   hmCharge: number;
   schemeDiscount: number;
@@ -659,6 +665,7 @@ function mapInvoice(invoice: any) {
       stoneClarity: item.stoneClarity ?? null,
       stoneCertificateNumber: item.stoneCertificateNumber ?? null,
       dmoWeight: item.dmoWeight ? Number(item.dmoWeight) : null,
+      wastagePercent: item.wastagePercent != null ? Number(item.wastagePercent) : null,
       stoneWeight: item.stoneWeight ? Number(item.stoneWeight) : null,
       hmCharge: Number(item.hmCharge ?? 0),
       schemeDiscount: Number(item.schemeDiscount ?? 0),
@@ -1638,7 +1645,7 @@ export async function createInvoice(
           actor,
           locationId: resolvedLocationId,
           referenceType: "Invoice",
-          fineWeight: item.piece ? item.piece.summary.fineWeight : fineOf(item),
+          ...lineWeights(item, fineOf),
           piece: item.piece,
         });
         soldItems.push({ ...item, inventoryStockId: newStockId });
@@ -1685,7 +1692,7 @@ export async function createInvoice(
               quantity: item.quantity || 1,
               grossWeight: item.grossWeight ?? undefined,
               netWeight: item.netWeight ?? undefined,
-              fineWeight: (item.piece ? item.piece.summary.fineWeight : fineOf(item)) ?? undefined,
+              ...storedLineWeights(item, fineOf),
               components: item.piece ? { create: pieceComponentCreates(item.piece.components) } : undefined,
               caratWeight: item.caratWeight ?? undefined,
               rate: item.rate ?? undefined,
@@ -2427,7 +2434,7 @@ export async function updateInvoice(
           actor,
           locationId: resolvedLocationId,
           referenceType: "Invoice",
-          fineWeight: item.piece ? item.piece.summary.fineWeight : fineOf(item),
+          ...lineWeights(item, fineOf),
           piece: item.piece,
         });
         soldItems.push({ ...item, inventoryStockId: newStockId });
@@ -2505,7 +2512,7 @@ export async function updateInvoice(
               quantity: item.quantity || 1,
               grossWeight: item.grossWeight ?? undefined,
               netWeight: item.netWeight ?? undefined,
-              fineWeight: (item.piece ? item.piece.summary.fineWeight : fineOf(item)) ?? undefined,
+              ...storedLineWeights(item, fineOf),
               components: item.piece ? { create: pieceComponentCreates(item.piece.components) } : undefined,
               caratWeight: item.caratWeight ?? undefined,
               rate: item.rate ?? undefined,

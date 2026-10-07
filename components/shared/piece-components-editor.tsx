@@ -29,6 +29,8 @@ import {
 } from "@/lib/piece-components"
 import type { GstRateRow } from "@/lib/actions/gst-rate-actions"
 import type { StoreMetalOriginRow, StoreMetalPurityRow, StoreMetalRow } from "@/lib/actions/taxonomy-actions"
+import { formatWeight, normalizeWastagePercent } from "@/lib/weight-calc"
+import { useWeightSettings } from "@/components/providers/weight-settings-provider"
 
 const rupees = (value: number) =>
   `₹${value.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
@@ -104,8 +106,12 @@ export function PieceComponentsEditor({
   const showGst = Boolean(gstRates?.length)
   const activeGst = (gstRates ?? []).filter((rate) => rate.isActive || rows.some((r) => r.gstRateId === rate.id))
 
+  const weightSettings = useWeightSettings()
   const finenessOf = (row: PieceMetalDraft) => metalRowFineness(row, puritiesByMetal[row.metalTypeId], enumFineness)
-  const valueOptions = { valuation, finenessOf }
+  const valueOptions = { valuation, finenessOf, weightSettings }
+  // Wastage % per metal row (Settings > Weights): a sale / purchase only —
+  // shown while wastage counts in the fine weight, or a row carries one.
+  const wastageEditable = valuation === "net"
   const totals = pieceTotals(rows, valueOptions)
 
   const update = (key: string, patch: Partial<PieceComponentDraft>) =>
@@ -126,7 +132,7 @@ export function PieceComponentsEditor({
   const pureByMetal = new Map<string, number>()
   for (const row of rows) {
     if (row.kind !== "METAL" || !row.metalTypeId) continue
-    pureByMetal.set(row.metalTypeId, (pureByMetal.get(row.metalTypeId) ?? 0) + metalRowFine(row, finenessOf))
+    pureByMetal.set(row.metalTypeId, (pureByMetal.get(row.metalTypeId) ?? 0) + metalRowFine(row, finenessOf, weightSettings))
   }
 
   return (
@@ -156,7 +162,8 @@ export function PieceComponentsEditor({
           const purities = (puritiesByMetal[row.metalTypeId] ?? []).filter((p) => p.isActive || p.label === row.purityLabel)
           const family = metal ? classifyPurityFamily(metal) : null
           const legacyOptions = PURITY_SELECT_OPTIONS.filter((option) => (family ? option.value.startsWith(`${family}_`) : false))
-          const fine = metalRowFine(row, finenessOf)
+          const fine = metalRowFine(row, finenessOf, weightSettings)
+          const showWastage = wastageEditable && (weightSettings.addWastageToFineWeight || (row.wastagePercent ?? 0) > 0)
           return (
             <div
               key={row.key}
@@ -199,9 +206,12 @@ export function PieceComponentsEditor({
                   onValueChange={(value) => {
                     if (value.startsWith("label:")) {
                       const label = value.slice(6)
+                      const picked = purities.find((p) => p.label === label)
                       update(row.key, {
                         purityLabel: label,
                         purity: metal ? matchLegacyPurityType(classifyPurityFamily(metal), label) ?? "" : "",
+                        // The purity's default wastage (Settings › Metals & Categories).
+                        ...(wastageEditable ? { wastagePercent: normalizeWastagePercent(picked?.wastagePercent) } : {}),
                       })
                     } else {
                       update(row.key, { purityLabel: "", purity: value.slice(5) })
@@ -272,7 +282,25 @@ export function PieceComponentsEditor({
                   {rupees(amount)}
                 </p>
                 {fine > 0 && fine !== row.netWeight ? (
-                  <p className="text-[10px] text-muted-foreground">{fine.toFixed(3)} g pure</p>
+                  <p className="text-[10px] text-muted-foreground" data-testid={`${testIdPrefix}-row-fine`}>
+                    {formatWeight(fine, "GRAM", weightSettings)} g pure
+                  </p>
+                ) : null}
+                {showWastage ? (
+                  <div className="flex items-center gap-1">
+                    <Input
+                      type="number"
+                      step="any"
+                      min={0}
+                      className="h-7 w-16 px-1 text-xs"
+                      aria-label="Wastage %"
+                      title="Wastage / touch %"
+                      data-testid={`${testIdPrefix}-wastage`}
+                      value={row.wastagePercent ?? ""}
+                      onChange={(e) => update(row.key, { wastagePercent: e.target.value === "" ? null : Number(e.target.value) })}
+                    />
+                    <span className="text-[10px] text-muted-foreground">% wastage</span>
+                  </div>
                 ) : null}
               </div>
               <RemoveButton disabled={lockPhysical} onClick={() => onRowsChange(rows.filter((r) => r.key !== row.key))} />

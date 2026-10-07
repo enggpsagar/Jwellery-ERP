@@ -115,6 +115,7 @@ export default async function EditPurchasePage({ params }: Props) {
         : [],
       dmoWeight: toGrams(item.dmoWeight),
       dmoWeightUnit: unit,
+      wastagePercent: item.wastagePercent != null ? Number(item.wastagePercent) : null,
       stoneWeightInput: toGrams(item.stoneWeight),
       stoneWeightUnit: unit,
       hsnCode: item.hsnCode ?? "",

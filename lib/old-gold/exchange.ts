@@ -247,7 +247,9 @@ export async function resolveOldGoldLines(
       };
     }
 
-    const fineWeight = fineOf({ metalTypeId: metal.id, purityLabel, purity, netWeight }) ?? netWeight;
+    // Settings > Weights basis; a Customer Exchange line carries no wastage.
+    const fineWeight =
+      fineOf({ metalTypeId: metal.id, purityLabel, purity, netWeight, grossWeight, wastagePercent: null }) ?? netWeight;
     const metalValue = oldGoldLineValue(fineWeight, rate, deductionPercent);
     resolved.push({
       description: line.description?.trim() || `Old ${metal.name}`,

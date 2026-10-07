@@ -78,6 +78,9 @@ export type StoreMetalPurityRow = {
   finenessPercent: number;
   sellingPrice: number | null;
   isHallmarkable: boolean;
+  // Default wastage / touch % copied onto new sale / purchase lines of this
+  // purity (Settings > Weights). null = none.
+  wastagePercent: number | null;
   sortOrder: number;
   isActive: boolean;
 };
@@ -691,6 +694,7 @@ export async function getStoreMetalPurities(
     finenessPercent: Number(row.finenessPercent),
     sellingPrice: row.sellingPrice != null ? Number(row.sellingPrice) : null,
     isHallmarkable: row.isHallmarkable,
+    wastagePercent: row.wastagePercent != null ? Number(row.wastagePercent) : null,
     sortOrder: row.sortOrder,
     isActive: row.isActive,
   }));
@@ -717,6 +721,10 @@ export async function upsertStoreMetalPurity(
     const finenessPercentRaw = String(formData.get("finenessPercent") || "").trim();
     const sellingPriceRaw = String(formData.get("sellingPrice") || "").trim();
     const isHallmarkable = formData.get("isHallmarkable") === "true";
+    // Default wastage / touch % for new lines (blank / 0 = none). Only
+    // written when the form sends the field, so other callers keep it.
+    const wastageRaw = formData.has("wastagePercent") ? String(formData.get("wastagePercent") ?? "").trim() : null;
+    const wastageNumber = wastageRaw ? Number(wastageRaw) : null;
     // Blank isn't "100%": it's filled from the label once the metal is
     // known (defaultFinenessForLabel below), so a "22K" added without a
     // figure doesn't count as pure gold in every fine-weight total.
@@ -731,6 +739,9 @@ export async function upsertStoreMetalPurity(
     else if (skuCode.length > 20) errors.skuCode = ["SKU code must be 20 characters or fewer"];
     if (!Number.isFinite(finenessPercent) || finenessPercent <= 0 || finenessPercent > 100) {
       errors.finenessPercent = ["Fineness must be between 0 and 100"];
+    }
+    if (wastageNumber !== null && (!Number.isFinite(wastageNumber) || wastageNumber < 0 || wastageNumber > 100)) {
+      errors.wastagePercent = ["Wastage must be between 0 and 100"];
     }
 
     if (Object.keys(errors).length > 0) {
@@ -770,7 +781,15 @@ export async function upsertStoreMetalPurity(
     }
 
     let savedId = id;
-    const data = { label, skuCode, finenessPercent, sellingPrice, isHallmarkable, storeMetalId };
+    const data = {
+      label,
+      skuCode,
+      finenessPercent,
+      sellingPrice,
+      isHallmarkable,
+      storeMetalId,
+      ...(wastageRaw !== null ? { wastagePercent: wastageNumber && wastageNumber > 0 ? wastageNumber : null } : {}),
+    };
 
     const saved = await saveWithRateHistory(storeId, "purity", id, async (tx) => {
       if (id) {
@@ -2019,6 +2038,7 @@ export async function exportMetalsAndCategoriesToExcel(): Promise<TaxonomyExport
               "Fineness %": Number(purity.finenessPercent),
               "Selling Price": purity.sellingPrice != null ? Number(purity.sellingPrice) : "",
               Hallmarkable: yesNo(purity.isHallmarkable),
+              "Wastage %": purity.wastagePercent != null ? Number(purity.wastagePercent) : "",
             })),
           ),
         categories: categories.map((category) => ({
@@ -2131,7 +2151,15 @@ export async function importMetalsAndCategoriesFromExcel(
           hasPurity: true,
           primaryUnit: true,
           purities: {
-            select: { id: true, label: true, skuCode: true, finenessPercent: true, sellingPrice: true, isHallmarkable: true },
+            select: {
+              id: true,
+              label: true,
+              skuCode: true,
+              finenessPercent: true,
+              sellingPrice: true,
+              isHallmarkable: true,
+              wastagePercent: true,
+            },
           },
         },
       }),
@@ -2206,6 +2234,7 @@ export async function importMetalsAndCategoriesFromExcel(
       finenessPercent: number;
       sellingPrice: number | null;
       isHallmarkable: boolean;
+      wastagePercent: number | null;
     };
     const purityPlans: PurityPlan[] = [];
     const seenPurities = new Set<string>();
@@ -2269,6 +2298,11 @@ export async function importMetalsAndCategoriesFromExcel(
       const hallmarkable = parseYesNo(taxonomyImportCell(row, "Hallmarkable"));
       if (hallmarkable === undefined) rowErrors.push("Hallmarkable must be Yes or No");
 
+      const wastage = taxonomyImportNumber(taxonomyImportCell(row, "Wastage %"));
+      if (wastage !== null && (!Number.isFinite(wastage) || wastage < 0 || wastage > 100)) {
+        rowErrors.push("Wastage % must be a number from 0 to 100");
+      }
+
       if (rowErrors.length) {
         errors.push(`Purities Row ${line}: ${rowErrors.join("; ")}`);
         continue;
@@ -2285,6 +2319,15 @@ export async function importMetalsAndCategoriesFromExcel(
         finenessPercent,
         sellingPrice: price === null ? before : roundMoney(price),
         isHallmarkable: hallmarkable ?? existing?.isHallmarkable ?? false,
+        // Blank keeps what's saved; 0 clears it.
+        wastagePercent:
+          wastage === null
+            ? existing?.wastagePercent != null
+              ? Number(existing.wastagePercent)
+              : null
+            : wastage > 0
+              ? wastage
+              : null,
       });
     }
 
@@ -2358,6 +2401,7 @@ export async function importMetalsAndCategoriesFromExcel(
             finenessPercent: plan.finenessPercent,
             sellingPrice: plan.sellingPrice,
             isHallmarkable: plan.isHallmarkable,
+            wastagePercent: plan.wastagePercent,
           };
           let refId: string;
           if (plan.existingId) {

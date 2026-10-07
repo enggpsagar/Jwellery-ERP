@@ -8,7 +8,7 @@ import { dropdownsFor, hiddenSheetHeaders, pickSheetRow, stripHiddenSheetColumns
 import { getSheetFeatures } from "@/lib/sheet-features.server";
 
 import { prisma } from "@/lib/prisma";
-import { getFineWeightResolver, resolveFineWeight } from "@/lib/fine-weight";
+import { getFineWeightResolver } from "@/lib/fine-weight";
 import { requireStoreScope, getStoreIdForRead } from "@/lib/store-context";
 import { actionErrorMessage } from "@/lib/action-error";
 import { getLocationScope, resolveWritableLocationId } from "@/lib/location-scope";
@@ -575,6 +575,7 @@ export async function getProducts(params: GetProductsParams = {}) {
     metalTypeId: true,
     defaultPurity: true,
     defaultNetWeight: true,
+    defaultGrossWeight: true,
     storeMetalPurity: { select: { label: true } },
   } as const;
 
@@ -603,14 +604,16 @@ export async function getProducts(params: GetProductsParams = {}) {
     metalTypeId: string | null;
     defaultPurity: string | null;
     defaultNetWeight: Prisma.Decimal | null;
+    defaultGrossWeight?: Prisma.Decimal | null;
     storeMetalPurity: { label: string } | null;
   }) =>
-    fineWeightOf({
+    fineWeightOf.line({
       metalTypeId: row.metalTypeId,
       purityLabel: row.storeMetalPurity?.label,
       purity: row.defaultPurity,
       netWeight: row.defaultNetWeight,
-    });
+      grossWeight: row.defaultGrossWeight,
+    }).fineWeight;
 
   // How many pieces of this product design are currently in stock, summed
   // across every InventoryStock lot it has (a design can have several —
@@ -1396,11 +1399,12 @@ export async function createProduct(
               // against the scale without touching the design.
               grossWeight: defaultGrossWeight,
               netWeight: defaultNetWeight,
-              fineWeight: await resolveFineWeight(storeId, {
+              ...(await getFineWeightResolver(storeId)).line({
                 metalTypeId: metalTypeId || null,
                 purityLabel: storeMetalPurityRow?.label ?? null,
                 purity: resolvedDefaultPurity,
                 netWeight: defaultNetWeight,
+                grossWeight: defaultGrossWeight,
               }),
               stoneWeight: defaultStoneWeight,
               caratWeight: defaultCaratWeight,
@@ -2621,7 +2625,13 @@ export async function importProductsFromExcel(
           stoneCharge: row.defaultStoneCharge,
           grossWeight: row.defaultGrossWeight,
           netWeight: row.defaultNetWeight,
-          fineWeight: fineOf({ metalTypeId: row.metalTypeId, purity: row.defaultPurity, purityLabel: row.purityLabel, netWeight: row.defaultNetWeight == null ? null : Number(row.defaultNetWeight) }),
+          ...fineOf.line({
+            metalTypeId: row.metalTypeId,
+            purity: row.defaultPurity,
+            purityLabel: row.purityLabel,
+            netWeight: row.defaultNetWeight == null ? null : Number(row.defaultNetWeight),
+            grossWeight: row.defaultGrossWeight == null ? null : Number(row.defaultGrossWeight),
+          }),
           stoneWeight: row.defaultStoneWeight,
           caratWeight: row.defaultCaratWeight,
           stoneRate: row.defaultStoneRate,

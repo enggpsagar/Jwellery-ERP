@@ -3,9 +3,12 @@
 // real figure). Client-safe: no server-only imports.
 //
 // value = fine (24K / 999) weight × the fine rate × (1 − deduction% / 100),
-// fine weight = net weight × the purity's fineness % (lib/fine-weight.ts).
+// fine weight = net (or gross) weight × the purity's fineness %, per
+// Settings > Weights (lib/weight-calc.ts — the server's lib/fine-weight.ts
+// uses the same calculator). A Customer Exchange line carries no wastage.
 
 import type { PieceComponentDraft } from "@/lib/piece-components"
+import { calcFineWeight, DEFAULT_WEIGHT_SETTINGS, deriveNetWeight, type WeightSettings } from "@/lib/weight-calc"
 
 export type OldGoldLineDraft = {
   key: string
@@ -54,9 +57,14 @@ export function round5(value: number) {
   return Math.round(value * 100000) / 100000
 }
 
-export function oldGoldFineWeight(netWeight: number, finenessPercent: number) {
+export function oldGoldFineWeight(
+  netWeight: number,
+  finenessPercent: number,
+  settings: WeightSettings = DEFAULT_WEIGHT_SETTINGS,
+  grossWeight?: number | null,
+) {
   if (!(netWeight > 0)) return 0
-  return round5((netWeight * finenessPercent) / 100)
+  return calcFineWeight({ netWeight, grossWeight, finenessPercent, wastagePercent: null, hasPurity: true }, settings) ?? 0
 }
 
 export function oldGoldLineValue(fineWeight: number, rate: number, deductionPercent: number) {
@@ -70,10 +78,11 @@ export function oldGoldLineTotal(metalValue: number, stoneValue: number) {
   return round2(metalValue + Math.max(stoneValue || 0, 0))
 }
 
-/** Metal net weight left once the stone's weight comes off the gross. */
-export function netAfterStone(grossWeight: number, stoneWeightGrams: number) {
+/** Metal net weight left once the stone's weight comes off the gross
+ *  (only when Settings > Weights deducts stone weight). */
+export function netAfterStone(grossWeight: number, stoneWeightGrams: number, settings: WeightSettings = DEFAULT_WEIGHT_SETTINGS) {
   if (!(grossWeight > 0)) return 0
-  return round5(Math.max(0, grossWeight - Math.max(stoneWeightGrams || 0, 0)))
+  return deriveNetWeight({ grossWeight, stoneWeight: stoneWeightGrams }, settings) ?? 0
 }
 
 /**

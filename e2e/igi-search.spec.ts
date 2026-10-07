@@ -35,6 +35,14 @@ test("products and stock are searchable by IGI certificate number", async ({ pag
 
     await page.goto(`/inventory/stock?search=${encodeURIComponent(partial)}`)
     await expect(page.locator("tbody tr").filter({ hasText: stock.stockCode })).toHaveCount(1)
+
+    // The header search finds the product by IGI number too.
+    await page.goto("/dashboard")
+    await page.waitForLoadState("networkidle")
+    const header = page.getByPlaceholder(/Search parties, invoices, products/).first()
+    await header.click()
+    await header.fill(partial)
+    await expect(page.locator("#global-search-results").getByText(product.name)).toBeVisible()
   } finally {
     await db().inventoryStock.delete({ where: { id: stock.id } })
     await db().product.delete({ where: { id: product.id } })

@@ -30,6 +30,7 @@ import { loadWeightSettings } from "@/lib/weight-settings.server";
 import {
   calcFineWeight,
   deriveNetWeight,
+  fineDecimals,
   normalizeWastagePercent,
   type NetWeightInput,
   type WeightSettings,
@@ -136,7 +137,7 @@ export async function getFineWeightResolver(
     hasPurity,
     defaultWastage,
     wastageFor,
-    deriveNet: (input: NetWeightInput) => deriveNetWeight(input, settings),
+    deriveNet: (input: NetWeightInput) => deriveNetWeight(input, settings, "GRAM", fineDecimals("GRAM", settings)),
     line: (line: FineWeightLine) => {
       const wastagePercent = hasPurity(line.metalTypeId) ? wastageFor(line) : null;
       return { wastagePercent, fineWeight: resolve({ ...line, wastagePercent }) };

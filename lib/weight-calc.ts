@@ -121,6 +121,9 @@ export function deriveNetWeight(
   input: NetWeightInput,
   settings: WeightSettings,
   unit: WeightUnitValue | string | null = "GRAM",
+  /** Override the rounding (the server keeps the column's 5 decimals while
+   *  3+ are shown — what its Excel imports always stored). */
+  decimals?: number,
 ): number | null {
   const gross = toNumber(input.grossWeight)
   if (!gross) return null
@@ -129,7 +132,7 @@ export function deriveNetWeight(
     ? Math.max(toNumber(input.dmoWeight) ?? 0, 0) + Math.max(toNumber(input.lessWeight) ?? 0, 0)
     : 0
   const net = gross - stone - dmo
-  return net >= 0 ? roundTo(net, netDecimals(unit, settings)) : null
+  return net >= 0 ? roundTo(net, decimals ?? netDecimals(unit, settings)) : null
 }
 
 /** A short "Gross − stone − DMO" hint for the Net Weight field

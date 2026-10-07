@@ -1344,6 +1344,20 @@ export function InvoiceForm({
     updateItem(item.key, patch)
   }
 
+  // `value` is typed in item.grossWeightUnit. Re-derives net weight
+  // (gross − stone − DMO) until the user has typed a net weight by hand.
+  const handleGrossWeightChange = (item: LineItem, value: string) => {
+    const gramsPerCarat = resolveGramsPerCarat(item.purity, caratConversionRates)
+    const grossWeight = toPrimaryUnit(Number(value) || 0, item.grossWeightUnit, "GRAM", gramsPerCarat)
+    const derived = item.netTouched
+      ? null
+      : deriveNetWeight(grossWeight, item.stoneWeightInput, item.dmoWeight, weightSettings)
+    updateItem(item.key, {
+      grossWeight,
+      ...(derived !== null ? { netWeight: derived } : {}),
+    })
+  }
+
   // Diamond items price per carat, not per gram — mirrors lineQuantity in
   // invoice-actions.ts so the live-preview total here never disagrees with
   // what the server actually saves. Stone lines keep pricing off Net Weight
@@ -1633,7 +1647,7 @@ export function InvoiceForm({
   // scrolls horizontally inside its own container instead of restacking
   // into a card.
   const compactRowGridCols =
-    "grid-cols-[28px_minmax(160px,2fr)_76px_168px_112px_104px_116px_28px]"
+    "grid-cols-[28px_minmax(140px,1.5fr)_64px_144px_144px_104px_96px_116px_28px]"
 
   return (
     <form
@@ -1897,7 +1911,7 @@ export function InvoiceForm({
         </p>
 
         <div className="overflow-x-auto">
-          <div className="min-w-[900px] space-y-2">
+          <div className="min-w-[960px] space-y-2">
             {/* Table header for the compact rows below — labels only,
                 same column widths as each row via compactRowGridCols. The
                 leading/trailing blank spans line up with each row's own
@@ -1908,6 +1922,7 @@ export function InvoiceForm({
               <span />
               <span>Item</span>
               <span>Qty</span>
+              <span>Gross Wt</span>
               <span>Net Wt</span>
               <span>Rate / g</span>
               <span>GST</span>
@@ -2270,6 +2285,46 @@ export function InvoiceForm({
                 </div>
 
                 {item.multiPart ? (
+                  <div className="flex h-8 items-center rounded-md border bg-muted px-2 text-sm" data-testid="sale-line-gross">
+                    {wf.g(pieceOf(item).metalGross + pieceOf(item).stoneGrams || pieceOf(item).metalNet)} g
+                  </div>
+                ) : (
+                <div className="flex gap-1">
+                  <Input
+                    type="number"
+                    step="any"
+                    className={isLinked ? "flex-1 bg-muted" : "flex-1"}
+                    value={
+                      item.grossWeight === 0
+                        ? ""
+                        : toPrimaryUnit(
+                            item.grossWeight,
+                            "GRAM",
+                            item.grossWeightUnit,
+                            resolveGramsPerCarat(item.purity, caratConversionRates),
+                          )
+                    }
+                    readOnly={isLinked}
+                    aria-label="Gross weight"
+                    onChange={(e) => handleGrossWeightChange(item, e.target.value)}
+                  />
+                  <Select
+                    value={item.grossWeightUnit}
+                    onValueChange={(unit) => updateItem(item.key, { grossWeightUnit: unit as "GRAM" | "CARAT" })}
+                    disabled={isLinked}
+                  >
+                    <SelectTrigger className="w-14" size="sm">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="GRAM">g</SelectItem>
+                      <SelectItem value="CARAT">ct</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                )}
+
+                {item.multiPart ? (
                   <div className="space-y-1">
                     <div className="flex h-8 items-center rounded-md border bg-muted px-2 text-sm" data-testid="sale-line-net">
                       {wf.g(pieceOf(item).metalNet)} g
@@ -2539,54 +2594,6 @@ export function InvoiceForm({
                       columns) in the same grid everything else shares. */}
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                     {!showNewProductDetails && !linkedStock && metalPurityFields}
-
-                    {!item.multiPart && (
-                    <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
-                      <Label className="text-xs">Gross Weight {!isLinked && <RequiredMark />}</Label>
-                      <div className="flex gap-1">
-                        <Input
-                          type="number"
-                          step="any"
-                          className={isLinked ? "h-11 flex-1 bg-muted" : "h-11 flex-1"}
-                          value={
-                            item.grossWeight === 0
-                              ? ""
-                              : toPrimaryUnit(
-                                  item.grossWeight,
-                                  "GRAM",
-                                  item.grossWeightUnit,
-                                  resolveGramsPerCarat(item.purity, caratConversionRates),
-                                )
-                          }
-                          readOnly={isLinked}
-                          onChange={(e) => {
-                            const gramsPerCarat = resolveGramsPerCarat(item.purity, caratConversionRates)
-                            const grossWeight = toPrimaryUnit(Number(e.target.value) || 0, item.grossWeightUnit, "GRAM", gramsPerCarat)
-                            const derived = item.netTouched
-                              ? null
-                              : deriveNetWeight(grossWeight, item.stoneWeightInput, item.dmoWeight, weightSettings)
-                            updateItem(item.key, {
-                              grossWeight,
-                              ...(derived !== null ? { netWeight: derived } : {}),
-                            })
-                          }}
-                        />
-                        <Select
-                          value={item.grossWeightUnit}
-                          onValueChange={(unit) => updateItem(item.key, { grossWeightUnit: unit as "GRAM" | "CARAT" })}
-                          disabled={isLinked}
-                        >
-                          <SelectTrigger className="h-11 w-16">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="GRAM">g</SelectItem>
-                            <SelectItem value="CARAT">ct</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-                    )}
 
                     {isCaratLine(item) && (
                       <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">

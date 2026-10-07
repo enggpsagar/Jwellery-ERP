@@ -10,10 +10,7 @@ import { db, demoStoreId, watchForPageCrash } from "./helpers"
  * the code, and a single-use voucher can't be used twice.
  */
 const grossWeightInput = (page: Page) =>
-  page
-    .locator("div.space-y-1")
-    .filter({ has: page.getByText("Gross Weight", { exact: false }) })
-    .locator('input[type="number"]')
+  page.getByLabel("Gross weight", { exact: true })
     .first()
 
 /** One new Gold line: `quantity` pieces of 10 g at ₹6,000/g, no making. */
@@ -26,8 +23,8 @@ async function fillLine(page: Page, itemName: string, quantity: string) {
   await page.getByPlaceholder("Item name").fill(itemName)
   const lineNumbers = page.locator('input[type="number"]')
   await lineNumbers.nth(0).fill(quantity)
-  await lineNumbers.nth(1).fill("10")
-  await lineNumbers.nth(2).fill("6000")
+  await lineNumbers.nth(2).fill("10")
+  await lineNumbers.nth(3).fill("6000")
   await page.getByRole("combobox").filter({ hasText: "Select metal" }).first().click()
   await page.getByRole("option", { name: "Gold", exact: true }).click()
   await page.getByRole("combobox").filter({ hasText: "Select category" }).click()

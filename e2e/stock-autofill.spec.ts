@@ -68,7 +68,7 @@ test("picking a stock piece fills Purity, stone and Rate / g", async ({ page }) 
   await page.getByRole("option", { name: new RegExp(product.productCode) }).click()
 
   // Rate / g: no selling price configured → today's 24K rate × 75%.
-  const rateInput = page.locator('input[type="number"]').nth(2)
+  const rateInput = page.locator('input[type="number"]').nth(3)
   await expect(rateInput).toHaveValue(String(expectedRate))
   await expect(page.getByText("Selling price is required")).toHaveCount(0)
 

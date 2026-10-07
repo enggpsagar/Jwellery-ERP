@@ -11,10 +11,7 @@ import { db, demoStoreId, watchForPageCrash } from "./helpers"
  * invoice write path.
  */
 const grossWeightInput = (page: Page) =>
-  page
-    .locator("div.space-y-1")
-    .filter({ has: page.getByText("Gross Weight", { exact: false }) })
-    .locator('input[type="number"]')
+  page.getByLabel("Gross weight", { exact: true })
     .first()
 
 async function goldMetalId(storeId: string) {
@@ -66,8 +63,8 @@ test("a 22K invoice line saves its 24K fine weight on the line and its stock", a
 
   // Compact row: Qty, Net Wt, Rate / g.
   const lineNumbers = page.locator('input[type="number"]')
-  await lineNumbers.nth(1).fill("10")
-  await lineNumbers.nth(2).fill("5000")
+  await lineNumbers.nth(2).fill("10")
+  await lineNumbers.nth(3).fill("5000")
 
   await page.getByRole("combobox").filter({ hasText: "Select metal" }).click()
   await page.getByRole("option", { name: "Gold", exact: true }).click()

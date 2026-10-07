@@ -12,10 +12,7 @@ import { db, demoStoreId, watchForPageCrash } from "./helpers"
  * is paid out. A piece can carry a stone; a loose stone is priced per carat.
  */
 const grossWeightInput = (page: Page) =>
-  page
-    .locator("div.space-y-1")
-    .filter({ has: page.getByText("Gross Weight", { exact: false }) })
-    .locator('input[type="number"]')
+  page.getByLabel("Gross weight", { exact: true })
     .first()
 
 async function setUpGold22K() {
@@ -43,8 +40,8 @@ async function fillSaleLine(page: Page, itemName: string, ratePerGram: string) {
   await page.getByRole("option", { name: "Create New Line Item" }).click()
   await page.getByPlaceholder("Item name").fill(itemName)
   const lineNumbers = page.locator('input[type="number"]')
-  await lineNumbers.nth(1).fill("10")
-  await lineNumbers.nth(2).fill(ratePerGram)
+  await lineNumbers.nth(2).fill("10")
+  await lineNumbers.nth(3).fill(ratePerGram)
   await page.getByRole("combobox").filter({ hasText: "Select metal" }).first().click()
   await page.getByRole("option", { name: "Gold", exact: true }).click()
   await page.getByRole("combobox").filter({ hasText: "Select category" }).click()

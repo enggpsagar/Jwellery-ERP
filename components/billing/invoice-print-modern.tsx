@@ -58,8 +58,12 @@ function lineQuantity(item: Invoice["items"][number]) {
   if (item.purity === "DIAMOND" && item.caratWeight) {
     return { qty: Number(item.caratWeight) * pieces, unit: "Ct", pricePerUnit: Number(item.rate ?? 0), isWeighed: true }
   }
-  if (item.netWeight && Number(item.netWeight) > 0) {
-    return { qty: Number(item.netWeight) * pieces, unit: "Gm", pricePerUnit: Number(item.rate ?? 0), isWeighed: true }
+  // The Quantity column shows the piece's gross weight (metal + stones) —
+  // what the customer actually holds — falling back to net weight for
+  // older lines saved without one. Price/Unit stays the per-gram metal rate.
+  const weight = Number(item.grossWeight) > 0 ? Number(item.grossWeight) : Number(item.netWeight)
+  if (weight > 0) {
+    return { qty: weight * pieces, unit: "Gm", pricePerUnit: Number(item.rate ?? 0), isWeighed: true }
   }
   const qty = item.quantity || 1
   return { qty, unit: "Pcs", pricePerUnit: Number(item.rate ?? (item.lineTotal / qty)), isWeighed: false }

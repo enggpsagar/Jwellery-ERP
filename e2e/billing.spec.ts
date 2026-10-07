@@ -5,10 +5,7 @@ import type { Page } from "@playwright/test"
 import { db, demoStoreId, watchForPageCrash } from "./helpers"
 
 const grossWeightInput = (page: Page) =>
-  page
-    .locator("div.space-y-1")
-    .filter({ has: page.getByText("Gross Weight", { exact: false }) })
-    .locator('input[type="number"]')
+  page.getByLabel("Gross weight", { exact: true })
     .first()
 
 /**
@@ -31,12 +28,12 @@ test("a new line item on an invoice creates its Product and Stock and sells it",
   await page.getByPlaceholder("Item name").fill(itemName)
   await expect(page.getByText("A new product and stock entry will be added on save")).toBeVisible()
 
-  // The line's compact row: Qty, Net Wt, then Rate / g (priced per gram,
+  // The line's compact row: Qty, Gross Wt, Net Wt, then Rate / g (priced per gram,
   // so Net Wt is what makes the total non-zero).
   const lineNumbers = page.locator('input[type="number"]')
   await lineNumbers.nth(0).fill("2")
-  await lineNumbers.nth(1).fill("5")
-  await lineNumbers.nth(2).fill("5000")
+  await lineNumbers.nth(2).fill("5")
+  await lineNumbers.nth(3).fill("5000")
   await expect(page.getByText("Selling price is required")).toHaveCount(0)
 
   // The new Product needs what Add Product asks for — Metal, Category,
@@ -115,8 +112,8 @@ test("a new line item can't be saved without the fields its Product needs", asyn
   await page.getByPlaceholder("Item name").fill(itemName)
 
   const lineNumbers = page.locator('input[type="number"]')
-  await lineNumbers.nth(1).fill("5")
-  await lineNumbers.nth(2).fill("5000")
+  await lineNumbers.nth(2).fill("5")
+  await lineNumbers.nth(3).fill("5000")
 
   await expect(page.getByText(/Still needed: .*Category/)).toBeVisible()
   await page.getByRole("button", { name: "Create Invoice" }).click()

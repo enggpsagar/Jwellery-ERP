@@ -66,6 +66,10 @@ type SidebarContextProps = {
    *  cheap enough to call on every pointermove during a drag rather than
    *  splitting "live preview" from "commit on release." */
   setSidebarWidthPx: (px: number) => void
+  /** Floor the rendered width so the nav's own labels fit (see AppSidebar's
+   *  measurement). Never persisted and never shrinks the user's own width —
+   *  the sidebar renders at max(user width, this floor). */
+  ensureSidebarWidthAtLeast: (px: number) => void
 }
 
 const SidebarContext = React.createContext<SidebarContextProps | null>(null)
@@ -128,6 +132,16 @@ function SidebarProvider({
     }
   }, [])
 
+  // The narrowest width at which nothing in the nav truncates or runs under
+  // a quick-add "+". Grow-only for the session: shrinking it back as counts
+  // drop would make the sidebar twitch for no real gain.
+  const [contentMinWidthPx, setContentMinWidthPx] = React.useState(0)
+  const ensureSidebarWidthAtLeast = React.useCallback((px: number) => {
+    const clamped = clampSidebarWidthPx(Math.ceil(px))
+    setContentMinWidthPx((prev) => (clamped > prev ? clamped : prev))
+  }, [])
+  const effectiveWidthPx = Math.max(sidebarWidthPx, contentMinWidthPx)
+
   // This is the internal state of the sidebar.
   // We use openProp and setOpenProp for control from outside the component.
   const [_open, _setOpen] = React.useState(defaultOpen)
@@ -182,8 +196,9 @@ function SidebarProvider({
       setOpenMobile,
       toggleSidebar,
       side,
-      sidebarWidthPx,
+      sidebarWidthPx: effectiveWidthPx,
       setSidebarWidthPx,
+      ensureSidebarWidthAtLeast,
     }),
     [
       state,
@@ -194,8 +209,9 @@ function SidebarProvider({
       setOpenMobile,
       toggleSidebar,
       side,
-      sidebarWidthPx,
+      effectiveWidthPx,
       setSidebarWidthPx,
+      ensureSidebarWidthAtLeast,
     ]
   )
 
@@ -205,7 +221,7 @@ function SidebarProvider({
         data-slot="sidebar-wrapper"
         style={
           {
-            "--sidebar-width": `${sidebarWidthPx}px`,
+            "--sidebar-width": `${effectiveWidthPx}px`,
             "--sidebar-width-icon": SIDEBAR_WIDTH_ICON,
             ...style,
           } as React.CSSProperties

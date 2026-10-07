@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSession } from "next-auth/react";
@@ -47,6 +47,7 @@ import {
   SidebarMenuSubButton,
   SidebarMenuSubItem,
   SidebarRail,
+  useSidebar,
 } from "@/components/ui/sidebar";
 
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -397,7 +398,10 @@ function SidebarNavItem({
               <SidebarMenuSubButton
                 asChild
                 isActive={pathname === subItem.href}
-                className={ACTIVE_NAV_CLASS}
+                // The quick-add "+" is absolutely positioned over the row's
+                // right edge, so reserve room for it — otherwise the label and
+                // count ("Tax Invoices (13)") run underneath it.
+                className={`${ACTIVE_NAV_CLASS} ${subItem.quickAddHref ? "pr-7" : ""}`}
               >
                 <Link href={subItem.href} prefetch={false}>
                   <span>
@@ -484,6 +488,38 @@ export function AppSidebar({
   useEffect(() => {
     setOpenMenu(undefined);
   }, [pathname]);
+  // Size the sidebar to its content: any nav label (title + count) that is
+  // truncated — e.g. "Tax Invoices (13)" running under its quick-add "+" —
+  // widens the sidebar by exactly the missing amount. Re-measured on every
+  // render (sections opening, counts arriving) and once web fonts load,
+  // since a fallback font measures differently.
+  const { state, isMobile, sidebarWidthPx, ensureSidebarWidthAtLeast } = useSidebar();
+  const contentRef = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    if (isMobile || state !== "expanded") return;
+    const measure = () => {
+      const root = contentRef.current;
+      if (!root) return;
+      let deficit = 0;
+      root
+        .querySelectorAll<HTMLElement>(
+          '[data-sidebar="menu-button"] > span:last-child, [data-sidebar="menu-sub-button"] > span:last-child',
+        )
+        .forEach((el) => {
+          deficit = Math.max(deficit, el.scrollWidth - el.clientWidth);
+        });
+      if (deficit > 0) ensureSidebarWidthAtLeast(sidebarWidthPx + deficit + 4);
+    };
+    measure();
+    let cancelled = false;
+    document.fonts?.ready.then(() => {
+      if (!cancelled) measure();
+    });
+    return () => {
+      cancelled = true;
+    };
+  });
+
   const showSettings = role !== "STAFF" && role !== "KARIGAR" && role !== "MANAGER";
   const userName = session?.user?.name ?? "User";
   const userInitials = initialsOf(userName);
@@ -530,7 +566,7 @@ export function AppSidebar({
         </div>
       </SidebarHeader>
 
-      <SidebarContent>
+      <SidebarContent ref={contentRef}>
         <SidebarGroup>
           <SidebarGroupLabel className="text-[10px] font-semibold uppercase tracking-[0.14em] text-white/40">
             Workspace

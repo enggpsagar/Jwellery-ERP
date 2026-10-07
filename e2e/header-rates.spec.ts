@@ -45,7 +45,7 @@ test("the Store Owner edits a selling rate from the header", async ({ page }) =>
     expect(entry?.changedById).toBeTruthy()
 
     await page.goto("/metal-rates")
-    await expect(page.getByText("Your Selling Rates")).toBeVisible()
+    await expect(page.getByText("Your Selling Rates", { exact: true })).toBeVisible()
     await expect(page.getByRole("cell", { name: /₹7,123\.45/ }).first()).toBeVisible()
   } finally {
     await db().storeMetalPurity.update({ where: { id: purity.id }, data: { sellingPrice: before } })

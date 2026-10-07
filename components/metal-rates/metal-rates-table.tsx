@@ -169,6 +169,30 @@ export function MetalRatesTable({ data }: Props) {
             <CardDescription>
               Gold &amp; Silver market prices, fetched daily — a reference, not your selling rate
             </CardDescription>
+            {/* Where these numbers come from, so a store can check them
+                itself (app/api/cron/metal-rates/route.ts). */}
+            <div className="mt-3 rounded-md border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+              <p>
+                <span className="font-medium text-foreground">Source:</span>{" "}
+                <a
+                  href="https://www.goldapi.io"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-medium text-foreground underline underline-offset-2"
+                >
+                  GoldAPI.io
+                </a>{" "}
+                — international spot price in INR (gold XAU/INR, silver XAG/INR), fetched once a day at 5:30 am IST.
+              </p>
+              <p className="mt-1">
+                24K = spot price per troy ounce ÷ 31.1035 (per gram). 22K and 18K are worked out from 24K
+                (× 22/24 and × 18/24). Spot prices exclude import duty, GST and local premiums, so they read lower
+                than Indian market rates (IBJA / MCX).
+              </p>
+              <p className="mt-1 text-amber-700 dark:text-amber-400">
+                Silver rates dated before 8 Oct 2026 were a fixed placeholder (₹120), not a market price.
+              </p>
+            </div>
           </div>
 
           <DropdownMenu>

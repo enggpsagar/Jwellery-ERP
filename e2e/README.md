@@ -51,6 +51,7 @@ No real secrets are used, and nothing talks to the shared Neon database —
 | `search-focus.spec.ts` | Header search, stock picker and the list search on Products / Stock / Parties / Artisans / Invoices keep the cursor while typing and through the reload |
 | `igi-search.spec.ts` | Products and Stock are found by a partial IGI / certificate number |
 | `weight-decimals.spec.ts` | With 2 gram decimals: product detail, invoice line, Stock report (+ CSV) and ledger show 2-decimal grams |
+| `unassigned-filter.spec.ts` | The Products "Unassigned" metal filter appears only when a product has no metal, and then finds it |
 | `reports.spec.ts` | Every report tab renders; Stock report's Available / Out of Stock split; CSV export |
 
 **When you build a feature, add a test for it here** — that's what keeps

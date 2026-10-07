@@ -8,6 +8,7 @@ import { hasPermission } from "@/lib/auth/auth";
 import { PERMISSIONS } from "@/lib/permissions";
 import { getCategoryFilterOptions, getStoreMetals } from "@/lib/actions/taxonomy-actions";
 import { UNASSIGNED_METAL_TYPE } from "@/lib/business-units";
+import { hasUnassignedMetal } from "@/lib/unassigned-metal";
 import { getBusinessSettings } from "@/lib/actions/settings-actions";
 
 import { ProductsClient } from "@/components/inventory/products/products-client";
@@ -117,6 +118,7 @@ export default async function InventoryProductsPage({
       metals={metals}
       categoryFilter={categoryFilter}
       styleFieldEnabled={businessSettings.styleFieldEnabled}
+      showUnassignedMetal={metalTypeId === UNASSIGNED_METAL_TYPE || (await hasUnassignedMetal("product"))}
     />
   );
 }

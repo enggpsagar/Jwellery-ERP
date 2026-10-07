@@ -27,6 +27,8 @@ type KarigarsToolbarProps = {
    * Type filter's options come directly from this list, so a metal added
    * there shows up here with no code change. */
   metals: StoreMetalRow[]
+  /** Offer the "Unassigned" metal filter — only when some artisan has no metal. */
+  showUnassignedMetal?: boolean
   /** BulkDeleteButton, rendered inside this same bordered bar (next to
    * Export) instead of as a separate floating box beside it — it already
    * renders nothing when nothing is selected, so this slot is simply empty
@@ -57,7 +59,7 @@ function downloadBase64File(base64: string, fileName: string) {
   window.URL.revokeObjectURL(url)
 }
 
-export function KarigarsToolbar({ selectedKarigarIds, metals, bulkActions }: KarigarsToolbarProps) {
+export function KarigarsToolbar({ selectedKarigarIds, metals, bulkActions, showUnassignedMetal = false }: KarigarsToolbarProps) {
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
@@ -202,7 +204,7 @@ export function KarigarsToolbar({ selectedKarigarIds, metals, bulkActions }: Kar
                   {metal.name}
                 </SelectItem>
               ))}
-            <SelectItem value={UNASSIGNED_METAL_TYPE}>Unassigned</SelectItem>
+            {showUnassignedMetal ? <SelectItem value={UNASSIGNED_METAL_TYPE}>Unassigned</SelectItem> : null}
           </SelectContent>
         </Select>
 

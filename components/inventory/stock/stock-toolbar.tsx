@@ -16,6 +16,8 @@ type StockToolbarProps = {
    * Type filter's options come directly from this list, so a metal added
    * there shows up here with no code change. */
   metals: StoreMetalRow[]
+  /** Offer the "Unassigned" metal filter — only when some stock has no metal. */
+  showUnassignedMetal?: boolean
   /** Category → Type filter options — filters by the linked Product's own
    * Category/Type. */
   categoryFilter?: CategoryFilterOptions
@@ -24,7 +26,7 @@ type StockToolbarProps = {
   bulkActions?: ReactNode
 }
 
-export function StockToolbar({ selectedIds, metals, categoryFilter, bulkActions }: StockToolbarProps) {
+export function StockToolbar({ selectedIds, metals, categoryFilter, bulkActions, showUnassignedMetal = false }: StockToolbarProps) {
   const router = useRouter()
 
   const handlePrintQr = () => {
@@ -65,7 +67,7 @@ export function StockToolbar({ selectedIds, metals, categoryFilter, bulkActions 
         ...metals
           .filter((metal) => metal.isActive)
           .map((metal) => ({ value: metal.id, label: metal.name })),
-        { value: UNASSIGNED_METAL_TYPE, label: "Unassigned" },
+        ...(showUnassignedMetal ? [{ value: UNASSIGNED_METAL_TYPE, label: "Unassigned" }] : []),
       ]}
       typeLabel="Metal"
       categoryOptions={categoryFilter?.categories}

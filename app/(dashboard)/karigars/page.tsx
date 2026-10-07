@@ -7,6 +7,7 @@ import { getKarigarLedgerSummary } from "@/lib/actions/ledger-actions"
 import { KarigarsClient } from "@/components/karigars/karigars-client"
 import { getStoreMetals } from "@/lib/actions/taxonomy-actions"
 import { UNASSIGNED_METAL_TYPE } from "@/lib/business-units"
+import { hasUnassignedMetal } from "@/lib/unassigned-metal"
 
 export const metadata: Metadata = {
   title: "Artisans",
@@ -65,6 +66,7 @@ export default async function KarigarsPage({ searchParams }: KarigarsPageProps) 
       pagination={pagination}
       metals={metals}
       ledgerSummary={ledgerSummary}
+      showUnassignedMetal={metalTypeId === UNASSIGNED_METAL_TYPE || (await hasUnassignedMetal("karigar"))}
     />
   )
 }

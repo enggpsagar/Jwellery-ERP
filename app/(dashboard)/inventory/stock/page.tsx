@@ -7,6 +7,7 @@ import {
 import { getCategoryFilterOptions, getStoreMetals } from "@/lib/actions/taxonomy-actions";
 import { getStoreLocations } from "@/lib/actions/store-location-actions";
 import { UNASSIGNED_METAL_TYPE } from "@/lib/business-units";
+import { hasUnassignedMetal } from "@/lib/unassigned-metal";
 
 import { StockClient } from "@/components/inventory/stock/stock-client";
 
@@ -101,6 +102,7 @@ export default async function InventoryStockPage({
       metals={metals}
       categoryFilter={categoryFilter}
       showLocation={locations.length > 1}
+      showUnassignedMetal={metalTypeId === UNASSIGNED_METAL_TYPE || (await hasUnassignedMetal("stock"))}
     />
   );
 }

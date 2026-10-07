@@ -33,6 +33,7 @@ type KarigarsClientProps = {
   karigars: Karigar[]
   pagination: PaginationInfo
   metals: StoreMetalRow[]
+  showUnassignedMetal?: boolean
   ledgerSummary: KarigarLedgerSummary
 }
 
@@ -80,6 +81,7 @@ export function KarigarsClient({
   pagination,
   metals,
   ledgerSummary,
+  showUnassignedMetal = false,
 }: KarigarsClientProps) {
   const [selectedKarigarIds, setSelectedKarigarIds] = React.useState<string[]>([])
   // Which row's full detail shows in the right-hand panel — defaults to
@@ -142,6 +144,7 @@ export function KarigarsClient({
           <KarigarsToolbar
             selectedKarigarIds={selectedKarigarIds}
             metals={metals}
+            showUnassignedMetal={showUnassignedMetal}
             bulkActions={
               <BulkDeleteButton
                 selectedIds={selectedKarigarIds}

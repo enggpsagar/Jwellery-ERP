@@ -30,6 +30,7 @@ type StockClientProps = {
   pagination: Pagination
   totals?: React.ComponentProps<typeof StockTable>["totals"]
   metals: StoreMetalRow[]
+  showUnassignedMetal?: boolean
   /** Category → Type filter options (getCategoryFilterOptions). */
   categoryFilter?: CategoryFilterOptions
   /** False for a single-location (or zero-location) store — there's
@@ -38,7 +39,7 @@ type StockClientProps = {
   showLocation: boolean
 }
 
-export function StockClient({ stockItems, pagination, totals, metals, categoryFilter, showLocation }: StockClientProps) {
+export function StockClient({ stockItems, pagination, totals, metals, categoryFilter, showLocation, showUnassignedMetal = false }: StockClientProps) {
   const [selectedIds, setSelectedIds] = React.useState<string[]>([])
   // Which row's full detail shows in the right-hand panel — defaults to
   // the first row on this page/search result so the panel is never empty
@@ -121,6 +122,7 @@ export function StockClient({ stockItems, pagination, totals, metals, categoryFi
           <StockToolbar
             selectedIds={selectedIds}
             metals={metals}
+            showUnassignedMetal={showUnassignedMetal}
             categoryFilter={categoryFilter}
             bulkActions={
               <BulkDeleteButton

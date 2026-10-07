@@ -41,6 +41,8 @@ type ProductsClientProps = {
    * Type filter's options come directly from this list, so a metal added
    * there shows up here with no code change. */
   metals?: StoreMetalRow[]
+  /** Offer the "Unassigned" metal filter — only when some product has no metal. */
+  showUnassignedMetal?: boolean
   /** Category → Type filter options (getCategoryFilterOptions). */
   categoryFilter?: CategoryFilterOptions
   /** BusinessSettings.styleFieldEnabled — the import dialog only asks for
@@ -57,6 +59,7 @@ export function ProductsClient({
   metals = [],
   categoryFilter,
   styleFieldEnabled = true,
+  showUnassignedMetal = false,
 }: ProductsClientProps) {
   const [selectedIds, setSelectedIds] = React.useState<string[]>([])
   // Forces ProductDetailPanel to re-fetch even when the selected product id
@@ -141,7 +144,7 @@ export function ProductsClient({
               ...metals
                 .filter((metal) => metal.isActive)
                 .map((metal) => ({ value: metal.id, label: metal.name })),
-              { value: UNASSIGNED_METAL_TYPE, label: "Unassigned" },
+              ...(showUnassignedMetal ? [{ value: UNASSIGNED_METAL_TYPE, label: "Unassigned" }] : []),
             ]}
             typeLabel="Metal"
             categoryOptions={categoryFilter?.categories}

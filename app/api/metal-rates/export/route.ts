@@ -44,7 +44,7 @@ export async function GET(req: NextRequest) {
       "22K Gold": Number(rate.gold22k),
       "18K Gold": Number(rate.gold18k),
       ...(has14k ? { "14K Gold": optional(rate.gold14k) } : {}),
-      Silver: Number(rate.silver),
+      Silver: rate.silver != null ? Number(rate.silver) : "",
       ...(hasPlatinum ? { "Platinum 95": optional(rate.platinum95) } : {}),
       Unit: rate.unit,
     }));

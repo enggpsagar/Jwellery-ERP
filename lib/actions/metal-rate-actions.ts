@@ -8,7 +8,7 @@ export interface DashboardMetalRate {
   id: string;
   gold24k: number;
   gold22k: number;
-  silver: number;
+  silver: number | null;
   createdAt: Date;
 }
 
@@ -16,7 +16,7 @@ export interface ChartData {
   date: string;
   gold24k: number;
   gold22k: number;
-  silver: number;
+  silver: number | null;
 }
 
 /**
@@ -74,7 +74,7 @@ export async function getLast10DaysRates(): Promise<ChartData[]> {
       id: rate.id,
       gold24k: Number(rate.gold24k),
       gold22k: Number(rate.gold22k),
-      silver: Number(rate.silver),
+      silver: rate.silver != null ? Number(rate.silver) : null,
       createdAt: rate.createdAt,
     });
   }
@@ -83,7 +83,7 @@ export async function getLast10DaysRates(): Promise<ChartData[]> {
     date: format(rate.createdAt, "dd MMM"),
     gold24k: Number(rate.gold24k),
     gold22k: Number(rate.gold22k),
-    silver: Number(rate.silver),
+    silver: rate.silver != null ? Number(rate.silver) : null,
   }));
 }
 
@@ -129,12 +129,10 @@ export async function getDashboardMetalSummary() {
           )
         : 0,
 
-      silver: previous
-        ? calculatePercentageChange(
-            Number(latest.silver),
-            Number(previous.silver)
-          )
-        : 0,
+      silver:
+        previous && latest.silver != null && previous.silver != null
+          ? calculatePercentageChange(Number(latest.silver), Number(previous.silver))
+          : 0,
     },
   };
 }

@@ -33,7 +33,7 @@ export default async function MetalRatesPage() {
     gold24k: Number(rate.gold24k),
     gold22k: Number(rate.gold22k),
     gold18k: Number(rate.gold18k),
-    silver: Number(rate.silver),
+    silver: rate.silver != null ? Number(rate.silver) : null,
     unit: rate.unit,
   }));
 

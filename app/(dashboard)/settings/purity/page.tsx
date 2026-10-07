@@ -1,50 +1,13 @@
-import type { Metadata } from "next";
-import { UserRole } from "@prisma/client";
 import { redirect } from "next/navigation";
 
-import {
-  getPurityFineness,
-  getCaratConversionRates,
-} from "@/lib/actions/purity-actions";
-import { getCurrentUser } from "@/lib/auth/auth";
-
-import { PuritySettingsForm } from "@/components/settings/purity-settings-form";
-import { CaratConversionForm } from "@/components/settings/carat-conversion-form";
-import { SettingsTabs } from "@/components/settings/settings-tabs";
-import { PageBackHeader } from "@/components/shared/page-back-header";
-
-export const metadata: Metadata = {
-  title: "Purity Settings",
-};
-
-export default async function PuritySettingsPage() {
-  const currentUser = await getCurrentUser();
-
-  // Admin/Super Admin only — see the matching comment in ../page.tsx.
-  const canEdit =
-    currentUser?.role === UserRole.ADMIN ||
-    currentUser?.role === UserRole.SUPER_ADMIN;
-  if (!canEdit) redirect("/dashboard");
-
-  const [rows, caratRows] = await Promise.all([
-    getPurityFineness(),
-    getCaratConversionRates(),
-  ]);
-
-  return (
-    <main className="mx-auto w-full max-w-5xl space-y-6 p-6">
-      <PageBackHeader
-        title="Purity & Carat Settings"
-        description="Define the fine-metal percentage used to convert weights across purities."
-        backHref="/dashboard"
-        backLabel="Back to Dashboard"
-      />
-
-      <SettingsTabs active="purity" role={currentUser?.role} />
-
-      <PuritySettingsForm rows={rows} canEdit={canEdit} />
-
-      <CaratConversionForm rows={caratRows} canEdit={canEdit} />
-    </main>
-  );
+// The old Purity & Carat page edited a fixed, schema-enum list (Gold
+// 24K/22K/20K/18K, Silver 999/925, Platinum 950/900, Diamond, Other) and
+// couldn't take a store's own purities such as 14K or 9K. Purities, their
+// fineness and stone types' grams-per-carat now live in Settings > Metals &
+// Categories, and weight calculation in Settings > Weights. The old
+// PurityFineness / CaratConversionRate rows stay in the database only as the
+// fallback for very old records with no store purity attached
+// (lib/purity-db.ts). Old links land on the page that replaced it.
+export default function PuritySettingsRedirect() {
+  redirect("/settings/taxonomy");
 }

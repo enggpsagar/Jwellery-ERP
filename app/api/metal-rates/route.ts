@@ -43,7 +43,7 @@ export async function GET() {
         gold24k: Number(current.gold24k),
         gold22k: Number(current.gold22k),
         gold18k: Number(current.gold18k),
-        silver: Number(current.silver),
+        silver: current.silver != null ? Number(current.silver) : null,
       },
 
       previous: previous
@@ -51,7 +51,7 @@ export async function GET() {
             gold24k: Number(previous.gold24k),
             gold22k: Number(previous.gold22k),
             gold18k: Number(previous.gold18k),
-            silver: Number(previous.silver),
+            silver: previous.silver != null ? Number(previous.silver) : null,
           }
         : null,
     });

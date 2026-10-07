@@ -486,6 +486,11 @@ it as "Your Selling Rates" above the "Market Rates" table. Store export and Forc
 Delete include the table (its FK is RESTRICT). Don't make a market API fill the
 selling price. Spec: `e2e/header-rates.spec.ts`.
 
+### Changed 2026-10-07: Purity & Carat page retired; placeholder silver cleared
+
+- `/settings/purity` now redirects to `/settings/taxonomy`; the tab and its two forms are gone. `PurityFineness` / `CaratConversionRate` rows remain only as the fallback for very old records with no store purity (`lib/purity-db.ts` `getFinenessMap`) — don't build new UI on them.
+- `MetalRate.silver` is nullable (migration `20261014100000_metal_rate_silver_nullable`): the cron used to store a hard-coded ₹120; the migration cleared those values (silver = 120 and before 2026-10-08, all stores — gold columns kept). The cron now fetches XAG/INR and falls back to the last non-null silver, else null. Every reader treats null as "unknown" (table shows —, billing gets no silver fine-rate suggestion).
+
 ### Added 2026-10-07: every icon-only control has a tooltip
 
 - An icon-size `<Button size="icon…">` with an `aria-label` gets a styled tooltip automatically (`components/ui/button.tsx`; skipped when the button shows its own text, e.g. calendar days). Anything else icon-only (raw `<button>`, `<Link>`, a `size="sm"` icon button) is wrapped in `<IconTooltip label=…>` (`components/ui/icon-tooltip.tsx`); for an `asChild` trigger wrap the outer element.

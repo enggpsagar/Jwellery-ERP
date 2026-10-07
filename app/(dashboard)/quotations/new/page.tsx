@@ -69,7 +69,7 @@ export default async function NewQuotationPage() {
           enumFineness={enumFineness}
           fineRates={{
             gold: metalRates.latest ? Number(metalRates.latest.gold24k) : null,
-            silver: metalRates.latest ? Number(metalRates.latest.silver) : null,
+            silver: metalRates.latest?.silver != null ? Number(metalRates.latest.silver) : null,
           }}
         />
       </ResetFormWrapper>

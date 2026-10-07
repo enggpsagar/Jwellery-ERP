@@ -2107,7 +2107,10 @@ model MetalRate {
   gold24k    Decimal  @db.Decimal(12, 2)
   gold18k    Decimal  @db.Decimal(12, 2)
   gold14k    Decimal? @db.Decimal(12, 2)
-  silver     Decimal  @db.Decimal(12, 2)
+  // Market silver per gram (GoldAPI XAG/INR). Null = not known: rows
+  // before 8 Oct 2026 held a hard-coded ₹120 placeholder, cleared by
+  // migration 20261014100000_metal_rate_silver_nullable.
+  silver     Decimal? @db.Decimal(12, 2)
   // 95%-purity platinum rate, matching the "Standard Rate" banner some
   // stores print on the invoice. Optional: not every store deals in
   // platinum, and a missing rate simply drops that column from the banner.

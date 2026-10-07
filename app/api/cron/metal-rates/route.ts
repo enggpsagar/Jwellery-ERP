@@ -72,7 +72,7 @@ export async function GET(request: Request) {
     // be a hard-coded ₹120 "temporary" value shown as a market rate. If the
     // silver call fails, keep the last stored silver rate rather than
     // inventing one, and log it.
-    let silverPerGram: number;
+    let silverPerGram: number | null;
     try {
       const silverResponse = await fetch("https://www.goldapi.io/api/XAG/INR", {
         headers: {
@@ -87,8 +87,12 @@ export async function GET(request: Request) {
       silverPerGram = Number(silverData.price) / 31.1035;
     } catch (silverError) {
       logger.error("Silver rate fetch failed — keeping the last stored silver rate", silverError);
-      const last = await prisma.metalRate.findFirst({ orderBy: { createdAt: "desc" }, select: { silver: true } });
-      silverPerGram = last ? Number(last.silver) : 0;
+      const last = await prisma.metalRate.findFirst({
+        where: { silver: { not: null } },
+        orderBy: { createdAt: "desc" },
+        select: { silver: true },
+      });
+      silverPerGram = last?.silver != null ? Number(last.silver) : null;
     }
 
     const payload = {
@@ -96,7 +100,7 @@ export async function GET(request: Request) {
       gold22k: Number(gold22kPerGram.toFixed(2)),
       gold18k: Number(gold18kPerGram.toFixed(2)),
       gold14k: Number(gold14kPerGram.toFixed(2)),
-      silver: Number(silverPerGram.toFixed(2)),
+      silver: silverPerGram != null ? Number(silverPerGram.toFixed(2)) : null,
       unit: "GRAM",
     };
 

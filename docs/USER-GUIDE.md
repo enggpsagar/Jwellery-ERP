@@ -104,12 +104,18 @@ Settings → **Business Settings** has these tabs:
 - **SKU format** — how product codes are generated (see Inventory).
 - **Import from Excel** — bring in a long list at once.
 
-### Step 3 — Purity & Carat (Settings → Purity & Carat)
+### Step 3 — Purities, fineness and selling rates
 
-Fineness for each purity (24K = 100%, 22K = 91.6%, 925 = 92.5% …), carat conversion
-rules, and **Metal Selling Rates per purity** — the rate that pre-fills on a sale.
+Each purity's **fineness %** (24K = 100%, 22K = 91.6%, 925 = 92.5% …), **selling rate**
+and default **wastage %** are set on the purity itself in **Settings → Metals &
+Categories** — add your own, e.g. 14K or 9K. Each stone type has its **grams per carat**
+there too. How net and fine weight are calculated is set in **Settings → Weights**.
 Fineness drives every fine-weight figure in artisan jobs, Customer Exchange and
-reports, so get it right early.
+reports, so get it right early. If a fineness looks unusual for its label, Settings
+flags it — **Fix** it, or **Ignore** it if it's deliberate. "18", "18K" and "18 kt" count
+as the same purity, so a duplicate can't be added.
+
+(The old **Purity & Carat** page has been retired; links to it open Metals & Categories.)
 
 > **Changing rates every day?** You don't need Settings for that. Click the
 > **rates chip** in the top bar (e.g. "Gold 22K ₹6,000 · Silver ₹98"), type the new

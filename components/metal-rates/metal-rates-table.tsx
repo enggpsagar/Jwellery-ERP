@@ -51,7 +51,7 @@ type MetalRate = {
   gold24k: number;
   gold22k: number;
   gold18k: number;
-  silver: number;
+  silver: number | null;
   unit: string;
 };
 
@@ -99,7 +99,15 @@ export function MetalRatesTable({ data }: Props) {
 
     return <Minus className="h-4 w-4 text-muted-foreground" />;
   }
-  function renderPrice(current: number, previous?: number) {
+  function renderPrice(current: number | null, previous?: number | null) {
+    if (current === null) {
+      // Not known (silver before 8 Oct 2026 was a placeholder, cleared).
+      return (
+        <div className="flex flex-col items-end">
+          <span className="text-muted-foreground">—</span>
+        </div>
+      );
+    }
     if (previous === undefined || previous === null) {
       return (
         <div className="flex flex-col items-end">
@@ -190,7 +198,7 @@ export function MetalRatesTable({ data }: Props) {
                 than Indian market rates (IBJA / MCX).
               </p>
               <p className="mt-1 text-amber-700 dark:text-amber-400">
-                Silver rates dated before 8 Oct 2026 were a fixed placeholder (₹120), not a market price.
+                Silver before 8 Oct 2026 was never fetched (a fixed ₹120 placeholder had been stored); those values have been cleared and show as —.
               </p>
             </div>
           </div>

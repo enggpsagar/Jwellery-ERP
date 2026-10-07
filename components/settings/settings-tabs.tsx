@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { UserRole } from "@prisma/client";
-import { Building2, Gem, Layers, MapPin, KeyRound, Percent, ShieldCheck, Mail, Tag, Scale } from "lucide-react";
+import { Building2, Layers, MapPin, KeyRound, Percent, ShieldCheck, Mail, Tag, Scale } from "lucide-react";
 
 type SettingsTab =
   | "business"
@@ -39,7 +39,6 @@ const TABS: {
   tint: string;
 }[] = [
   { id: "business", href: "/settings", label: "Business Settings", icon: Building2, tint: "var(--chart-1)" },
-  { id: "purity", href: "/settings/purity", label: "Purity & Carat", icon: Gem, tint: "var(--chart-2)" },
   { id: "taxonomy", href: "/settings/taxonomy", label: "Metals & Categories", icon: Layers, tint: "var(--chart-3)" },
   { id: "locations", href: "/settings/locations", label: "Locations", icon: MapPin, tint: "var(--chart-4)" },
   { id: "api-keys", href: "/settings/api-keys", label: "API Keys", icon: KeyRound, tint: "var(--chart-5)" },

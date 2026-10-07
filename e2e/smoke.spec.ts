@@ -43,7 +43,7 @@ const PAGES = [
   "/settings/taxonomy",
   "/settings/gst-rates",
   "/settings/locations",
-  "/settings/purity",
+  "/settings/weights",
   "/profile",
 ]
 

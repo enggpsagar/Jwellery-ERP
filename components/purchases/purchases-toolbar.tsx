@@ -6,7 +6,7 @@ import { DataTableToolbar } from "@/components/shared/data-table-toolbar"
 import { exportPurchasesToExcel } from "@/lib/actions/purchase-actions"
 
 const STATUS_OPTIONS = [
-  { value: InvoiceStatus.DRAFT, label: "Draft" },
+  { value: InvoiceStatus.DRAFT, label: "Unpaid" },
   { value: InvoiceStatus.PAID, label: "Paid" },
   { value: InvoiceStatus.PARTIAL, label: "Partially Paid" },
   { value: InvoiceStatus.CANCELLED, label: "Cancelled" },

@@ -45,8 +45,11 @@ function humanize(value: string) {
 const lookup = (labels: Record<string, string>) => (status: string | null | undefined) =>
   status ? labels[status] ?? humanize(status) : ""
 
-/** Invoice and Purchase (both use InvoiceStatus). */
+/** Invoices (InvoiceStatus). */
 export const invoiceStatusLabel = lookup(INVOICE_STATUS_LABELS)
+/** Purchases share InvoiceStatus, but their DRAFT means "recorded, nothing
+ *  paid yet" — matches purchase-status-badge.tsx's "Unpaid". */
+export const purchaseStatusLabel = lookup({ ...INVOICE_STATUS_LABELS, DRAFT: "Unpaid" })
 export const draftOrderStatusLabel = lookup(DRAFT_ORDER_STATUS_LABELS)
 export const quotationStatusLabel = lookup(QUOTATION_STATUS_LABELS)
 export const stockStatusLabel = lookup(STOCK_STATUS_LABELS)

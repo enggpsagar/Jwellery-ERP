@@ -1,7 +1,11 @@
 import { InvoiceStatus } from "@prisma/client";
 
+// A purchase's DRAFT status means "recorded, nothing paid yet" — it is
+// set by createPurchase whenever balance > 0 and paid == 0, after the stock
+// and the supplier ledger entry are already posted. "Draft" read as "not
+// saved yet", so it is shown as "Unpaid".
 const STATUS_LABELS: Record<InvoiceStatus, string> = {
-  DRAFT: "Draft",
+  DRAFT: "Unpaid",
   PAID: "Paid",
   PARTIAL: "Partially Paid",
   CANCELLED: "Cancelled",

@@ -22,7 +22,7 @@ import { getFineWeightResolver, storedLineWeights } from "@/lib/fine-weight";
 import { requirePermission } from "@/lib/auth/auth";
 import { PERMISSIONS } from "@/lib/permissions";
 import { requireStoreScope, getStoreIdForRead, assertPlanActiveForExport } from "@/lib/store-context";
-import { invoiceStatusLabel } from "@/lib/status-labels";
+import { purchaseStatusLabel } from "@/lib/status-labels";
 import { actionErrorMessage } from "@/lib/action-error";
 import { isVendorGstApplicable, partyGstTypeLabel } from "@/lib/gst";
 import { computeRoundOff } from "@/lib/round-off";
@@ -1041,7 +1041,7 @@ export async function exportPurchasesToExcel(
       Vendor: purchase.vendor?.name || "",
       // Bought from a customer against a sale (Customer Exchange), not a supplier bill.
       Type: purchases[index].isOldGoldExchange ? "Old Gold Exchange" : "Purchase",
-      Status: invoiceStatusLabel(purchase.status),
+      Status: purchaseStatusLabel(purchase.status),
       Subtotal: purchase.subtotal,
       "Making Charges": purchase.makingCharges,
       "Stone Charges": purchase.stoneCharges,

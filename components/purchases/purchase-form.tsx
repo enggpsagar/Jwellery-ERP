@@ -668,6 +668,9 @@ export function PurchaseForm({
     if (!key || items[0].productId) return
     applyProductToItem(key, prefillProductId)
     if (prefillRate && prefillRate > 0) updateItem(key, { rate: prefillRate })
+    // ProductSelect keeps its own selection from mount; remount it so it
+    // shows the product just applied (same as after a draft restore).
+    setProductSelectKeys((prev) => ({ ...prev, [key]: (prev[key] ?? 0) + 1 }))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 

@@ -468,6 +468,7 @@ async function lockLinkedStockFields(
     where: { id: { in: [...explicitStockIds] }, storeId },
     select: {
       id: true,
+      hsnCode: true,
       metalTypeId: true,
       purity: true,
       purityLabel: true,
@@ -499,7 +500,8 @@ async function lockLinkedStockFields(
       stoneWeight: stock.stoneWeight !== null ? Number(stock.stoneWeight) : null,
       stoneMetalTypeName: stock.stoneMetalTypeName,
       stoneTypeNames: stock.stoneTypeNames,
-      hsnCode: stock.product.hsnCode,
+      // The piece's own HSN first (it can differ per stock), else the Product's.
+      hsnCode: stock.hsnCode ?? stock.product.hsnCode,
     };
   });
 }
@@ -1132,7 +1134,8 @@ export async function getInvoiceFormStockItems(includeInvoiceId?: string) {
     stockCode: stock.stockCode,
     productName: stock.product.name,
     productCode: stock.product.productCode,
-    hsnCode: stock.product.hsnCode,
+    // The piece's own HSN first (it can differ per stock), else the Product's.
+      hsnCode: stock.hsnCode ?? stock.product.hsnCode,
     metalType: stock.metalType
       ? { id: stock.metalType.id, name: stock.metalType.name }
       : null,
@@ -1218,7 +1221,8 @@ export async function getInvoiceFormStockItems(includeInvoiceId?: string) {
       stockCode: stock.stockCode,
       productName: stock.product.name,
       productCode: stock.product.productCode,
-      hsnCode: stock.product.hsnCode,
+      // The piece's own HSN first (it can differ per stock), else the Product's.
+      hsnCode: stock.hsnCode ?? stock.product.hsnCode,
       metalType: stock.metalType ? { id: stock.metalType.id, name: stock.metalType.name } : null,
       purity: stock.purity,
       purityLabel: stock.purityLabel,

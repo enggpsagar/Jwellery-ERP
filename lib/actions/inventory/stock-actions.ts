@@ -260,6 +260,7 @@ function getStockWhere(
               },
             },
             { product: { productCode: { contains: query, mode: "insensitive" as const } } },
+            { hsnCode: { contains: query, mode: "insensitive" as const } },
             { product: { hsnCode: { contains: query, mode: "insensitive" as const } } },
             // IGI / lab certificate number: the piece's own stone rows, or
             // its product's (a single-stone piece has no rows of its own).
@@ -556,6 +557,7 @@ export async function getInventoryStockFormProducts() {
       categoryType: { select: { id: true, name: true } },
       metalType: { select: { id: true, name: true } },
       defaultPurity: true,
+      hsnCode: true,
       defaultMakingCharge: true,
       defaultStoneCharge: true,
       defaultGrossWeight: true,
@@ -726,6 +728,7 @@ export async function createInventoryStock(
 
     const vendorName = parseNullableString(formData.get("vendorName"))
     const vendorInvoiceNumber = parseNullableString(formData.get("vendorInvoiceNumber"))
+    const hsnCode = parseNullableString(formData.get("hsnCode"))
     const locationId = parseNullableString(formData.get("locationId"))
     const remarks = parseNullableString(formData.get("remarks"))
 
@@ -923,7 +926,17 @@ export async function createInventoryStock(
     })
     const fineWeight = pieceRows ? pieceRows.rows.fineWeight : weights.fineWeight
     const metalWeightFine = storeMetal?.hasPurity && fineWeight ? fineWeight : undefined
-    const stockAddedDescription = `Stock added — ${stockCode}${tagNumber ? ` (Tag ${tagNumber})` : ""}`
+    // Who it came from and on which bill, so the Ledger row is readable on
+    // its own. A tag typed as "Tag - 98798" isn't prefixed with "Tag" again.
+    const tagText = tagNumber ? (/^tag\b/i.test(tagNumber) ? tagNumber : `Tag ${tagNumber}`) : null
+    const stockAddedDescription = [
+      `Stock added — ${stockCode}`,
+      tagText,
+      vendorName ? `from ${vendorName}` : null,
+      vendorInvoiceNumber ? `bill ${vendorInvoiceNumber}` : null,
+    ]
+      .filter(Boolean)
+      .join(" · ")
     const ledgerMetals = pieceRows
       ? pieceRows.rows.metals.map((row) => {
           const hasPurity = pieceRows.hasPurity.get(row.metalTypeId) ?? false
@@ -971,6 +984,7 @@ export async function createInventoryStock(
           saleAmount: toDecimal(saleAmount),
           vendorName,
           vendorInvoiceNumber,
+          hsnCode,
           purchaseDate,
           manufactureDate,
           locationId,
@@ -1122,6 +1136,7 @@ export async function updateInventoryStock(
 
     const vendorName = parseNullableString(formData.get("vendorName"))
     const vendorInvoiceNumber = parseNullableString(formData.get("vendorInvoiceNumber"))
+    const hsnCode = parseNullableString(formData.get("hsnCode"))
     const locationId = parseNullableString(formData.get("locationId"))
     const remarks = parseNullableString(formData.get("remarks"))
 
@@ -1303,6 +1318,7 @@ export async function updateInventoryStock(
           remarks,
           vendorName,
           vendorInvoiceNumber,
+          hsnCode,
         },
       })
 
@@ -1361,6 +1377,7 @@ export async function updateInventoryStock(
         saleAmount: toDecimal(saleAmount),
         vendorName,
         vendorInvoiceNumber,
+        hsnCode,
         purchaseDate,
         manufactureDate,
         locationId,

@@ -49,6 +49,7 @@ type ProductOption = {
   categoryType: { id: string; name: string } | null;
   metalType: { id: string; name: string } | null;
   defaultPurity: string | null;
+  hsnCode?: string | null;
   defaultMakingCharge: string | null;
   defaultStoneCharge: string | null;
   defaultGrossWeight: string | null;
@@ -106,6 +107,7 @@ type Stock = {
 
   vendorName: string | null;
   vendorInvoiceNumber?: string | null;
+  hsnCode?: string | null;
 
   purchaseDate: string | null;
 
@@ -472,6 +474,7 @@ export function StockForm({
       quantity: field("quantity"),
       vendorName: field("vendorName"),
       vendorInvoiceNumber: field("vendorInvoiceNumber"),
+      hsnCode: field("hsnCode"),
       purchaseDate: field("purchaseDate"),
       manufactureDate: field("manufactureDate"),
       remarks: field("remarks"),
@@ -549,6 +552,7 @@ export function StockForm({
       restoreField("quantity", str("quantity"));
       restoreField("vendorName", str("vendorName"));
       restoreField("vendorInvoiceNumber", str("vendorInvoiceNumber"));
+      restoreField("hsnCode", str("hsnCode"));
       restoreField("purchaseDate", str("purchaseDate"));
       restoreField("manufactureDate", str("manufactureDate"));
       restoreField("remarks", str("remarks"));
@@ -723,6 +727,22 @@ export function StockForm({
             />
 
             <ErrorText error={state.errors.tagNumber} />
+          </div>
+
+          {/* This piece's own HSN — can differ from the product's. Blank =
+              use the product's (shown as the placeholder); sales use this
+              one first. */}
+          <div>
+            <Label htmlFor="hsnCode">HSN Code</Label>
+
+            <Input
+              id="hsnCode"
+              name="hsnCode"
+              defaultValue={stock?.hsnCode ?? ""}
+              placeholder={selectedProduct?.hsnCode ? `${selectedProduct.hsnCode} (from product)` : "e.g. 7113"}
+            />
+
+            <ErrorText error={state.errors.hsnCode} />
           </div>
 
           {/*

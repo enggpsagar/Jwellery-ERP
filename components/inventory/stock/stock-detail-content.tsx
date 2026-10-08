@@ -66,6 +66,7 @@ export function StockDetailContent({
       <DetailSection title="Basic Information" icon={Boxes} tint="var(--chart-1)" compact>
         <DetailGrid dense>
           <DetailField label="Tag Number" value={stock.tagNumber} />
+          <DetailField label="HSN Code" value={stock.hsnCode ?? stock.product?.hsnCode} />
           <DetailField
             label="Product"
             span

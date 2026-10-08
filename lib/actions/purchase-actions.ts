@@ -1457,6 +1457,7 @@ export async function createPurchase(
             stockCode: stockCodes[i],
             // The supplier's bill no., so the stock piece shows it too.
             vendorInvoiceNumber: vendorInvoiceNumber ?? undefined,
+            hsnCode: item.hsnCode || undefined,
             metalTypeId: item.metalTypeId ?? undefined,
             purity: item.purity ?? undefined,
             purityLabel: item.purityLabel ?? undefined,
@@ -2002,6 +2003,7 @@ export async function updatePurchase(
             stockCode: stockCodes[i],
             // The supplier's bill no., so the stock piece shows it too.
             vendorInvoiceNumber: vendorInvoiceNumber ?? undefined,
+            hsnCode: item.hsnCode || undefined,
             metalTypeId: item.metalTypeId ?? undefined,
             purity: item.purity ?? undefined,
             purityLabel: item.purityLabel ?? undefined,

@@ -59,12 +59,10 @@ export function StockClient({ stockItems, pagination, totals, metals, categoryFi
   const router = useRouter()
   const [scanning, setScanning] = React.useState(false)
 
-  // Carries the selected row's Product into Add Stock so adding another
-  // unit of the same design doesn't require re-picking it from scratch.
+  // Add Stock is a purchase: New Purchase, carrying the selected row's
+  // Product so another unit of the same design needn't be re-picked.
   const activeProductId = stockItems.find((item) => item.id === activeStockId)?.product?.id
-  const addStockHref = activeProductId
-    ? `/inventory/stock/new?productId=${activeProductId}`
-    : "/inventory/stock/new"
+  const addStockHref = activeProductId ? `/purchases/new?productId=${activeProductId}` : "/purchases/new"
 
   return (
     <main className="space-y-6 p-6">

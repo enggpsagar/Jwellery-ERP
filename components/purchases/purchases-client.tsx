@@ -106,19 +106,9 @@ export function PurchasesClient({ purchases, groups, view, locations, pagination
           </div>
         </div>
 
-        {/* New Purchase records a supplier bill (payable + GST) for new or
-            existing products. Add Stock is for stock that isn't a supplier
-            purchase — opening stock, own manufacture, corrections — and
-            posts no payable or GST. Same blue as the product panel's own
-            Add Stock button. */}
+        {/* All stock comes in on a purchase bill (New Purchase: existing
+            product or "+ New product"), so there's no separate Add Stock. */}
         <div className="flex flex-wrap items-center gap-2">
-          <Button
-            asChild
-            className="bg-[var(--chart-1)] text-white shadow-sm hover:bg-[color-mix(in_oklab,var(--chart-1)_88%,black)]"
-            title="Add stock that isn't a supplier purchase — no payable or GST is recorded"
-          >
-            <Link href={`/inventory/stock/new?returnTo=${encodeURIComponent("/purchases")}`}>Add Stock</Link>
-          </Button>
           <Button asChild>
             <Link href="/purchases/new">New Purchase</Link>
           </Button>

@@ -564,7 +564,7 @@ function missingWeightError(
     if (hasWeight) continue;
     const label = `Line ${index + 1}${item.itemName ? ` (${item.itemName})` : ""}`;
     return item.productId && explicitProductIds.has(item.productId)
-      ? `${label}: its product has no weight saved. Set the weight on the product (Inventory → Products), then add it again.`
+      ? `${label}: enter this piece's weight — its product has no default weight saved.`
       : `${label}: enter its weight — net weight for metal, carat weight for a stone.`;
   }
   return null;
@@ -635,12 +635,19 @@ async function applyExistingStockLines(
   return { items: next, stockCodeById: new Map(stocks.map((stock) => [stock.id, stock.stockCode])) };
 }
 
+/** A weight the client sent, if it's a positive number. */
+function positive(value: unknown): number | null {
+  const number = Number(value);
+  return Number.isFinite(number) && number > 0 ? number : null;
+}
+
 /**
  * A disabled input on purchase-form.tsx is a UI courtesy, not enforcement —
  * a direct/tampered request can still submit anything for a field the UI
- * locks once a real Product is picked. This overwrites every physical field
- * (item name, metal/purity, weights, embedded stone, HSN) with that
- * Product's own saved values before they ever reach the DB, for every line
+ * locks once a real Product is picked. This overwrites the identity fields
+ * (item name, metal/purity, embedded stone) with that Product's own saved
+ * values before they ever reach the DB — weights and HSN are the piece's
+ * own (the line's, falling back to the Product's) — for every line
  * that explicitly picked one — `explicitProductIds` must be captured BEFORE
  * createProductFromManualEntry's per-line substitution, so a genuinely
  * manual line (no product picked at all) is never touched. Mirrors
@@ -747,16 +754,24 @@ async function lockLinkedProductFields(
       metalTypeId: isGemstoneProduct ? null : product.metalTypeId,
       purity: isGemstoneProduct ? null : product.defaultPurity,
       purityLabel: isGemstoneProduct ? null : product.storeMetalPurity?.label ?? null,
-      grossWeight: isGemstoneProduct ? 0 : product.defaultGrossWeight !== null ? Number(product.defaultGrossWeight) : 0,
-      netWeight: isGemstoneProduct ? 0 : product.defaultNetWeight !== null ? Number(product.defaultNetWeight) : 0,
-      caratWeight: product.defaultCaratWeight !== null ? Number(product.defaultCaratWeight) : 0,
+      // Weights are this piece's own: the form pre-fills the Product's
+      // defaults but lets them be changed (a design comes in many weights),
+      // so a positive weight the line carries wins; 0/blank falls back to
+      // the Product's. Which metal/purity/stone it is stays locked above.
+      grossWeight: isGemstoneProduct
+        ? 0
+        : positive(item.grossWeight) ?? (product.defaultGrossWeight !== null ? Number(product.defaultGrossWeight) : 0),
+      netWeight: isGemstoneProduct
+        ? 0
+        : positive(item.netWeight) ?? (product.defaultNetWeight !== null ? Number(product.defaultNetWeight) : 0),
+      caratWeight: positive(item.caratWeight) ?? (product.defaultCaratWeight !== null ? Number(product.defaultCaratWeight) : 0),
       // Server field `stoneWeight` is the Net Stone Weight the form calls
       // stoneWeightInput — see purchase-form.tsx's identical
       // isGemstoneProduct/hasStoneComponent branching in applyProductToItem.
       stoneWeight: isGemstoneProduct
-        ? (product.defaultNetWeight !== null ? Number(product.defaultNetWeight) : 0)
+        ? positive(item.stoneWeight) ?? (product.defaultNetWeight !== null ? Number(product.defaultNetWeight) : 0)
         : product.hasStoneComponent
-          ? (product.defaultStoneWeight !== null ? Number(product.defaultStoneWeight) : 0)
+          ? positive(item.stoneWeight) ?? (product.defaultStoneWeight !== null ? Number(product.defaultStoneWeight) : 0)
           : null,
       stoneMetalTypeName: isGemstoneProduct
         ? product.metalType?.name ?? null
@@ -764,7 +779,8 @@ async function lockLinkedProductFields(
           ? product.defaultStoneMetalTypeName ?? null
           : null,
       stoneTypeNames: product.hasStoneComponent ? product.defaultStoneTypeNames ?? null : null,
-      hsnCode: product.hsnCode ?? null,
+      // Per-piece HSN: the line's, else the Product's.
+      hsnCode: item.hsnCode || product.hsnCode || null,
     };
   });
 }

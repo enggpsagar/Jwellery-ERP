@@ -194,7 +194,7 @@ test("a purchase line can be one piece of gold + silver + diamond", async ({ pag
   await page.goto("/purchases/new")
   await pick(page, page.getByRole("combobox").filter({ hasText: /Select (a|or search a) supplier/ }).first(), /Chandra Bullion Suppliers/)
   await page.getByRole("combobox").filter({ hasText: /Search product|Select a product|product/i }).first().click()
-  await page.getByRole("option", { name: /Enter Manually/ }).click()
+  await page.getByRole("option", { name: /New product/ }).click()
   const expand = page.getByRole("button", { name: "Expand line item details" }).first()
   if (await expand.isVisible()) await expand.click()
   await page

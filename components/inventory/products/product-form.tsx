@@ -1936,64 +1936,15 @@ export function ProductForm({
         </div>
       </div>
 
+      {/* Stock comes in only on a purchase bill (what's owed + GST), so a new
+          product no longer opens its own stock entry here — after saving, Add
+          Stock on the product opens New Purchase with it selected. */}
       {mode === "create" && (
-        <div className="rounded-xl border p-6">
-          <h3 className="mb-1 text-lg font-semibold">Stock entry</h3>
-          <p className="mb-4 text-sm text-muted-foreground">
-            Metal, purity and charges come from this product, so a stock entry
-            started here needs nothing but a quantity.
-          </p>
-
-          <label className="flex items-center gap-3 text-sm font-medium">
-            <input
-              type="checkbox"
-              name="createStockEntry"
-              value="true"
-              checked={createStock}
-              onChange={(event) => setCreateStock(event.target.checked)}
-              className="h-4 w-4 rounded border-input"
-            />
-            Do you want to create a stock entry as well?
-          </label>
-
-          {createStock && (
-            <div className="mt-4 grid gap-4 sm:grid-cols-2">
-              <div>
-                <Label htmlFor="stockQuantity">Quantity</Label>
-                <Input
-                  id="stockQuantity"
-                  name="stockQuantity"
-                  type="number"
-                  min="0"
-                  step="1"
-                  placeholder="0"
-                />
-                <p className="mt-1.5 text-xs text-muted-foreground">
-                  Leave blank and the entry is created with a quantity of 0 —
-                  the product is stockable, with none on hand yet.
-                </p>
-                <ErrorText error={state.errors.stockQuantity} />
-              </div>
-
-              <div>
-                {showLocationField && <Label htmlFor="locationId">Location</Label>}
-                <LocationSelect
-                  locations={locations}
-                  name="locationId"
-                  defaultValue={defaultLocationId}
-                  placeholder="Select location (optional)"
-                />
-                {showLocationField && (
-                  <p className="mt-1.5 text-xs text-muted-foreground">
-                    Optional — left blank, the same default a full Add Stock
-                    entry would use is applied automatically.
-                  </p>
-                )}
-                <ErrorText error={state.errors.locationId} />
-              </div>
-            </div>
-          )}
-        </div>
+        <p className="rounded-xl border border-dashed p-4 text-sm text-muted-foreground">
+          To bring this product into stock, record it on a purchase: after saving, use{" "}
+          <span className="font-medium text-foreground">Add Stock</span> on the product (opens New Purchase), or
+          add it straight from New Purchase with &quot;+ New product&quot;.
+        </p>
       )}
 
       {(metalValueSum > 0 || stoneChargeSum > 0) && (

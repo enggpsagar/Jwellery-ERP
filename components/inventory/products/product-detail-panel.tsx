@@ -99,7 +99,9 @@ export function ProductDetailPanel({ productId, canEdit = false, refreshToken }:
             className="gap-1.5 bg-[var(--chart-1)] text-white shadow-sm hover:bg-[color-mix(in_oklab,var(--chart-1)_88%,black)]"
             asChild
           >
-            <Link href={`/inventory/stock/new?productId=${product.id}`}>
+            {/* Stock comes in on a purchase bill: New Purchase with this
+                product on the first line. */}
+            <Link href={`/purchases/new?productId=${product.id}`}>
               <PackagePlus className="h-4 w-4" />
               Add Stock
             </Link>

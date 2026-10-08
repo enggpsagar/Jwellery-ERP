@@ -147,7 +147,7 @@ const mainNav: NavItem[] = [
     icon: Package,
     items: [
       { title: "Products", href: "/inventory/products", quickAddHref: "/inventory/products/new", countKey: "products" },
-      { title: "Stock", href: "/inventory/stock", quickAddHref: "/inventory/stock/new", countKey: "stock" },
+      { title: "Stock", href: "/inventory/stock", quickAddHref: "/purchases/new", countKey: "stock" },
     ],
   },
   {

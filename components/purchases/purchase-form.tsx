@@ -1161,7 +1161,7 @@ export function PurchaseForm({
     const label = `Line ${index + 1}${item.itemName ? ` (${item.itemName})` : ""}`
     return [
       item.productId
-        ? `${label}: its product has no weight saved — set it in Inventory → Products`
+        ? `${label}: enter this piece's weight (the product has no default saved)`
         : `${label}: ${item.itemKind === "STONE" ? "carat weight" : "net weight"}`,
     ]
   })
@@ -1379,7 +1379,7 @@ export function PurchaseForm({
                     {item.productLinkDecided && !item.productId ? (
                       <div className="flex gap-1">
                         <div className="flex h-9 flex-1 items-center rounded-md border bg-muted px-3 text-sm text-muted-foreground">
-                          No product — manual entry
+                          New product — fill in its details below
                         </div>
                         <IconTooltip label="Pick a product instead">
                           <button
@@ -1399,20 +1399,24 @@ export function PurchaseForm({
                         name={`product-${item.key}`}
                         defaultValue={item.productId}
                         onChange={(productId) => applyProductToItem(item.key, productId)}
-                        addNewHref={`/inventory/products/new?returnTo=${encodeURIComponent(RETURN_TO)}`}
-                        onBeforeAddNew={() => saveDraft(item.key)}
-                        onSkip={() =>
+                        // One window: a new product is described right on
+                        // this line (Details opens) and created on save —
+                        // no trip to a separate Add Product page.
+                        placeholder="Existing product — search…"
+                        skipLabel="+ New product (not in the list)"
+                        onSkip={() => {
                           updateItem(item.key, {
                             ...emptyLineItem(gstRateId),
                             key: item.key,
                             productLinkDecided: true,
                           })
-                        }
+                          setExpandedKeys((prev) => new Set(prev).add(item.key))
+                        }}
                       />
                     )}
                     {!item.productLinkDecided && (
                       <p className="text-[10px] leading-tight text-destructive">
-                        Select a product, or choose &quot;Enter Manually&quot;
+                        Pick an existing product, or choose &quot;+ New product&quot;
                       </p>
                     )}
                   </div>
@@ -1442,9 +1446,8 @@ export function PurchaseForm({
                       <Input
                         type="number"
                         step="any"
-                        className={isLinked ? "flex-1 bg-muted" : "flex-1"}
-                        readOnly={isLinked}
-                        aria-label="Gross weight"
+                        className={"flex-1"}
+                                                aria-label="Gross weight"
                         value={
                           item.grossWeight === 0
                             ? ""
@@ -1459,7 +1462,6 @@ export function PurchaseForm({
                       />
                       <Select
                         value={item.grossWeightUnit}
-                        disabled={isLinked}
                         onValueChange={(unit) => updateItem(item.key, { grossWeightUnit: unit as "GRAM" | "CARAT" })}
                       >
                         <SelectTrigger className="w-14" size="sm">
@@ -1490,9 +1492,8 @@ export function PurchaseForm({
                       <Input
                         type="number"
                         step="any"
-                        className={isLinked ? "flex-1 bg-muted" : "flex-1"}
-                        readOnly={isLinked}
-                        value={
+                        className={"flex-1"}
+                                                value={
                           item.netWeight === 0
                             ? ""
                             : toPrimaryUnit(
@@ -1506,7 +1507,6 @@ export function PurchaseForm({
                       />
                       <Select
                         value={item.netWeightUnit}
-                        disabled={isLinked}
                         onValueChange={(unit) => updateItem(item.key, { netWeightUnit: unit as "GRAM" | "CARAT" })}
                       >
                         <SelectTrigger className="w-14" size="sm">
@@ -1587,8 +1587,7 @@ export function PurchaseForm({
                           value={item.hsnCode}
                           onChange={(e) => updateItem(item.key, { hsnCode: e.target.value })}
                           placeholder="e.g. 7113"
-                          readOnly={isLinked}
-                          className={isLinked ? "bg-muted" : undefined}
+
                         />
                       </div>
                     </div>
@@ -1804,9 +1803,8 @@ export function PurchaseForm({
                             <Input
                               type="number"
                               step="any"
-                              className={isLinked ? "flex-1 bg-muted" : "flex-1"}
-                              readOnly={isLinked}
-                              value={
+                              className={"flex-1"}
+                                                            value={
                                 item.stoneWeightInput === 0
                                   ? ""
                                   : toPrimaryUnit(
@@ -1820,7 +1818,6 @@ export function PurchaseForm({
                             />
                             <Select
                               value={item.stoneWeightUnit}
-                              disabled={isLinked}
                               onValueChange={(unit) => handleStoneWeightUnitChange(item, unit as "GRAM" | "CARAT")}
                             >
                               <SelectTrigger className="w-16">
@@ -1841,8 +1838,7 @@ export function PurchaseForm({
                           <Input
                             type="number"
                             step="any"
-                            readOnly={isLinked}
-                            className={isLinked ? "bg-muted" : undefined}
+
                             value={item.caratWeight === 0 ? "" : item.caratWeight}
                             onChange={(e) => handleCaratWeightChange(item, e.target.value)}
                           />
@@ -1951,6 +1947,7 @@ export function PurchaseForm({
                           onStoneWeightUnitChange={(unit) => handleStoneWeightUnitChange(item, unit)}
                           netStoneWeightTouched={item.netStoneWeightTouched}
                           lockPhysicalFields={isLinked}
+                          allowWeightEdit
                         />
                       </div>
                     )}
@@ -1990,6 +1987,7 @@ export function PurchaseForm({
                           onStoneWeightUnitChange={(unit) => handleStoneWeightUnitChange(item, unit)}
                           netStoneWeightTouched={item.netStoneWeightTouched}
                           lockPhysicalFields={isLinked}
+                          allowWeightEdit
                         />
                       </div>
                     )}

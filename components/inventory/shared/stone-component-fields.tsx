@@ -98,6 +98,10 @@ type StoneComponentFieldsProps = {
    * (pricing, not physical) stay editable. Not used by the Product form,
    * where this component's fields are the source of truth being defined. */
   lockPhysicalFields?: boolean
+  /** With lockPhysicalFields: which stone stays locked, but its carat and
+   * net weight are editable — a purchase of an existing product records
+   * this piece's own weight. */
+  allowWeightEdit?: boolean
   /** Product form only: Stone Charge there is just an estimate that now
    * feeds the form's own bottom-of-page total breakdown instead of a real
    * money field the way it is on Invoice/Kacha/Purchase (an actual sale/
@@ -146,6 +150,7 @@ export function StoneComponentFields({
   onStoneWeightUnitChange,
   netStoneWeightTouched,
   lockPhysicalFields = false,
+  allowWeightEdit = false,
   compact = false,
 }: StoneComponentFieldsProps) {
   // Scopes the Stone Type radios to THIS component instance — the same
@@ -298,8 +303,8 @@ export function StoneComponentFields({
               step="any"
               value={caratWeight}
               onValueChange={onCaratWeightChange}
-              readOnly={lockPhysicalFields}
-              className={lockPhysicalFields ? "bg-muted" : undefined}
+              readOnly={lockPhysicalFields && !allowWeightEdit}
+              className={lockPhysicalFields && !allowWeightEdit ? "bg-muted" : undefined}
             />
           </div>
 
@@ -317,10 +322,10 @@ export function StoneComponentFields({
             <div className="flex gap-1">
               <DecimalInput
                 step="any"
-                className={lockPhysicalFields ? "flex-1 bg-muted" : "flex-1"}
+                className={lockPhysicalFields && !allowWeightEdit ? "flex-1 bg-muted" : "flex-1"}
                 value={stoneWeightInput}
                 onValueChange={onStoneWeightInputChange}
-                readOnly={lockPhysicalFields}
+                readOnly={lockPhysicalFields && !allowWeightEdit}
               />
               <Select
                 value={stoneWeightUnit}

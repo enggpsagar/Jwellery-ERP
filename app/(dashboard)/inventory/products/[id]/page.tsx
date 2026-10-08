@@ -11,6 +11,7 @@ import { PERMISSIONS } from "@/lib/permissions"
 import { PageBackHeader } from "@/components/shared/page-back-header"
 import { Button } from "@/components/ui/button"
 import { ProductDetailContent } from "@/components/inventory/products/product-detail-content"
+import { ProductStockHistory } from "@/components/inventory/products/product-stock-history"
 
 type Props = {
   params: Promise<{ id: string }>
@@ -76,6 +77,7 @@ export default async function ProductDetailsPage({ params, searchParams }: Props
       )}
 
       <ProductDetailContent product={product} canEdit={canEdit} />
+      <ProductStockHistory productId={product.id} />
     </main>
   )
 }

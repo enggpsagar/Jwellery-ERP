@@ -7,6 +7,7 @@ import { Package, PackagePlus } from "lucide-react"
 import { getProductById } from "@/lib/actions/inventory/product-actions"
 import { ProductRowActions } from "@/components/inventory/products/product-row-actions"
 import { ProductDetailContent } from "@/components/inventory/products/product-detail-content"
+import { ProductStockHistory } from "@/components/inventory/products/product-stock-history"
 import { ProductStatusToggle } from "@/components/inventory/products/product-status-toggle"
 import { ActiveBadge } from "@/components/shared/active-badge"
 import { Button } from "@/components/ui/button"
@@ -121,6 +122,7 @@ export function ProductDetailPanel({ productId, canEdit = false, refreshToken }:
       </div>
 
       <ProductDetailContent product={product} canEdit={canEdit} hideStatusField />
+      <ProductStockHistory productId={product.id} refreshToken={refreshToken} />
     </div>
   )
 }

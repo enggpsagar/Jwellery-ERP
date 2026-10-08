@@ -202,7 +202,17 @@ export function SupplierLedgerHistoryTable({ entries }: { entries: SupplierLedge
                   <MetalList metals={entry.metals} weightOf={weightText} />
                 </TableCell>
                 <TableCell className="whitespace-nowrap text-right font-medium text-red-600">
-                  {entry.type === "CREDIT" && entry.amount !== 0 ? formatAmount(entry.amount) : ""}
+                  {entry.type === "CREDIT" && entry.amount !== 0 ? (
+                    formatAmount(entry.amount)
+                  ) : entry.stockValue ? (
+                    // Add Stock's price: shown, but not owed (not in totals).
+                    <span className="font-normal text-muted-foreground" title="Stock value from Add Stock — not added to what's owed">
+                      {formatAmount(entry.stockValue)}
+                      <span className="block text-[10px] leading-tight">stock value · not owed</span>
+                    </span>
+                  ) : (
+                    ""
+                  )}
                 </TableCell>
                 <TableCell className="whitespace-nowrap text-right font-medium text-emerald-600">
                   {entry.type === "DEBIT" && entry.amount !== 0 ? formatAmount(entry.amount) : ""}

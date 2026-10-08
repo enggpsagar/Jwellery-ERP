@@ -276,6 +276,9 @@ export type SupplierLedgerEntryItem = {
   /** What a purchase brought in, per metal/purity (grams, net) or stone
    * (carats) — empty for payments. */
   metals: SupplierLedgerMetal[]
+  /** Add Stock from this supplier: the piece's purchase amount. Shown for
+   * information only — Add Stock never adds to what's owed. */
+  stockValue: number | null
 }
 
 export type SupplierLedgerMetal = { label: string; weight: number; unit: "g" | "ct" }
@@ -319,6 +322,23 @@ export async function getSupplierLedgerEntries(
     },
   })
 
+  // An Add Stock entry has no stock FK; its description starts "Stock added
+  // — <stock code>", so the piece (price, purity) is found by that code.
+  const stockCodeOf = (description: string | null) => /^Stock added — (\S+)/.exec(description ?? "")?.[1] ?? null
+  const stockCodes = entries
+    .filter((entry) => entry.sourceType === "ADJUSTMENT")
+    .map((entry) => stockCodeOf(entry.description))
+    .filter((code): code is string => Boolean(code))
+  const stockByCode = new Map(
+    (stockCodes.length
+      ? await prisma.inventoryStock.findMany({
+          where: { storeId, stockCode: { in: stockCodes } },
+          select: { stockCode: true, purchaseAmount: true, purityLabel: true },
+        })
+      : []
+    ).map((stock) => [stock.stockCode, stock]),
+  )
+
   // Per-piece weights × quantity, merged per metal + purity (or stone).
   // Only on the purchase's own "owed" entry — a Payment Out made at the
   // same time also carries the purchaseId and must not repeat the metal.
@@ -326,10 +346,12 @@ export async function getSupplierLedgerEntries(
     // A metal-only entry (Add Stock from this supplier) carries its own
     // weight; for a purity metal that's the fine (pure) weight.
     if (entry.sourceType !== "PURCHASE" && (entry.metalWeight || entry.metalWeightFine)) {
-      const fine = !entry.metalWeight && entry.metalWeightFine
+      // Same "<metal> <purity>" label purchases use, so the totals merge.
+      const purity = stockByCode.get(stockCodeOf(entry.description) ?? "")?.purityLabel
+      const fine = !purity && !entry.metalWeight && entry.metalWeightFine
       return [
         {
-          label: `${entry.metalType?.name ?? "Metal"}${fine ? " (fine)" : ""}`,
+          label: `${entry.metalType?.name ?? "Metal"}${purity ? ` ${purity}` : fine ? " (fine)" : ""}`,
           weight: Number(entry.metalWeight ?? entry.metalWeightFine ?? 0),
           unit: "g",
         },
@@ -365,5 +387,12 @@ export async function getSupplierLedgerEntries(
     entryDate: formatDate(entry.entryDate),
     entryDateISO: entry.entryDate.toISOString(),
     metals: metalsOf(entry),
+    stockValue:
+      entry.sourceType === "ADJUSTMENT"
+        ? (() => {
+            const amount = stockByCode.get(stockCodeOf(entry.description) ?? "")?.purchaseAmount
+            return amount != null ? Number(amount) : null
+          })()
+        : null,
   }))
 }

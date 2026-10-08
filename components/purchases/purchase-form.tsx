@@ -180,6 +180,9 @@ export type LineItem = {
    * minted for it from this line's own name/metal/purity/weights, see
    * createProductFromManualEntry in purchase-actions.ts. */
   productLinkDecided: boolean
+  /** "Convert to purchase": the Add Stock piece this line becomes (no new
+   * stock row; createPurchase's applyExistingStockLines). */
+  existingStockId?: string
   /** "Made of more than one metal or stone?" — one piece of e.g. Gold 22K
    * + Silver 925 + a Diamond, each row in `components` with its own
    * purity, weight, rate and GST rate (lib/piece-components.ts). While on,
@@ -341,6 +344,10 @@ type PurchaseFormProps = {
   initialItems?: LineItem[]
   defaultPurchaseDate?: string
   defaultVendorInvoiceNumber?: string
+  /** "Switch to New Purchase" from Add Stock: the first line starts on
+   * this product (filled exactly as picking it would) at this rate. */
+  prefillProductId?: string
+  prefillRate?: number
   defaultNotes?: string
   /** This purchase's already-recorded paidAmount — shown read-only in edit
    * mode instead of "Paid Now"'s payment-method rows. updatePurchase's
@@ -390,6 +397,8 @@ export function PurchaseForm({
   initialItems,
   defaultPurchaseDate,
   defaultVendorInvoiceNumber,
+  prefillProductId,
+  prefillRate,
   defaultNotes,
   defaultPaidAmount,
 }: PurchaseFormProps) {
@@ -646,6 +655,19 @@ export function PurchaseForm({
     if (newPartyId || newProductId) {
       window.history.replaceState({}, "", RETURN_TO)
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Switch from Add Stock: apply the product to the starting line once, the
+  // same way picking it does, then the rate typed there.
+  const prefillAppliedRef = useRef(false)
+  useEffect(() => {
+    if (prefillAppliedRef.current || !prefillProductId || initialItems) return
+    prefillAppliedRef.current = true
+    const key = items[0]?.key
+    if (!key || items[0].productId) return
+    applyProductToItem(key, prefillProductId)
+    if (prefillRate && prefillRate > 0) updateItem(key, { rate: prefillRate })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -1110,6 +1132,7 @@ export function PurchaseForm({
         igstAmount: igst,
         gstRateId: item.gstRateId || null,
         multiPart: item.multiPart,
+        existingStockId: item.existingStockId || null,
         // A row left on the default GST picks up the line's own rate, so
         // what's stored is what was taxed (see lineGst). A row never filled
         // in at all (e.g. the starter stone row on a metals-only piece) is

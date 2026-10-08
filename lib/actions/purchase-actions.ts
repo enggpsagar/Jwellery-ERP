@@ -104,6 +104,10 @@ export type PurchaseLineItemInput = {
   // resolved summary (see resolveMultiPartLines). The line's own gstRateId
   // then only taxes its making charge; each row is taxed at its own rate.
   multiPart?: boolean;
+  /** "Convert to purchase": this line is an existing Add Stock piece. It is
+   * reused (not a new stock row) and its own weights win — see
+   * applyExistingStockLines. createPurchase only. */
+  existingStockId?: string | null;
   components?: PieceComponentPayload[] | null;
 };
 
@@ -564,6 +568,71 @@ function missingWeightError(
       : `${label}: enter its weight — net weight for metal, carat weight for a stone.`;
   }
   return null;
+}
+
+/**
+ * "Convert to purchase": lines that point at an existing Add Stock piece.
+ * The piece must be this store's, for the line's product, single-part, in
+ * stock with nothing sold, and not already on a purchase bill. Its physical
+ * fields (weights, purity, stone, quantity) replace whatever the line
+ * carried — lockLinkedProductFields would otherwise have put the Product's
+ * default weights there, and the piece's real weight is what was bought.
+ * Returns the stock codes per line (for removing the Add Stock metal
+ * entry) or an error message.
+ */
+async function applyExistingStockLines(
+  storeId: string,
+  items: PurchaseLineItemInput[],
+): Promise<{ items: PurchaseLineItemInput[]; stockCodeById: Map<string, string> } | { error: string }> {
+  const ids = items.map((item) => item.existingStockId).filter((id): id is string => Boolean(id));
+  if (ids.length === 0) return { items, stockCodeById: new Map() };
+  if (new Set(ids).size !== ids.length) return { error: "The same stock piece is on two lines." };
+
+  const stocks = await prisma.inventoryStock.findMany({
+    where: { id: { in: ids }, storeId },
+    include: {
+      purchaseItems: { select: { id: true }, take: 1 },
+      components: { select: { id: true }, take: 1 },
+      transactions: { where: { transactionType: InventoryTransactionType.SALE }, select: { id: true }, take: 1 },
+    },
+  });
+  const byId = new Map(stocks.map((stock) => [stock.id, stock]));
+
+  const next: PurchaseLineItemInput[] = [];
+  for (const item of items) {
+    if (!item.existingStockId) {
+      next.push(item);
+      continue;
+    }
+    const stock = byId.get(item.existingStockId);
+    if (!stock) return { error: "That stock piece was not found." };
+    const code = stock.stockCode;
+    if (stock.purchaseItems.length > 0) return { error: `${code} is already on a purchase bill.` };
+    if (stock.components.length > 0) return { error: `${code} is a multi-part piece — enter it as a new purchase instead.` };
+    if (stock.transactions.length > 0 || stock.status !== InventoryStockStatus.IN_STOCK || stock.quantity < 1)
+      return { error: `${code} has been sold or isn't in stock, so it can't be converted.` };
+    if (stock.productId !== item.productId) return { error: `${code} belongs to a different product than this line.` };
+
+    const num = (value: Prisma.Decimal | null) => (value != null ? Number(value) : null);
+    next.push({
+      ...item,
+      multiPart: false,
+      components: null,
+      metalTypeId: stock.metalTypeId,
+      purity: stock.purity,
+      purityLabel: stock.purityLabel,
+      quantity: stock.quantity,
+      grossWeight: num(stock.grossWeight),
+      netWeight: num(stock.netWeight),
+      caratWeight: num(stock.caratWeight),
+      stoneWeight: num(stock.stoneWeight),
+      dmoWeight: num(stock.dmoWeight),
+      stoneMetalTypeName: stock.stoneMetalTypeName,
+      stoneTypeNames: stock.stoneTypeNames,
+      hsnCode: item.hsnCode || stock.hsnCode,
+    });
+  }
+  return { items: next, stockCodeById: new Map(stocks.map((stock) => [stock.id, stock.stockCode])) };
 }
 
 /**
@@ -1285,6 +1354,10 @@ export async function createPurchase(
       return { success: false, message: resolvedLines.error };
     }
     items = resolvedLines.items;
+    // "Convert to purchase": reuse the Add Stock piece, with its own weights.
+    const existingStock = await applyExistingStockLines(storeId, items);
+    if ("error" in existingStock) return { success: false, message: existingStock.error };
+    items = existingStock.items;
     const weightError = missingWeightError(items, explicitProductIds);
     if (weightError) return { success: false, message: weightError };
 
@@ -1450,6 +1523,45 @@ export async function createPurchase(
       const stockIds: string[] = [];
       for (let i = 0; i < items.length; i++) {
         const item = items[i];
+        if (item.existingStockId) {
+          // Converted Add Stock piece: becomes this bill's stock row as-is
+          // (weights already taken from it), now carrying the bill's
+          // supplier, number, date and price.
+          await tx.inventoryStock.update({
+            where: { id: item.existingStockId },
+            data: {
+              vendorId,
+              vendorName: vendor.name,
+              vendorInvoiceNumber: vendorInvoiceNumber ?? undefined,
+              hsnCode: item.hsnCode || undefined,
+              purchaseDate,
+              purchaseRate: toDecimal(item.rate),
+              purchaseAmount: toDecimal(lineTotal(item)),
+              makingCharge: toDecimal(item.makingCharge),
+              makingChargeType: toChargeType(item.makingChargeType),
+              stoneCharge: toDecimal(item.stoneCharge),
+              stoneRate: toDecimal(item.stoneRate),
+            },
+          });
+          // Its Add Stock "metal in" entry goes: a purchase posts no metal
+          // entry of its own, so keeping it would count this gold twice
+          // against every normally purchased piece. Matched on the exact
+          // code (followed by nothing, " ·" or " (").
+          const code = existingStock.stockCodeById.get(item.existingStockId) ?? "";
+          await tx.ledgerEntry.deleteMany({
+            where: {
+              storeId,
+              sourceType: LedgerSourceType.ADJUSTMENT,
+              amount: 0,
+              OR: [
+                { description: `Stock added — ${code}` },
+                { description: { startsWith: `Stock added — ${code} ` } },
+              ],
+            },
+          });
+          stockIds.push(item.existingStockId);
+          continue;
+        }
         const stock = await tx.inventoryStock.create({
           data: {
             storeId,
@@ -2247,4 +2359,69 @@ export async function deletePurchase(id: string): Promise<PurchaseFormState> {
     logger.error("deletePurchase error", error);
     return { success: false, message: actionErrorMessage(error, "Failed to delete purchase") };
   }
+}
+
+/**
+ * "Convert to purchase": an Add Stock piece's details for pre-filling New
+ * Purchase, or null when it can't be converted (not this store's, already on
+ * a bill, multi-part, or sold) — createPurchase re-checks all of it
+ * (applyExistingStockLines). The supplier Party is the piece's own vendorId,
+ * else a Party with its vendorName.
+ */
+export async function getStockForPurchaseConversion(stockId: string) {
+  const storeId = await getStoreIdForRead();
+  const stock = await prisma.inventoryStock.findFirst({
+    where: { id: stockId, storeId },
+    include: {
+      product: { select: { name: true, hsnCode: true } },
+      purchaseItems: { select: { id: true }, take: 1 },
+      components: { select: { id: true }, take: 1 },
+      transactions: { where: { transactionType: InventoryTransactionType.SALE }, select: { id: true }, take: 1 },
+    },
+  });
+  if (
+    !stock ||
+    stock.purchaseItems.length > 0 ||
+    stock.components.length > 0 ||
+    stock.transactions.length > 0 ||
+    stock.status !== InventoryStockStatus.IN_STOCK ||
+    stock.quantity < 1
+  ) {
+    return null;
+  }
+  const vendor = stock.vendorId
+    ? { id: stock.vendorId }
+    : stock.vendorName
+      ? await prisma.customer.findFirst({
+          where: { storeId, name: { equals: stock.vendorName, mode: "insensitive" } },
+          select: { id: true },
+        })
+      : null;
+  const num = (value: Prisma.Decimal | null) => (value != null ? Number(value) : 0);
+  return {
+    id: stock.id,
+    stockCode: stock.stockCode,
+    productId: stock.productId,
+    productName: stock.product.name,
+    vendorId: vendor?.id ?? null,
+    vendorInvoiceNumber: stock.vendorInvoiceNumber,
+    purchaseDate: stock.purchaseDate ? stock.purchaseDate.toISOString().slice(0, 10) : null,
+    metalTypeId: stock.metalTypeId,
+    purity: stock.purity,
+    purityLabel: stock.purityLabel,
+    quantity: stock.quantity,
+    grossWeight: num(stock.grossWeight),
+    netWeight: num(stock.netWeight),
+    caratWeight: num(stock.caratWeight),
+    stoneWeight: num(stock.stoneWeight),
+    dmoWeight: num(stock.dmoWeight),
+    rate: num(stock.purchaseRate),
+    makingCharge: num(stock.makingCharge),
+    makingChargeType: stock.makingChargeType,
+    stoneCharge: num(stock.stoneCharge),
+    stoneRate: num(stock.stoneRate),
+    stoneMetalTypeName: stock.stoneMetalTypeName,
+    stoneTypeNames: stock.stoneTypeNames,
+    hsnCode: stock.hsnCode ?? stock.product.hsnCode,
+  };
 }

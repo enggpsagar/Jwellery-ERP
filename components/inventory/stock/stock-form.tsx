@@ -1111,6 +1111,34 @@ export function StockForm({
           </div>
         </div>
       </div>
+      {/* Bought on credit from a supplier belongs on a purchase bill (what's
+          owed + GST); Add Stock records neither. Offered once a supplier and
+          a price are both entered, carrying them over to New Purchase. */}
+      {mode === "create" && vendorId && (Number(purchaseRate) > 0 || Number(purchaseAmount) > 0) ? (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
+          <p>
+            <span className="font-medium">Bought on credit from this supplier?</span> Use New Purchase so
+            it&apos;s added to what you owe and GST is recorded — Add Stock records neither.
+          </p>
+          <Button
+            type="button"
+            variant="outline"
+            className="border-amber-400 bg-white"
+            onClick={() => {
+              const value = (id: string) => (document.getElementById(id) as HTMLInputElement | null)?.value ?? ""
+              const query = new URLSearchParams({ vendorId })
+              if (selectedProductId) query.set("productId", selectedProductId)
+              if (Number(purchaseRate) > 0) query.set("rate", String(purchaseRate))
+              if (value("vendorInvoiceNumber")) query.set("vendorInvoiceNumber", value("vendorInvoiceNumber"))
+              if (value("purchaseDate")) query.set("purchaseDate", value("purchaseDate"))
+              window.location.href = `/purchases/new?${query.toString()}`
+            }}
+          >
+            Switch to New Purchase
+          </Button>
+        </div>
+      ) : null}
+
       {/* ============================
           PURCHASE DETAILS
       ============================ */}

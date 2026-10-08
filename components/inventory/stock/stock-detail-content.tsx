@@ -128,6 +128,15 @@ export function StockDetailContent({
                   <Link href={`/purchases/${purchase.id}`} className="text-primary underline-offset-4 hover:underline">
                     {purchase.purchaseNumber}
                   </Link>
+                ) : stock.status === "IN_STOCK" && stock.vendorName ? (
+                  // Added via Add Stock from a supplier: turn it into a bill
+                  // (owed + GST) without adding a second piece of stock.
+                  <Link
+                    href={`/purchases/new?fromStockId=${stock.id}`}
+                    className="font-medium text-primary underline-offset-4 hover:underline"
+                  >
+                    Convert to purchase →
+                  </Link>
                 ) : null
               }
             />

@@ -1133,12 +1133,16 @@ export async function createProduct(
       errors.targetStyleId = ["Style is required"];
     }
 
-    if (defaultGrossWeight === null) {
-      errors.defaultGrossWeight = ["Gross weight is required"];
+    // A 0 weight is as missing as a blank one: purchases and sales of a
+    // linked product copy these values, and a loose stone's carat weight is
+    // derived from Net Weight — a 0 here surfaced as "0.0000 g" on every
+    // purchase of that product.
+    if (defaultGrossWeight === null || Number(defaultGrossWeight) <= 0) {
+      errors.defaultGrossWeight = ["Gross weight is required and must be more than 0"];
     }
 
-    if (defaultNetWeight === null) {
-      errors.defaultNetWeight = ["Net weight is required"];
+    if (defaultNetWeight === null || Number(defaultNetWeight) <= 0) {
+      errors.defaultNetWeight = ["Net weight is required and must be more than 0"];
     }
 
     Object.assign(
@@ -1556,12 +1560,16 @@ export async function updateProduct(
       errors.name = ["Product name is required"];
     }
 
-    if (defaultGrossWeight === null) {
-      errors.defaultGrossWeight = ["Gross weight is required"];
+    // A 0 weight is as missing as a blank one: purchases and sales of a
+    // linked product copy these values, and a loose stone's carat weight is
+    // derived from Net Weight — a 0 here surfaced as "0.0000 g" on every
+    // purchase of that product.
+    if (defaultGrossWeight === null || Number(defaultGrossWeight) <= 0) {
+      errors.defaultGrossWeight = ["Gross weight is required and must be more than 0"];
     }
 
-    if (defaultNetWeight === null) {
-      errors.defaultNetWeight = ["Net weight is required"];
+    if (defaultNetWeight === null || Number(defaultNetWeight) <= 0) {
+      errors.defaultNetWeight = ["Net weight is required and must be more than 0"];
     }
 
     const storeId = await requireStoreScope();

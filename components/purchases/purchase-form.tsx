@@ -1118,7 +1118,25 @@ export function PurchaseForm({
     }),
   )
 
-  const canSubmit = vendorId && items.every((item) => item.productId || item.productLinkDecided)
+  // Same rule as purchase-actions.ts missingWeightError: a single-part line
+  // with no weight (net for metal, carat/stone grams for a loose stone)
+  // used to save anyway and read "0.0000 g". A linked product's weights are
+  // locked to the product, so the fix is on the product, not here.
+  const missingWeightLines = items.flatMap((item, index) => {
+    if (item.multiPart || !(item.productId || item.productLinkDecided)) return []
+    if (item.netWeight > 0 || item.caratWeight > 0 || item.stoneWeightInput > 0) return []
+    const label = `Line ${index + 1}${item.itemName ? ` (${item.itemName})` : ""}`
+    return [
+      item.productId
+        ? `${label}: its product has no weight saved — set it in Inventory → Products`
+        : `${label}: ${item.itemKind === "STONE" ? "carat weight" : "net weight"}`,
+    ]
+  })
+
+  const canSubmit =
+    vendorId &&
+    items.every((item) => item.productId || item.productLinkDecided) &&
+    missingWeightLines.length === 0
 
   // Zero-amount rows (a split row opened but never filled in) are dropped
   // here — the server's parseOptionalPayments requires any row it does
@@ -2102,6 +2120,17 @@ export function PurchaseForm({
           <span>₹{balanceAmount.toFixed(2)}</span>
         </div>
       </div>
+
+      {missingWeightLines.length > 0 && (
+        <div className="ml-auto max-w-xl rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900" role="alert">
+          <p className="font-medium">Still needed before saving:</p>
+          <ul className="list-disc pl-5">
+            {missingWeightLines.map((line) => (
+              <li key={line}>{line}</li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       <div className="flex justify-end">
         <Button type="submit" disabled={pending || !canSubmit || paidOverTotal}>

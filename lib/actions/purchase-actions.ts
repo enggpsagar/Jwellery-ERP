@@ -541,6 +541,32 @@ function productPieceComponents(
 }
 
 /**
+ * Every single-part line must carry a weight — net weight for metal, carat
+ * or stone grams for a loose stone. Without one the line still saved (its
+ * value comes from charges), then showed "0.0000 g" and put weightless stock
+ * into inventory. A linked Product's weights are copied from the Product
+ * (lockLinkedProductFields), so a 0 there can only be fixed on the Product.
+ * Multi-part lines are checked per component by resolveMultiPartLines.
+ * purchase-form.tsx shows the same check as "Still needed" before submit.
+ */
+function missingWeightError(
+  items: PurchaseLineItemInput[],
+  explicitProductIds: ReadonlySet<string>,
+): string | null {
+  for (const [index, item] of items.entries()) {
+    if (item.multiPart) continue;
+    const hasWeight =
+      toNumber(item.netWeight) > 0 || toNumber(item.caratWeight) > 0 || toNumber(item.stoneWeight) > 0;
+    if (hasWeight) continue;
+    const label = `Line ${index + 1}${item.itemName ? ` (${item.itemName})` : ""}`;
+    return item.productId && explicitProductIds.has(item.productId)
+      ? `${label}: its product has no weight saved. Set the weight on the product (Inventory → Products), then add it again.`
+      : `${label}: enter its weight — net weight for metal, carat weight for a stone.`;
+  }
+  return null;
+}
+
+/**
  * A disabled input on purchase-form.tsx is a UI courtesy, not enforcement —
  * a direct/tampered request can still submit anything for a field the UI
  * locks once a real Product is picked. This overwrites every physical field
@@ -1251,6 +1277,8 @@ export async function createPurchase(
       return { success: false, message: resolvedLines.error };
     }
     items = resolvedLines.items;
+    const weightError = missingWeightError(items, explicitProductIds);
+    if (weightError) return { success: false, message: weightError };
 
     // A line with no product picked (the form's own "Enter Manually (No
     // Product)" choice) still needs a real Product row under the hood —
@@ -1865,6 +1893,8 @@ export async function updatePurchase(
       return { success: false, message: resolvedLines.error };
     }
     items = resolvedLines.items;
+    const weightError = missingWeightError(items, explicitProductIds);
+    if (weightError) return { success: false, message: weightError };
 
     // One new real Product per manual line — see createProductFromManualEntry's
     // own doc comment. Sequential, not Promise.all — same reasoning as

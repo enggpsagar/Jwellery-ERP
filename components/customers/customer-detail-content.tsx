@@ -44,8 +44,8 @@ export function CustomerDetailContent({
   supplierModuleEnabled?: boolean
   /** This Party's own supplier-side ledger, a separate slot from `ledger`
    * above (same reasoning as that prop's own doc comment — server-fetched
-   * on the standalone page, client-fetched on the inline panel). Only
-   * rendered when supplierModuleEnabled && customer.isSupplier. */
+   * on the standalone page, client-fetched on the inline panel). Rendered
+   * whenever customer.isSupplier, module on or off. */
   supplierLedger?: React.ReactNode
 }) {
   const money = (value: unknown) => `₹ ${Number(value || 0).toLocaleString("en-IN")}`
@@ -186,9 +186,13 @@ export function CustomerDetailContent({
 
       {/* Tracked independently from the Customer ledger/balance above, not
           netted into it — see lib/core/customer.ts' mapCustomer doc
-          comment on why. Only shown once this Party has actually been
-          used as one (isSupplier) and the module itself is on. */}
-      {supplierModuleEnabled && customer.isSupplier ? (
+          comment on why. Shown once this Party has actually been used as
+          one (isSupplier — set by its first purchase), whether or not the
+          Supplier module is on: with it off, a party you only bought from
+          showed an empty Party Ledger and no trace of the purchase, the
+          same gap the Parties list's Payable column closes. The module
+          still gates the standalone Suppliers section and "Also Supplier". */}
+      {customer.isSupplier ? (
         <DetailSection
           title="Supplier Ledger"
           description="This party's own activity as a supplier — tracked separately from its Customer balance above."

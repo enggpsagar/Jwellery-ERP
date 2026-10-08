@@ -914,6 +914,10 @@ model InventoryStock {
   // asks for it; a Purchase copies its vendorInvoiceNumber). Not ours to
   // number, never unique.
   vendorInvoiceNumber String?
+  // This piece's own HSN — defaults from the Product, editable per piece
+  // (Add Stock, copied from a purchase line). Sales use it before the
+  // Product's; null = use the Product's.
+  hsnCode             String?
   purchaseDate        DateTime?
   manufactureDate     DateTime?
   locationId          String?

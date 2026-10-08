@@ -674,6 +674,16 @@ export function ProductForm({
   const [defaultFinish, setDefaultFinish] = useState<"KACHA" | "PAKKA">(
     product?.defaultFinish ?? "KACHA",
   );
+  // New product only: a Gold Ornament is sold finished/hallmarked, so it
+  // starts on Finished instead of making the user switch it every time.
+  // Follows Metal/Category until the user picks a Finish themselves; an
+  // existing product's saved Finish is never changed.
+  const [finishTouched, setFinishTouched] = useState(Boolean(product));
+  const selectedCategoryName = categories.find((item) => item.id === categoryId)?.name ?? "";
+  useEffect(() => {
+    if (finishTouched) return;
+    setDefaultFinish(metalFamily === "GOLD" && /ornament/i.test(selectedCategoryName) ? "PAKKA" : "KACHA");
+  }, [finishTouched, metalFamily, selectedCategoryName]);
 
   // Create-only: offer to open the stock entry in the same step, so a new
   // product doesn't need a second trip to Inventory to become stockable.
@@ -1860,7 +1870,13 @@ export function ProductForm({
           <div>
             <Label htmlFor="defaultFinish">Finish</Label>
 
-            <Select value={defaultFinish} onValueChange={(value) => setDefaultFinish(value as "KACHA" | "PAKKA")}>
+            <Select
+              value={defaultFinish}
+              onValueChange={(value) => {
+                setFinishTouched(true);
+                setDefaultFinish(value as "KACHA" | "PAKKA");
+              }}
+            >
               <SelectTrigger id="defaultFinish" className="h-11 w-full">
                 <SelectValue />
               </SelectTrigger>

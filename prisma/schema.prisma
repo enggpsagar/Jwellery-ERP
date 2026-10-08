@@ -910,6 +910,10 @@ model InventoryStock {
   purchaseAmount      Decimal?               @db.Decimal(12, 2)
   saleAmount          Decimal?               @db.Decimal(12, 2)
   vendorName          String?
+  // The supplier's own bill / invoice number for this piece (Add Stock
+  // asks for it; a Purchase copies its vendorInvoiceNumber). Not ours to
+  // number, never unique.
+  vendorInvoiceNumber String?
   purchaseDate        DateTime?
   manufactureDate     DateTime?
   locationId          String?

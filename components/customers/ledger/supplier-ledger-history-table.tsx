@@ -179,7 +179,12 @@ export function SupplierLedgerHistoryTable({ entries }: { entries: SupplierLedge
                     label={
                       <div className="max-w-[260px] space-y-0.5">
                         <div className="font-medium">
-                          {entry.type === "CREDIT" ? "Owed" : "Paid"} · {entry.sourceType}
+                          {entry.amount === 0 && entry.metals.length > 0
+                            ? "Metal received"
+                            : entry.type === "CREDIT"
+                              ? "Owed"
+                              : "Paid"}{" "}
+                          · {entry.sourceType}
                         </div>
                         {entry.description ? <div>{entry.description}</div> : null}
                       </div>
@@ -197,10 +202,10 @@ export function SupplierLedgerHistoryTable({ entries }: { entries: SupplierLedge
                   <MetalList metals={entry.metals} weightOf={weightText} />
                 </TableCell>
                 <TableCell className="whitespace-nowrap text-right font-medium text-red-600">
-                  {entry.type === "CREDIT" ? formatAmount(entry.amount) : ""}
+                  {entry.type === "CREDIT" && entry.amount !== 0 ? formatAmount(entry.amount) : ""}
                 </TableCell>
                 <TableCell className="whitespace-nowrap text-right font-medium text-emerald-600">
-                  {entry.type === "DEBIT" ? formatAmount(entry.amount) : ""}
+                  {entry.type === "DEBIT" && entry.amount !== 0 ? formatAmount(entry.amount) : ""}
                 </TableCell>
               </TableRow>
             ))}

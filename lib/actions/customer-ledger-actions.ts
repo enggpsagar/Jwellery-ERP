@@ -299,6 +299,8 @@ export async function getSupplierLedgerEntries(
     where: { vendorId: customerId, storeId },
     orderBy: [{ entryDate: "desc" }, { createdAt: "desc" }],
     include: {
+      // Add Stock from this supplier: a metal-only entry (amount 0).
+      metalType: { select: { name: true } },
       // A purchase's lines carry the metal/weight its money entry doesn't.
       purchase: {
         select: {
@@ -321,6 +323,18 @@ export async function getSupplierLedgerEntries(
   // Only on the purchase's own "owed" entry — a Payment Out made at the
   // same time also carries the purchaseId and must not repeat the metal.
   const metalsOf = (entry: (typeof entries)[number]): SupplierLedgerMetal[] => {
+    // A metal-only entry (Add Stock from this supplier) carries its own
+    // weight; for a purity metal that's the fine (pure) weight.
+    if (entry.sourceType !== "PURCHASE" && (entry.metalWeight || entry.metalWeightFine)) {
+      const fine = !entry.metalWeight && entry.metalWeightFine
+      return [
+        {
+          label: `${entry.metalType?.name ?? "Metal"}${fine ? " (fine)" : ""}`,
+          weight: Number(entry.metalWeight ?? entry.metalWeightFine ?? 0),
+          unit: "g",
+        },
+      ]
+    }
     if (entry.type !== "CREDIT" || entry.sourceType !== "PURCHASE" || !entry.purchase) return []
     const merged = new Map<string, SupplierLedgerMetal>()
     for (const item of entry.purchase.items) {

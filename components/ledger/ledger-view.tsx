@@ -84,6 +84,19 @@ function formatEntryValue(entry: LedgerEntryRow, wf: WeightFormat) {
   return formatCurrency(entry.amount)
 }
 
+/** A stock adjustment of metal only (Add Stock / stock import: no money,
+ * a weight) — "Debit" there just means metal came into the store, which
+ * read like a loss in red, so it says "Metal in" / "Metal out". Only
+ * ADJUSTMENT: on a karigar issue Debit means the karigar now holds the
+ * metal (it went out), so a general Debit = in rule would be wrong. */
+function isMetalOnly(entry: LedgerEntryRow) {
+  return (
+    entry.sourceType === "ADJUSTMENT" &&
+    !entry.amount &&
+    (entry.metalWeight != null || entry.caratWeight != null)
+  )
+}
+
 const pageSizeOptions = [10, 20, 50, 100]
 
 type LedgerViewProps = {
@@ -456,12 +469,21 @@ export function LedgerView({ entries, totals }: LedgerViewProps) {
                           variant="outline"
                           className={cn(
                             "w-fit font-normal",
-                            entry.type === "CREDIT"
-                              ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                              : "border-destructive/30 bg-destructive/10 text-destructive",
+                            isMetalOnly(entry)
+                              ? "border-amber-300 bg-amber-50 text-amber-800"
+                              : entry.type === "CREDIT"
+                                ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                                : "border-destructive/30 bg-destructive/10 text-destructive",
                           )}
+                          title={entry.type === "CREDIT" ? "Credit" : "Debit"}
                         >
-                          {entry.type === "CREDIT" ? "Credit" : "Debit"}
+                          {isMetalOnly(entry)
+                            ? entry.type === "CREDIT"
+                              ? "Metal out"
+                              : "Metal in"
+                            : entry.type === "CREDIT"
+                              ? "Credit"
+                              : "Debit"}
                         </Badge>
                         {entry.paymentMethod ? (
                           <span className="text-xs text-muted-foreground">

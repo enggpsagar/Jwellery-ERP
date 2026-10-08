@@ -217,6 +217,11 @@ export function StockForm({
   // blank text box, storing whichever name was picked (or typed via "Add
   // New") straight into it.
   const [vendorName, setVendorName] = useState(stock?.vendorName ?? "");
+  // The picked supplier's Party id — links Add Stock's metal ledger entry
+  // to that supplier (Ledger "Party", the supplier's own ledger).
+  const [vendorId, setVendorId] = useState(
+    () => suppliers.find((supplier) => supplier.name === (stock?.vendorName ?? ""))?.id ?? "",
+  );
   const [netWeight, setNetWeight] = useState(stock?.netWeight ?? "");
   const [grossWeight, setGrossWeight] = useState(stock?.grossWeight ?? "");
   const [stoneWeight, setStoneWeight] = useState(stock?.stoneWeight ?? "");
@@ -625,11 +630,15 @@ export function StockForm({
             <CustomerSelect
               customers={suppliers}
               defaultValue={suppliers.find((supplier) => supplier.name === vendorName)?.id}
-              onChange={(_id, supplier) => setVendorName(supplier?.name ?? "")}
+              onChange={(id, supplier) => {
+                setVendorName(supplier?.name ?? "")
+                setVendorId(id ?? "")
+              }}
               placeholder="Select or search a supplier"
               termLabel="supplier"
             />
             <input type="hidden" name="vendorName" value={vendorName} />
+            <input type="hidden" name="vendorId" value={vendorId} />
 
             <ErrorText error={state.errors.vendorName} />
           </div>

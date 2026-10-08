@@ -929,6 +929,17 @@ export async function createInventoryStock(
     // Who it came from and on which bill, so the Ledger row is readable on
     // its own. A tag typed as "Tag - 98798" isn't prefixed with "Tag" again.
     const tagText = tagNumber ? (/^tag\b/i.test(tagNumber) ? tagNumber : `Tag ${tagNumber}`) : null
+    // The supplier as a Party: the posted id when it's this store's,
+    // else a same-name Party (older drafts post only the name).
+    const postedVendorId = String(formData.get("vendorId") ?? "").trim()
+    const supplierParty = postedVendorId
+      ? await prisma.customer.findFirst({ where: { id: postedVendorId, storeId }, select: { id: true } })
+      : vendorName
+        ? await prisma.customer.findFirst({
+            where: { storeId, name: { equals: vendorName, mode: "insensitive" } },
+            select: { id: true },
+          })
+        : null
     const stockAddedDescription = [
       `Stock added — ${stockCode}`,
       tagText,
@@ -1005,6 +1016,9 @@ export async function createInventoryStock(
             metalWeight: metal.metalWeight,
             metalWeightFine: metal.metalWeightFine,
             amount: 0,
+            // Metal in from this supplier; amount 0, so it never changes
+            // what's owed to them.
+            vendorId: supplierParty?.id ?? undefined,
             description: stockAddedDescription,
             locationId: locationId ?? undefined,
           },

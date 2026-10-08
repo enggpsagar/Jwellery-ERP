@@ -922,6 +922,20 @@ export function PurchaseForm({
     updateItem(item.key, patch)
   }
 
+  // `value` is typed in item.grossWeightUnit. Re-derives net weight
+  // (gross − stone − DMO) until the user has typed a net weight by hand.
+  const handleGrossWeightChange = (item: LineItem, value: string) => {
+    const gramsPerCarat = resolveGramsPerCarat(item.purity, caratConversionRates)
+    const grossWeight = toPrimaryUnit(Number(value) || 0, item.grossWeightUnit, "GRAM", gramsPerCarat)
+    const derived = item.netTouched
+      ? undefined
+      : deriveNetWeight(grossWeight, item.stoneWeightInput, item.dmoWeight, weightSettings)
+    updateItem(item.key, {
+      grossWeight,
+      ...(derived !== null && derived !== undefined ? { netWeight: derived } : {}),
+    })
+  }
+
   // Diamond items price per carat, not per gram — mirrors lineQuantity in
   // purchase-actions.ts so the live-preview total here never disagrees with
   // what the server actually saves. Stone lines keep pricing off Net Weight
@@ -1131,10 +1145,10 @@ export function PurchaseForm({
   const docIgst = items.reduce((sum, item) => sum + lineGst(item).igst, 0)
 
   // Same compact-row column widths as InvoiceForm's own compactRowGridCols —
-  // chevron, Product (searchable, wide), Qty, Net Wt, Rate/g, GST, Amount,
-  // remove.
+  // chevron, Product (searchable), Qty, Gross Wt, Net Wt, Rate/g, GST,
+  // Amount, remove.
   const compactRowGridCols =
-    "grid-cols-[28px_minmax(160px,2fr)_76px_168px_112px_104px_116px_28px]"
+    "grid-cols-[28px_minmax(140px,1.5fr)_64px_144px_144px_104px_96px_116px_28px]"
 
   return (
     <form
@@ -1257,7 +1271,7 @@ export function PurchaseForm({
         </p>
 
         <div className="overflow-x-auto">
-          <div className="min-w-[900px] space-y-2">
+          <div className="min-w-[960px] space-y-2">
             {/* Compact-row layout, same shape as the Invoice form: one dense
                 line per item (chevron, Product, Qty, Net Wt, Rate/g, GST,
                 Amount, remove) with everything else — Item Name, Purity,
@@ -1270,6 +1284,7 @@ export function PurchaseForm({
               <span />
               <span>Product</span>
               <span>Qty</span>
+              <span>Gross Wt</span>
               <span>Net Wt</span>
               <span>Rate / g</span>
               <span>GST</span>
@@ -1362,6 +1377,50 @@ export function PurchaseForm({
                       }
                     />
                   </div>
+
+                  {piece ? (
+                    <div className="flex h-8 items-center rounded-md border bg-muted px-2 text-sm text-muted-foreground">
+                      {wf.g(piece.metalGross + piece.stoneGrams || piece.metalNet)} g
+                    </div>
+                  ) : item.itemKind !== "METAL" ? (
+                    // A loose stone has no gross metal weight — its weight
+                    // is carats/stone grams, entered in Details.
+                    <div className="flex h-8 items-center rounded-md border bg-muted px-2 text-sm text-muted-foreground">-</div>
+                  ) : (
+                    <div className="flex gap-1">
+                      <Input
+                        type="number"
+                        step="any"
+                        className={isLinked ? "flex-1 bg-muted" : "flex-1"}
+                        readOnly={isLinked}
+                        aria-label="Gross weight"
+                        value={
+                          item.grossWeight === 0
+                            ? ""
+                            : toPrimaryUnit(
+                                item.grossWeight,
+                                "GRAM",
+                                item.grossWeightUnit,
+                                resolveGramsPerCarat(item.purity, caratConversionRates),
+                              )
+                        }
+                        onChange={(e) => handleGrossWeightChange(item, e.target.value)}
+                      />
+                      <Select
+                        value={item.grossWeightUnit}
+                        disabled={isLinked}
+                        onValueChange={(unit) => updateItem(item.key, { grossWeightUnit: unit as "GRAM" | "CARAT" })}
+                      >
+                        <SelectTrigger className="w-14" size="sm">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="GRAM">g</SelectItem>
+                          <SelectItem value="CARAT">ct</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
 
                   {piece ? (
                     // Multi-part: all metals' net weight together, read-only
@@ -1668,56 +1727,6 @@ export function PurchaseForm({
                         />
                       )}
                       </>
-                      )}
-
-                      {item.itemKind === "METAL" && (
-                      <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
-                        <Label className="text-xs">Gross Weight</Label>
-                        <div className="flex gap-1">
-                          <Input
-                            type="number"
-                            step="any"
-                            className={isLinked ? "flex-1 bg-muted" : "flex-1"}
-                            readOnly={isLinked}
-                            value={
-                              item.grossWeight === 0
-                                ? ""
-                                : toPrimaryUnit(
-                                    item.grossWeight,
-                                    "GRAM",
-                                    item.grossWeightUnit,
-                                    resolveGramsPerCarat(item.purity, caratConversionRates),
-                                  )
-                            }
-                            onChange={(e) => {
-                              const gramsPerCarat = resolveGramsPerCarat(item.purity, caratConversionRates)
-                              const grossWeight = toPrimaryUnit(Number(e.target.value) || 0, item.grossWeightUnit, "GRAM", gramsPerCarat)
-                              const derived = item.netTouched
-                                ? undefined
-                                : deriveNetWeight(grossWeight, item.stoneWeightInput, item.dmoWeight, weightSettings)
-                              updateItem(item.key, {
-                                grossWeight,
-                                ...(derived !== null && derived !== undefined
-                                  ? { netWeight: derived }
-                                  : {}),
-                              })
-                            }}
-                          />
-                          <Select
-                            value={item.grossWeightUnit}
-                            disabled={isLinked}
-                            onValueChange={(unit) => updateItem(item.key, { grossWeightUnit: unit as "GRAM" | "CARAT" })}
-                          >
-                            <SelectTrigger className="w-16">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="GRAM">g</SelectItem>
-                              <SelectItem value="CARAT">ct</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      </div>
                       )}
 
                       {/* Legacy-only from here: a line saved before this

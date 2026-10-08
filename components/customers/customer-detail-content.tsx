@@ -112,7 +112,9 @@ export function CustomerDetailContent({
             icon={MapPin}
             tint="var(--chart-3)"
           >
-            <DetailGrid>
+            {/* dense = two columns from the start: City and State share a
+                row even in the narrow side panel; Full Address / Notes span. */}
+            <DetailGrid dense>
               <DetailField label="City" value={customer.city} />
               <DetailField label="State" value={customer.state} />
               <DetailField label="Pincode" value={customer.pincode} />

@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { useWeightFormat } from "@/components/providers/weight-settings-provider"
 import Link from "next/link"
 import { ChevronDown, ChevronUp, PackagePlus } from "lucide-react"
 
@@ -33,6 +34,7 @@ type SupplierLedgerBodyProps = {
  */
 export function SupplierLedgerBody({ customerId, entries }: SupplierLedgerBodyProps) {
   const [showDetails, setShowDetails] = useState(false)
+  const wf = useWeightFormat()
 
   // Same CREDIT/DEBIT polarity as lib/core/customer.ts' mapCustomer
   // supplierBalance — CREDIT (a Purchase's balance due) increases what's
@@ -40,6 +42,17 @@ export function SupplierLedgerBody({ customerId, entries }: SupplierLedgerBodyPr
   const totalOwed = entries.reduce((sum, e) => (e.type === "CREDIT" ? sum + e.amount : sum), 0)
   const totalPaid = entries.reduce((sum, e) => (e.type === "DEBIT" ? sum + e.amount : sum), 0)
   const currentBalance = totalOwed - totalPaid
+
+  // Metal bought from this supplier, totalled per metal + purity / stone.
+  const metalTotals = new Map<string, { label: string; weight: number; unit: "g" | "ct" }>()
+  for (const entry of entries) {
+    for (const metal of entry.metals) {
+      const key = `${metal.label}|${metal.unit}`
+      const existing = metalTotals.get(key)
+      if (existing) existing.weight += metal.weight
+      else metalTotals.set(key, { ...metal })
+    }
+  }
 
   return (
     <section className="space-y-4">
@@ -63,7 +76,10 @@ export function SupplierLedgerBody({ customerId, entries }: SupplierLedgerBodyPr
       </div>
 
       {entries.length > 0 && (
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+        // auto-fit, not md:grid-cols-3: this renders in the narrow Parties
+        // side panel as well as the full page, and a viewport breakpoint
+        // can't tell the two apart.
+        <div className="grid grid-cols-[repeat(auto-fit,minmax(150px,1fr))] gap-3">
           <div className="rounded-lg border bg-card p-4">
             <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
               Total Purchases (Owed)
@@ -95,6 +111,19 @@ export function SupplierLedgerBody({ customerId, entries }: SupplierLedgerBodyPr
               {formatAmount(currentBalance)}
             </p>
           </div>
+
+          {metalTotals.size > 0 && (
+            <div className="rounded-lg border bg-card p-4">
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                Metal Purchased
+              </p>
+              {[...metalTotals.values()].map((metal) => (
+                <p key={`${metal.label}|${metal.unit}`} className="mt-1 text-sm font-semibold text-foreground">
+                  {metal.label}: {metal.unit === "ct" ? wf.ct(metal.weight) : wf.g(metal.weight)} {metal.unit}
+                </p>
+              ))}
+            </div>
+          )}
         </div>
       )}
 

@@ -13,6 +13,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Input } from "@/components/ui/input"
+import { useWeightFormat } from "@/components/providers/weight-settings-provider"
 import { cn } from "@/lib/utils"
 
 const PAGE_SIZE = 10
@@ -27,13 +28,15 @@ function formatAmount(value: number) {
 type SortKey = "entryDate" | "amount"
 
 /**
- * A much simpler twin of CustomerLedgerHistoryTable — no metal/weight
- * columns, no invoice/credit-note links, since Purchases/Payment Out never
- * track non-money units or link to those document types. Same search +
- * sortable-column + paginate shape, just over SupplierLedgerEntryItem's
- * smaller field set.
+ * A simpler twin of CustomerLedgerHistoryTable — same search + sortable-
+ * column + paginate shape over SupplierLedgerEntryItem. Four columns that
+ * wrap (Entry folds Type/Source/Description together, Metal lists what a
+ * purchase brought in) so it fits the narrow Parties side panel; it used to
+ * be five nowrap columns inside an overflow-hidden box, which pushed Amount
+ * off-screen with no way to scroll to it.
  */
 export function SupplierLedgerHistoryTable({ entries }: { entries: SupplierLedgerEntryItem[] }) {
+  const wf = useWeightFormat()
   const [search, setSearch] = useState("")
   const [sortKey, setSortKey] = useState<SortKey>("entryDate")
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc")
@@ -45,7 +48,8 @@ export function SupplierLedgerHistoryTable({ entries }: { entries: SupplierLedge
     return entries.filter(
       (entry) =>
         entry.sourceType.toLowerCase().includes(query) ||
-        entry.description.toLowerCase().includes(query),
+        entry.description.toLowerCase().includes(query) ||
+        entry.metals.some((metal) => metal.label.toLowerCase().includes(query)),
     )
   }, [entries, search])
 
@@ -103,19 +107,18 @@ export function SupplierLedgerHistoryTable({ entries }: { entries: SupplierLedge
         className="max-w-xs"
       />
 
-      <div className="overflow-hidden rounded-lg border">
-        <Table>
+      <div className="overflow-x-auto rounded-lg border">
+        <Table className="min-w-[480px]">
           <TableHeader>
             <TableRow>
               <TableHead
-                className="cursor-pointer select-none"
+                className="w-[92px] cursor-pointer select-none"
                 onClick={() => toggleSort("entryDate")}
               >
                 Date <SortIcon column="entryDate" />
               </TableHead>
-              <TableHead>Type</TableHead>
-              <TableHead>Source</TableHead>
-              <TableHead>Description</TableHead>
+              <TableHead>Entry</TableHead>
+              <TableHead>Metal</TableHead>
               <TableHead
                 className="cursor-pointer select-none text-right"
                 onClick={() => toggleSort("amount")}
@@ -126,9 +129,9 @@ export function SupplierLedgerHistoryTable({ entries }: { entries: SupplierLedge
           </TableHeader>
           <TableBody>
             {pageEntries.map((entry) => (
-              <TableRow key={entry.id}>
-                <TableCell>{entry.entryDate}</TableCell>
-                <TableCell>
+              <TableRow key={entry.id} className="align-top">
+                <TableCell className="whitespace-nowrap">{entry.entryDate}</TableCell>
+                <TableCell className="whitespace-normal">
                   <span
                     className={cn(
                       "text-xs font-medium",
@@ -137,10 +140,26 @@ export function SupplierLedgerHistoryTable({ entries }: { entries: SupplierLedge
                   >
                     {entry.type === "CREDIT" ? "Owed" : "Paid"}
                   </span>
+                  <span className="text-xs text-muted-foreground"> · {entry.sourceType}</span>
+                  {entry.description ? (
+                    <div className="text-sm text-muted-foreground break-words">{entry.description}</div>
+                  ) : null}
                 </TableCell>
-                <TableCell className="text-sm text-muted-foreground">{entry.sourceType}</TableCell>
-                <TableCell className="text-sm text-muted-foreground">{entry.description || "-"}</TableCell>
-                <TableCell className="text-right font-medium">{formatAmount(entry.amount)}</TableCell>
+                <TableCell className="whitespace-normal text-sm">
+                  {entry.metals.length > 0 ? (
+                    entry.metals.map((metal) => (
+                      <div key={`${metal.label}|${metal.unit}`} className="whitespace-nowrap">
+                        {metal.label}:{" "}
+                        <span className="font-medium tabular-nums">
+                          {metal.unit === "ct" ? wf.ct(metal.weight) : wf.g(metal.weight)} {metal.unit}
+                        </span>
+                      </div>
+                    ))
+                  ) : (
+                    <span className="text-muted-foreground">—</span>
+                  )}
+                </TableCell>
+                <TableCell className="whitespace-nowrap text-right font-medium">{formatAmount(entry.amount)}</TableCell>
               </TableRow>
             ))}
           </TableBody>

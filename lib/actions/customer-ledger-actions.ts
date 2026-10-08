@@ -273,7 +273,12 @@ export type SupplierLedgerEntryItem = {
   amount: number
   entryDate: string
   entryDateISO: string
+  /** What a purchase brought in, per metal/purity (grams, net) or stone
+   * (carats) — empty for payments. */
+  metals: SupplierLedgerMetal[]
 }
+
+export type SupplierLedgerMetal = { label: string; weight: number; unit: "g" | "ct" }
 
 /**
  * This same Party's own supplier-side ledger (LedgerEntry rows where
@@ -293,7 +298,49 @@ export async function getSupplierLedgerEntries(
   const entries = await prisma.ledgerEntry.findMany({
     where: { vendorId: customerId, storeId },
     orderBy: [{ entryDate: "desc" }, { createdAt: "desc" }],
+    include: {
+      // A purchase's lines carry the metal/weight its money entry doesn't.
+      purchase: {
+        select: {
+          items: {
+            select: {
+              quantity: true,
+              netWeight: true,
+              caratWeight: true,
+              purityLabel: true,
+              stoneMetalTypeName: true,
+              metalType: { select: { name: true } },
+            },
+          },
+        },
+      },
+    },
   })
+
+  // Per-piece weights × quantity, merged per metal + purity (or stone).
+  // Only on the purchase's own "owed" entry — a Payment Out made at the
+  // same time also carries the purchaseId and must not repeat the metal.
+  const metalsOf = (entry: (typeof entries)[number]): SupplierLedgerMetal[] => {
+    if (entry.type !== "CREDIT" || entry.sourceType !== "PURCHASE" || !entry.purchase) return []
+    const merged = new Map<string, SupplierLedgerMetal>()
+    for (const item of entry.purchase.items) {
+      const qty = item.quantity || 1
+      const net = Number(item.netWeight ?? 0) * qty
+      const carat = Number(item.caratWeight ?? 0) * qty
+      const line: SupplierLedgerMetal | null =
+        net > 0
+          ? { label: [item.metalType?.name, item.purityLabel].filter(Boolean).join(" ") || "Metal", weight: net, unit: "g" }
+          : carat > 0
+            ? { label: item.stoneMetalTypeName || item.metalType?.name || "Stone", weight: carat, unit: "ct" }
+            : null
+      if (!line) continue
+      const key = `${line.label}|${line.unit}`
+      const existing = merged.get(key)
+      if (existing) existing.weight += line.weight
+      else merged.set(key, line)
+    }
+    return [...merged.values()]
+  }
 
   return entries.map((entry) => ({
     id: entry.id,
@@ -303,5 +350,6 @@ export async function getSupplierLedgerEntries(
     amount: Number(entry.amount ?? 0),
     entryDate: formatDate(entry.entryDate),
     entryDateISO: entry.entryDate.toISOString(),
+    metals: metalsOf(entry),
   }))
 }

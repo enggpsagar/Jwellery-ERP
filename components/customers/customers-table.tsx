@@ -35,6 +35,19 @@ type CustomersTableProps = {
   onActivate?: (id: string) => void
 }
 
+/** Supplier-side balance: red when the store owes the party, blue when the
+ *  party holds an advance from the store, "-" for a party never bought from. */
+function PayableAmount({ customer }: { customer: Customer }) {
+  const balance = customer.supplierBalance ?? 0
+  if (!customer.isSupplier && balance === 0) return <span className="text-muted-foreground">-</span>
+  if (balance < 0) return <span className="font-medium text-blue-600">{inr(Math.abs(balance))} Advance</span>
+  return (
+    <span className={cn("font-medium", balance > 0 ? "text-red-600" : "text-foreground")}>
+      {inr(balance) || "₹0"}
+    </span>
+  )
+}
+
 export function CustomersTable({
   customers,
   pagination,
@@ -128,6 +141,13 @@ export function CustomersTable({
                   page's own rows are fetched (see getCustomers()), not a
                   real column the database can ORDER BY. */}
               <th className="px-4 py-3 font-medium">Outstanding</th>
+              {/* What the store owes this party for purchases (supplier-side
+                  ledger, mapCustomer's supplierBalance). Its own column, not
+                  netted into Outstanding — the two balances are kept apart
+                  on purpose. Shown whether or not the Supplier module is on:
+                  it's the same data either way, and without it a party you
+                  bought from read "₹0" here. */}
+              <th className="px-4 py-3 font-medium">Payable</th>
             </tr>
           </thead>
 
@@ -197,6 +217,7 @@ export function CustomersTable({
                                   inr(customer.currentBalance ?? 0)
                                 ),
                             },
+                            { label: "Payable", value: <PayableAmount customer={customer} /> },
                             { label: "Orders", value: customer.totalOrders },
                             { label: "Last purchase", value: customer.lastPurchaseDate },
                           ],
@@ -232,6 +253,10 @@ export function CustomersTable({
                         ? `${inr(Math.abs(customer.currentBalance ?? 0))} Advance`
                         : inr(customer.currentBalance ?? 0) || "₹0"}
                     </span>
+                  </td>
+
+                  <td className="px-4 py-3">
+                    <PayableAmount customer={customer} />
                   </td>
                 </tr>
               )

@@ -5,7 +5,11 @@ import Link from "next/link"
 
 import { Button } from "@/components/ui/button"
 import { PurchaseTable } from "@/components/purchases/purchase-table"
-import { PurchaseSupplierGroups, type SupplierGroup } from "@/components/purchases/purchase-supplier-groups"
+import {
+  PurchaseSupplierGroups,
+  SupplierPurchasePanel,
+  type SupplierGroup,
+} from "@/components/purchases/purchase-supplier-groups"
 import { usePathname, useSearchParams } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { PurchasesToolbar } from "@/components/purchases/purchases-toolbar"
@@ -59,6 +63,14 @@ export function PurchasesClient({ purchases, groups, view, locations, pagination
     purchases[0]?.id ?? null,
   )
 
+  // By-supplier view: which supplier's ledger the panel shows.
+  const [activeVendorId, setActiveVendorId] = React.useState<string | null>(groups?.[0]?.vendor.id ?? null)
+  React.useEffect(() => {
+    setActiveVendorId((current) =>
+      current && groups?.some((group) => group.vendor.id === current) ? current : (groups?.[0]?.vendor.id ?? null),
+    )
+  }, [groups])
+
   React.useEffect(() => {
     setActivePurchaseId((current) => {
       if (current && purchases.some((purchase) => purchase.id === current)) return current
@@ -73,7 +85,7 @@ export function PurchasesClient({ purchases, groups, view, locations, pagination
           <h1 className="text-2xl font-semibold">Purchases</h1>
           <p className="text-sm text-muted-foreground">
             {view === "supplier"
-              ? `${pagination.totalCount} supplier${pagination.totalCount === 1 ? "" : "s"} · ${purchases.length} bills shown`
+              ? `${pagination.totalCount} supplier${pagination.totalCount === 1 ? "" : "s"} · ${purchases.length} bills`
               : `Showing ${purchases.length} of ${pagination.totalCount} purchases`}
           </p>
           <div className="mt-2 inline-flex rounded-md border p-0.5 text-sm" role="tablist" aria-label="Purchases view">
@@ -123,8 +135,8 @@ export function PurchasesClient({ purchases, groups, view, locations, pagination
           {groups ? (
             <PurchaseSupplierGroups
               groups={groups}
-              activePurchaseId={activePurchaseId}
-              onActivate={setActivePurchaseId}
+              activeVendorId={activeVendorId}
+              onActivate={setActiveVendorId}
             />
           ) : (
             <PurchaseTable
@@ -144,10 +156,14 @@ export function PurchasesClient({ purchases, groups, view, locations, pagination
           />
         </div>
 
-        <PurchaseDetailPanel
-          purchaseId={activePurchaseId}
-          locations={locations}
-        />
+        {groups ? (
+          <SupplierPurchasePanel group={groups.find((group) => group.vendor.id === activeVendorId) ?? null} />
+        ) : (
+          <PurchaseDetailPanel
+            purchaseId={activePurchaseId}
+            locations={locations}
+          />
+        )}
       </div>
     </main>
   )

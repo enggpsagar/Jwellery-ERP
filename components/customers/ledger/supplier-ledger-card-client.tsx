@@ -13,7 +13,13 @@ import { Skeleton } from "@/components/ui/skeleton"
  * Client-fetched twin of SupplierLedgerCard — same table, fetched via
  * useEffect since this renders inside the client-side master-detail panel.
  */
-export function SupplierLedgerCardClient({ customerId }: { customerId: string }) {
+export function SupplierLedgerCardClient({
+  customerId,
+  defaultShowDetails,
+}: {
+  customerId: string
+  defaultShowDetails?: boolean
+}) {
   const [entries, setEntries] = useState<SupplierLedgerEntryItem[] | null>(null)
 
   useEffect(() => {
@@ -31,5 +37,5 @@ export function SupplierLedgerCardClient({ customerId }: { customerId: string })
     return <Skeleton className="h-40 w-full" />
   }
 
-  return <SupplierLedgerBody customerId={customerId} entries={entries} />
+  return <SupplierLedgerBody key={customerId} customerId={customerId} entries={entries} defaultShowDetails={defaultShowDetails} />
 }

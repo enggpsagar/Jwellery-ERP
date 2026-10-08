@@ -279,6 +279,10 @@ export type SupplierLedgerEntryItem = {
   /** Add Stock from this supplier: the piece's purchase amount. Shown for
    * information only — Add Stock never adds to what's owed. */
   stockValue: number | null
+  /** The purchase bill this entry belongs to (its owed amount or a payment
+   * against it), linked from the ledger row. */
+  purchaseId: string | null
+  purchaseNumber: string | null
 }
 
 export type SupplierLedgerMetal = { label: string; weight: number; unit: "g" | "ct" }
@@ -307,6 +311,8 @@ export async function getSupplierLedgerEntries(
       // A purchase's lines carry the metal/weight its money entry doesn't.
       purchase: {
         select: {
+          id: true,
+          purchaseNumber: true,
           items: {
             select: {
               quantity: true,
@@ -387,6 +393,8 @@ export async function getSupplierLedgerEntries(
     entryDate: formatDate(entry.entryDate),
     entryDateISO: entry.entryDate.toISOString(),
     metals: metalsOf(entry),
+    purchaseId: entry.purchase?.id ?? null,
+    purchaseNumber: entry.purchase?.purchaseNumber ?? null,
     stockValue:
       entry.sourceType === "ADJUSTMENT"
         ? (() => {

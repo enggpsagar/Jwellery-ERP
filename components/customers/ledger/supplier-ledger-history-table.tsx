@@ -1,6 +1,7 @@
 "use client"
 
 import { useMemo, useState } from "react"
+import Link from "next/link"
 import { ArrowDown, ArrowUp, ArrowUpDown, Truck } from "lucide-react"
 
 import type { SupplierLedgerEntryItem, SupplierLedgerMetal } from "@/lib/actions/customer-ledger-actions"
@@ -70,6 +71,7 @@ export function SupplierLedgerHistoryTable({ entries }: { entries: SupplierLedge
       (entry) =>
         entry.sourceType.toLowerCase().includes(query) ||
         entry.description.toLowerCase().includes(query) ||
+        (entry.purchaseNumber ?? "").toLowerCase().includes(query) ||
         entry.metals.some((metal) => metal.label.toLowerCase().includes(query)),
     )
   }, [entries, search])
@@ -197,6 +199,14 @@ export function SupplierLedgerHistoryTable({ entries }: { entries: SupplierLedge
                       {entry.entryDate}
                     </button>
                   </IconTooltip>
+                  {entry.purchaseId && entry.purchaseNumber ? (
+                    <Link
+                      href={`/purchases/${entry.purchaseId}`}
+                      className="block text-xs text-primary underline-offset-4 hover:underline"
+                    >
+                      {entry.purchaseNumber}
+                    </Link>
+                  ) : null}
                 </TableCell>
                 <TableCell className="whitespace-normal text-sm">
                   <MetalList metals={entry.metals} weightOf={weightText} />

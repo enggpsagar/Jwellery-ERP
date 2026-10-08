@@ -20,6 +20,9 @@ function formatAmount(value: number) {
 type SupplierLedgerBodyProps = {
   customerId: string
   entries: SupplierLedgerEntryItem[]
+  /** Start with the history table open (the Purchases page's supplier
+   * panel, where the entries are the point). */
+  defaultShowDetails?: boolean
 }
 
 /**
@@ -32,8 +35,8 @@ type SupplierLedgerBodyProps = {
  * from scratch on /purchases/new or /payments/out and this party re-picked
  * from a dropdown there.
  */
-export function SupplierLedgerBody({ customerId, entries }: SupplierLedgerBodyProps) {
-  const [showDetails, setShowDetails] = useState(false)
+export function SupplierLedgerBody({ customerId, entries, defaultShowDetails = false }: SupplierLedgerBodyProps) {
+  const [showDetails, setShowDetails] = useState(defaultShowDetails)
   const wf = useWeightFormat()
 
   // Same CREDIT/DEBIT polarity as lib/core/customer.ts' mapCustomer

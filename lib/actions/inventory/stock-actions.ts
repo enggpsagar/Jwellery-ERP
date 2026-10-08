@@ -719,6 +719,7 @@ export async function createInventoryStock(
     const saleAmount = parseOptionalNumber(formData.get("saleAmount"))
 
     const vendorName = parseNullableString(formData.get("vendorName"))
+    const vendorInvoiceNumber = parseNullableString(formData.get("vendorInvoiceNumber"))
     const locationId = parseNullableString(formData.get("locationId"))
     const remarks = parseNullableString(formData.get("remarks"))
 
@@ -963,6 +964,7 @@ export async function createInventoryStock(
           purchaseAmount: toDecimal(purchaseAmount),
           saleAmount: toDecimal(saleAmount),
           vendorName,
+          vendorInvoiceNumber,
           purchaseDate,
           manufactureDate,
           locationId,
@@ -1113,6 +1115,7 @@ export async function updateInventoryStock(
     const saleAmount = parseOptionalNumber(formData.get("saleAmount"))
 
     const vendorName = parseNullableString(formData.get("vendorName"))
+    const vendorInvoiceNumber = parseNullableString(formData.get("vendorInvoiceNumber"))
     const locationId = parseNullableString(formData.get("locationId"))
     const remarks = parseNullableString(formData.get("remarks"))
 
@@ -1293,6 +1296,7 @@ export async function updateInventoryStock(
           locationId,
           remarks,
           vendorName,
+          vendorInvoiceNumber,
         },
       })
 
@@ -1350,6 +1354,7 @@ export async function updateInventoryStock(
         purchaseAmount: toDecimal(purchaseAmount),
         saleAmount: toDecimal(saleAmount),
         vendorName,
+        vendorInvoiceNumber,
         purchaseDate,
         manufactureDate,
         locationId,

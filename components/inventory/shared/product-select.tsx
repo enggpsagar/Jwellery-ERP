@@ -35,6 +35,9 @@ export type ProductOption = {
   defaultPurity?: string | null
   /** Searchable, not shown in the label. */
   hsnCode?: string | null
+  /** Shown after the code, e.g. "60.900 g" or "1.250 ct" — the caller
+   * formats it (it knows metal vs stone and the store's decimals). */
+  weightLabel?: string | null
   isActive: boolean
 }
 
@@ -127,7 +130,10 @@ export function ProductSelect({
           <SelectValue placeholder={placeholder} />
         </SelectTrigger>
 
-        <SelectContent>
+        {/* popper, not the default item-aligned: item-aligned anchors on the
+            selected item, and once the search filters it out (or nothing
+            matches) the list jumped to the corner of the screen. */}
+        <SelectContent position="popper" className="min-w-(--radix-select-trigger-width)">
           <div className="p-2">
             <SelectSearchInput
               placeholder="Search by name or code..."
@@ -146,6 +152,7 @@ export function ProductSelect({
                   {product.name}{" "}
                   <span className="text-muted-foreground">
                     ({product.productCode})
+                    {product.weightLabel ? ` · ${product.weightLabel}` : ""}
                   </span>
                 </SelectItem>
               ))}

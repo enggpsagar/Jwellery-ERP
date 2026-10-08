@@ -139,7 +139,9 @@ async function addStock(page: Page, productCode: string, stockCode: string, expe
   await page.getByRole("combobox").filter({ hasText: "Select Product" }).click()
   await page.getByPlaceholder(/search/i).last().fill(productCode)
   await page.getByRole("option", { name: new RegExp(productCode) }).click()
-  await page.locator("#stockCode").fill(stockCode)
+  // Stock Code is system-generated and hidden on Add Stock; the test pins
+  // its own so it can find the row afterwards.
+  await page.locator('input[name="stockCode"]').evaluate((el, value) => { (el as HTMLInputElement).value = value }, stockCode)
   await page.locator("#grossWeight").fill("10")
   await page.locator("#lessWeight").fill("0.1")
   await page.locator("#stoneWeight").fill("0.2")

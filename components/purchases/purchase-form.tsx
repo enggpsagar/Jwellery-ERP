@@ -416,10 +416,19 @@ export function PurchaseForm({
   // ProductSelect's shared ProductOption type expects metalType as a flat
   // display string, not the relation object; the full `products` array
   // (with the metal's id) is still used for applyProductToItem's lookup.
-  const productSelectOptions = products.map((product) => ({
-    ...product,
-    metalType: product.metalType?.name ?? null,
-  }))
+  // Gross weight in the picker (carats for a stone product), so similar
+  // designs — Gold 999 (1210) x2 — can be told apart before picking.
+  const productSelectOptions = products.map((product) => {
+    const isStone = initialMetals.find((metal) => metal.id === product.metalType?.id)?.isGemstone ?? false
+    const weightLabel = isStone
+      ? product.defaultCaratWeight
+        ? `${wf.ct(product.defaultCaratWeight)} ct`
+        : null
+      : product.defaultGrossWeight
+        ? `${wf.g(product.defaultGrossWeight)} g`
+        : null
+    return { ...product, metalType: product.metalType?.name ?? null, weightLabel }
+  })
 
   const [vendorId, setVendorId] = useState(initialVendorId ?? "")
   const [locationId, setLocationId] = useState(initialLocationId ?? "")

@@ -146,7 +146,9 @@ export function CustomerSelect({
           <SelectValue placeholder={resolvedPlaceholder} />
         </SelectTrigger>
 
-        <SelectContent>
+        {/* popper — see ProductSelect: item-aligned lost its anchor when the
+            search filtered out the selected row. */}
+        <SelectContent position="popper" className="min-w-(--radix-select-trigger-width)">
           <div className="p-2">
             <SelectSearchInput
               placeholder="Search by name or phone..."

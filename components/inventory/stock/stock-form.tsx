@@ -104,6 +104,7 @@ type Stock = {
   saleAmount: string | null;
 
   vendorName: string | null;
+  vendorInvoiceNumber?: string | null;
 
   purchaseDate: string | null;
 
@@ -469,6 +470,7 @@ export function StockForm({
       tagNumber: field("tagNumber"),
       quantity: field("quantity"),
       vendorName: field("vendorName"),
+      vendorInvoiceNumber: field("vendorInvoiceNumber"),
       purchaseDate: field("purchaseDate"),
       manufactureDate: field("manufactureDate"),
       remarks: field("remarks"),
@@ -545,6 +547,7 @@ export function StockForm({
       restoreField("tagNumber", str("tagNumber"));
       restoreField("quantity", str("quantity"));
       restoreField("vendorName", str("vendorName"));
+      restoreField("vendorInvoiceNumber", str("vendorInvoiceNumber"));
       restoreField("purchaseDate", str("purchaseDate"));
       restoreField("manufactureDate", str("manufactureDate"));
       restoreField("remarks", str("remarks"));
@@ -598,6 +601,69 @@ export function StockForm({
   return (
     <div className="space-y-8">
       {/* ============================
+          SUPPLIER — first, same order as New Purchase: who it came from
+          and their bill, then what it is.
+      ============================ */}
+
+      <div className="rounded-xl border p-6">
+        <h3 className="mb-6 text-lg font-semibold">Supplier</h3>
+
+        <div className="grid gap-6 lg:grid-cols-3">
+          <div>
+            <Label htmlFor="vendorName">Supplier</Label>
+
+            {/* Suggests names from the actual Supplier list (Parties
+                flagged as a Supplier, same list Purchases' own Vendor
+                field uses) instead of a blank text box -- Vendor Name
+                itself stays free text (no schema change), so picking a
+                supplier here just fills it in with that name. */}
+            <CustomerSelect
+              customers={suppliers}
+              defaultValue={suppliers.find((supplier) => supplier.name === vendorName)?.id}
+              onChange={(_id, supplier) => setVendorName(supplier?.name ?? "")}
+              placeholder="Select or search a supplier"
+              termLabel="supplier"
+            />
+            <input type="hidden" name="vendorName" value={vendorName} />
+
+            <ErrorText error={state.errors.vendorName} />
+          </div>
+
+          <div>
+            <Label htmlFor="vendorInvoiceNumber">Supplier Invoice No.</Label>
+
+            <Input
+              id="vendorInvoiceNumber"
+              name="vendorInvoiceNumber"
+              defaultValue={stock?.vendorInvoiceNumber ?? ""}
+              placeholder="e.g. GB/25-26/187"
+            />
+
+            <ErrorText error={state.errors.vendorInvoiceNumber} />
+          </div>
+
+          <div>
+            <Label htmlFor="purchaseDate">Purchase Date</Label>
+
+            <Input
+              id="purchaseDate"
+              name="purchaseDate"
+              type="date"
+              defaultValue={
+                stock?.purchaseDate
+                  ? new Date(stock.purchaseDate).toISOString().substring(0, 10)
+                  : mode === "create"
+                    ? new Date().toISOString().slice(0, 10)
+                    : ""
+              }
+            />
+
+            <ErrorText error={state.errors.purchaseDate} />
+          </div>
+        </div>
+      </div>
+
+      {/* ============================
           STOCK INFORMATION
       ============================ */}
 
@@ -626,18 +692,24 @@ export function StockForm({
             <ErrorText error={state.errors.productId} />
           </div>
 
-          <div>
-            <Label htmlFor="stockCode">Stock Code <RequiredMark /></Label>
-
-            <Input
-              id="stockCode"
-              name="stockCode"
-              defaultValue={stock?.stockCode ?? nextStockCode ?? ""}
-              placeholder="STK-0001"
-            />
-
-            <ErrorText error={state.errors.stockCode} />
-          </div>
+          {/* System-generated (nextStockCode), so not asked for on Add
+              Stock — still posted, and shown read-only when editing. */}
+          {mode === "create" ? (
+            <>
+              <input type="hidden" name="stockCode" defaultValue={nextStockCode ?? ""} />
+              {state.errors.stockCode ? (
+                <div className="lg:col-span-3">
+                  <ErrorText error={state.errors.stockCode} />
+                </div>
+              ) : null}
+            </>
+          ) : (
+            <div>
+              <Label htmlFor="stockCode">Stock Code</Label>
+              <Input id="stockCode" name="stockCode" defaultValue={stock?.stockCode ?? ""} readOnly className="bg-muted" />
+              <ErrorText error={state.errors.stockCode} />
+            </div>
+          )}
 
           <div>
             <Label htmlFor="tagNumber">Tag Number</Label>
@@ -1011,47 +1083,9 @@ export function StockForm({
       ============================ */}
 
       <div className="rounded-xl border p-6">
-        <h3 className="mb-6 text-lg font-semibold">Purchase Details</h3>
+        <h3 className="mb-6 text-lg font-semibold">Other Details</h3>
 
         <div className="grid gap-6 lg:grid-cols-3">
-          <div>
-            <Label htmlFor="vendorName">Vendor Name</Label>
-
-            {/* Suggests names from the actual Supplier list (Parties
-                flagged as a Supplier, same list Purchases' own Vendor
-                field uses) instead of a blank text box -- Vendor Name
-                itself stays free text (no schema change), so picking a
-                supplier here just fills it in with that name. */}
-            <CustomerSelect
-              customers={suppliers}
-              defaultValue={suppliers.find((supplier) => supplier.name === vendorName)?.id}
-              onChange={(_id, supplier) => setVendorName(supplier?.name ?? "")}
-              placeholder="Select or search a supplier"
-              termLabel="supplier"
-            />
-            <input type="hidden" name="vendorName" value={vendorName} />
-
-            <ErrorText error={state.errors.vendorName} />
-          </div>
-
-          <div>
-            <Label htmlFor="purchaseDate">Purchase Date</Label>
-
-            <Input
-              id="purchaseDate"
-              name="purchaseDate"
-              type="date"
-              defaultValue={
-                stock?.purchaseDate
-                  ? new Date(stock.purchaseDate).toISOString().substring(0, 10)
-                  : mode === "create"
-                    ? new Date().toISOString().slice(0, 10)
-                    : ""
-              }
-            />
-
-            <ErrorText error={state.errors.purchaseDate} />
-          </div>
 
           <div>
             <Label htmlFor="manufactureDate">Date of Manufacture</Label>

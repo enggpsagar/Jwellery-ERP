@@ -266,7 +266,9 @@ test("editing an Add Stock piece's weight re-splits its metal rows; hand-entered
     await page.getByRole("combobox").filter({ hasText: "Select Product" }).click()
     await page.getByPlaceholder(/search/i).last().fill(product.productCode)
     await page.getByRole("option", { name: new RegExp(product.productCode) }).click()
-    await page.locator("#stockCode").fill(stockCode)
+    // Stock Code is system-generated and hidden on Add Stock; the test pins
+    // its own so it can find the row afterwards.
+    await page.locator('input[name="stockCode"]').evaluate((el, value) => { (el as HTMLInputElement).value = value }, stockCode)
     await page.locator("#grossWeight").fill("4.7")
     await page.locator("#netWeight").fill("4.588")
     await page.getByRole("button", { name: "Add Stock" }).click()

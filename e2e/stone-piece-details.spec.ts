@@ -180,7 +180,9 @@ test("Add Stock of a gold + silver + diamond + ruby Product writes its rows, wit
     await page.getByRole("combobox").filter({ hasText: "Select Product" }).click()
     await page.getByPlaceholder(/search/i).last().fill(product.productCode)
     await page.getByRole("option", { name: new RegExp(product.productCode) }).click()
-    await page.locator("#stockCode").fill(stockCode)
+    // Stock Code is system-generated and hidden on Add Stock; the test pins
+    // its own so it can find the row afterwards.
+    await page.locator('input[name="stockCode"]').evaluate((el, value) => { (el as HTMLInputElement).value = value }, stockCode)
     // Twice the Product's weight: the metals share it in the Product's
     // proportions. (Carats aren't asked for a gold piece — the stones keep
     // the Product's own.)

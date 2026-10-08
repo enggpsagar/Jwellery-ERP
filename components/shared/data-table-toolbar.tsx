@@ -7,6 +7,7 @@ import { Loader } from "@/components/ui/loader"
 import { Button } from "@/components/ui/button"
 import { DateRangePicker } from "@/components/ui/date-range-picker"
 import { CollapsibleSearch } from "@/components/shared/collapsible-search"
+import { Switch } from "@/components/ui/switch"
 import {
   Select,
   SelectContent,
@@ -63,6 +64,10 @@ type DataTableToolbarProps = {
    * Stock / Out of Stock) can override this to something that reads more
    * naturally as "show both," e.g. "Both". */
   statusAllLabel?: string
+  /** A two-state status (e.g. Products' Active / Inactive) as a compact
+   * switch instead of the Status dropdown: on = no "status" param (the
+   * page's default), off = `offValue`. Use instead of statusOptions. */
+  statusToggle?: { onLabel: string; offLabel: string; offValue: string }
   /** A second, independent filter dropdown next to Status — e.g. Stock/
    * Karigar's Gold/Silver/Diamond/Stone/Other Type filter. Kept as its own
    * prop/URL param ("type") rather than reusing statusOptions, since a table
@@ -135,6 +140,7 @@ export function DataTableToolbar({
   defaultSortOrder = "desc",
   statusOptions,
   statusAllLabel = "All Statuses",
+  statusToggle,
   typeOptions,
   typeLabel = "Type",
   categoryOptions,
@@ -370,6 +376,20 @@ export function DataTableToolbar({
       />
 
       <div className="flex flex-1 flex-wrap items-center gap-3">
+        {statusToggle ? (
+          <label className="flex h-9 cursor-pointer items-center gap-2 rounded-md border px-3 text-sm">
+            <Switch
+              checked={currentStatus !== statusToggle.offValue}
+              onCheckedChange={(checked) => updateParam("status", checked ? "ALL" : statusToggle.offValue)}
+              disabled={isPending}
+              aria-label={`Show ${statusToggle.onLabel.toLowerCase()} or ${statusToggle.offLabel.toLowerCase()}`}
+            />
+            <span className="min-w-[4.5rem]">
+              {currentStatus === statusToggle.offValue ? statusToggle.offLabel : statusToggle.onLabel}
+            </span>
+          </label>
+        ) : null}
+
         {statusOptions ? (
           <Select value={currentStatus} onValueChange={(value) => updateParam("status", value)} disabled={isPending}>
             <SelectTrigger className="h-9 w-[150px]">

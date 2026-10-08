@@ -138,8 +138,7 @@ export function ProductsClient({
             // view (see page.tsx's own status resolution). The catch-all slot
             // *is* the Active view here, so it's labelled "Active" and there's
             // no separate ACTIVE option — that listed "Active" twice.
-            statusOptions={[{ value: "INACTIVE", label: "Inactive" }]}
-            statusAllLabel="Active"
+            statusToggle={{ onLabel: "Active", offLabel: "Inactive", offValue: "INACTIVE" }}
             typeOptions={[
               ...metals
                 .filter((metal) => metal.isActive)

@@ -87,6 +87,11 @@ export function PurchaseDetailContent({
               // real purities, weights and rates; the line's own Purity/
               // Rate are only a summary (first metal / none).
               const multiPart = item.components.length > 0
+              // No metal weight but a carat/stone weight: a loose stone.
+              const isStoneLine =
+                item.purity === "DIAMOND" ||
+                (!(Number(item.netWeight) > 0) &&
+                  (Number(item.caratWeight) > 0 || Number(item.stoneWeight) > 0))
               return (
               <tr key={item.id} className="border-b last:border-0">
                 <td className="px-4 py-3">
@@ -135,13 +140,33 @@ export function PurchaseDetailContent({
                 <td className="px-4 py-3">{item.quantity}</td>
                 <td className="px-4 py-3">{multiPart ? "Mixed" : item.purity ?? "-"}</td>
                 <td className="px-4 py-3">
-                  {multiPart || item.purity !== "DIAMOND" ? (
+                  {multiPart ? (
                     <WeightText value={item.netWeight} fallback="-" />
+                  ) : isStoneLine ? (
+                    // A loose-stone line (diamond, moissanite, any gemstone
+                    // metal type) keeps its weight in carats + stone grams;
+                    // netWeight is 0 by design, so showing it read "0 g".
+                    <>
+                      <WeightText value={item.caratWeight} unit="CARAT" fallback="-" />
+                      {item.stoneWeight ? (
+                        <span className="block text-xs text-muted-foreground">
+                          <WeightText value={item.stoneWeight} />
+                        </span>
+                      ) : null}
+                    </>
                   ) : (
-                    <WeightText value={item.caratWeight} unit="CARAT" fallback="-" />
+                    <WeightText value={item.netWeight} fallback="-" />
                   )}
                 </td>
-                <td className="px-4 py-3">{multiPart ? "Mixed" : item.rate ? `₹${item.rate.toFixed(2)}` : "-"}</td>
+                <td className="px-4 py-3">
+                  {multiPart
+                    ? "Mixed"
+                    : item.rate
+                      ? `₹${item.rate.toFixed(2)}`
+                      : isStoneLine && item.stoneRate
+                        ? `₹${item.stoneRate.toFixed(2)} / ct`
+                        : "-"}
+                </td>
                 <td className="px-4 py-3 font-medium">₹{item.lineTotal.toFixed(2)}</td>
               </tr>
               )
@@ -155,6 +180,18 @@ export function PurchaseDetailContent({
           <span>Subtotal</span>
           <span>₹{purchase.subtotal.toFixed(2)}</span>
         </div>
+        {purchase.makingCharges !== 0 && (
+          <div className="flex justify-between">
+            <span>Making Charges</span>
+            <span>₹{purchase.makingCharges.toFixed(2)}</span>
+          </div>
+        )}
+        {purchase.stoneCharges !== 0 && (
+          <div className="flex justify-between">
+            <span>Stone Charges</span>
+            <span>₹{purchase.stoneCharges.toFixed(2)}</span>
+          </div>
+        )}
         <div className="flex justify-between">
           <span>Discount</span>
           <span>-₹{purchase.discount.toFixed(2)}</span>

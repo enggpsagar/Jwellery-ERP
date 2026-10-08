@@ -3,6 +3,7 @@ import Link from "next/link"
 import type { Purchase, PurchaseItemComponent } from "@/lib/actions/purchase-actions"
 import { formatShortDate } from "@/lib/utils"
 import { WeightText } from "@/components/shared/weight-text"
+import { GstBreakdown } from "@/components/purchases/gst-breakdown"
 import { PurchaseStatusBadge } from "@/components/purchases/purchase-status-badge"
 
 const rupees = (value: number) =>
@@ -192,10 +193,15 @@ export function PurchaseDetailContent({
           <span>Discount</span>
           <span>-₹{purchase.discount.toFixed(2)}</span>
         </div>
-        <div className="flex justify-between">
-          <span>GST (SGST+CGST or IGST)</span>
-          <span>₹{purchase.taxAmount.toFixed(2)}</span>
-        </div>
+        <GstBreakdown
+          totalTax={purchase.taxAmount}
+          lines={purchase.items.map((item: (typeof purchase.items)[number]) => ({
+            ratePercent: item.components.length > 0 ? null : item.gstRatePercent,
+            sgst: item.sgstAmount,
+            cgst: item.cgstAmount,
+            igst: item.igstAmount,
+          }))}
+        />
         {purchase.roundOffAmount !== 0 && (
           <div className="flex justify-between">
             <span>Round Off</span>

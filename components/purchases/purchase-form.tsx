@@ -29,6 +29,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { CustomerSelect } from "@/components/customers/customer-select"
 import { ProductSelect } from "@/components/inventory/shared/product-select"
+import { GstBreakdown } from "@/components/purchases/gst-breakdown"
 import { LocationSelect, useShowLocationField } from "@/components/shared/location-select"
 
 import { MakingChargeInput } from "@/components/shared/making-charge-input"
@@ -2101,10 +2102,13 @@ export function PurchaseForm({
           <span>Discount</span>
           <span>-₹{discount.toFixed(2)}</span>
         </div>
-        <div className="flex justify-between">
-          <span>GST (SGST+CGST or IGST)</span>
-          <span>₹{taxAmount.toFixed(2)}</span>
-        </div>
+        <GstBreakdown
+          totalTax={taxAmount}
+          lines={items.map((item) => ({
+            ratePercent: item.multiPart ? null : lineGstRatePercent(item),
+            ...lineGst(item),
+          }))}
+        />
         <div className="flex justify-between">
           <span>Round Off</span>
           <span>

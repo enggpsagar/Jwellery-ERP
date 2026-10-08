@@ -1,7 +1,7 @@
 import type { Metadata } from "next"
 import { InvoiceStatus } from "@prisma/client"
 
-import { getPurchases } from "@/lib/actions/purchase-actions"
+import { getPurchases, getPurchasesBySupplier } from "@/lib/actions/purchase-actions"
 import { getStoreLocations } from "@/lib/actions/store-location-actions"
 import { PurchasesClient } from "@/components/purchases/purchases-client"
 
@@ -19,6 +19,8 @@ type PurchasesPageProps = {
     status?: string
     dateFrom?: string
     dateTo?: string
+    /** "bills" = flat list; anything else = grouped by supplier (default). */
+    view?: string
   }>
 }
 
@@ -37,16 +39,27 @@ export default async function PurchasesPage({ searchParams }: PurchasesPageProps
   const dateFrom = params.dateFrom || undefined
   const dateTo = params.dateTo || undefined
 
-  const [{ purchases, pagination }, locations] = await Promise.all([
-    getPurchases({ page, pageSize, search, sortBy, sortOrder, status, dateFrom, dateTo }),
+  const view = params.view === "bills" ? "bills" : "supplier"
+  const filters: NonNullable<Parameters<typeof getPurchases>[0]> = { page, pageSize, search, sortBy, sortOrder, status, dateFrom, dateTo }
+
+  const [listing, locations] = await Promise.all([
+    view === "bills"
+      ? getPurchases(filters).then((result) => ({ ...result, groups: null }))
+      : getPurchasesBySupplier(filters).then((result) => ({
+          purchases: result.groups.flatMap((group) => group.purchases),
+          groups: result.groups,
+          pagination: result.pagination,
+        })),
     getStoreLocations(),
   ])
 
   return (
     <PurchasesClient
-      purchases={purchases}
+      purchases={listing.purchases}
+      groups={listing.groups}
+      view={view}
       locations={locations}
-      pagination={pagination}
+      pagination={listing.pagination}
     />
   )
 }

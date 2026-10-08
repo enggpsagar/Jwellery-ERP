@@ -5,6 +5,9 @@ import Link from "next/link"
 
 import { Button } from "@/components/ui/button"
 import { PurchaseTable } from "@/components/purchases/purchase-table"
+import { PurchaseSupplierGroups, type SupplierGroup } from "@/components/purchases/purchase-supplier-groups"
+import { usePathname, useSearchParams } from "next/navigation"
+import { cn } from "@/lib/utils"
 import { PurchasesToolbar } from "@/components/purchases/purchases-toolbar"
 import { PurchaseDetailPanel } from "@/components/purchases/purchase-detail-panel"
 import { DataTablePagination } from "@/components/shared/data-table-pagination"
@@ -22,6 +25,9 @@ type PurchaseRow = {
 
 type PurchasesClientProps = {
   purchases: PurchaseRow[]
+  /** Grouped by supplier (the default view); null in the flat "bills" view. */
+  groups: SupplierGroup[] | null
+  view: "supplier" | "bills"
   locations: LocationOption[]
   pagination: {
     page: number
@@ -37,7 +43,16 @@ type PurchasesClientProps = {
  * shows its full detail (with Edit/Delete/Record Payment) in the panel on
  * the right, instead of every action requiring a full navigation.
  */
-export function PurchasesClient({ purchases, locations, pagination }: PurchasesClientProps) {
+export function PurchasesClient({ purchases, groups, view, locations, pagination }: PurchasesClientProps) {
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+  const viewHref = (next: "supplier" | "bills") => {
+    const query = new URLSearchParams(searchParams.toString())
+    if (next === "bills") query.set("view", "bills")
+    else query.delete("view")
+    query.delete("page")
+    return `${pathname}?${query.toString()}`
+  }
   // Defaults to the first row on this page/search result so the panel is
   // never empty on load, matching CustomersClient.
   const [activePurchaseId, setActivePurchaseId] = React.useState<string | null>(
@@ -57,8 +72,26 @@ export function PurchasesClient({ purchases, locations, pagination }: PurchasesC
         <div>
           <h1 className="text-2xl font-semibold">Purchases</h1>
           <p className="text-sm text-muted-foreground">
-            Showing {purchases.length} of {pagination.totalCount} purchases
+            {view === "supplier"
+              ? `${pagination.totalCount} supplier${pagination.totalCount === 1 ? "" : "s"} · ${purchases.length} bills shown`
+              : `Showing ${purchases.length} of ${pagination.totalCount} purchases`}
           </p>
+          <div className="mt-2 inline-flex rounded-md border p-0.5 text-sm" role="tablist" aria-label="Purchases view">
+            {(["supplier", "bills"] as const).map((option) => (
+              <Link
+                key={option}
+                href={viewHref(option)}
+                role="tab"
+                aria-selected={view === option}
+                className={cn(
+                  "rounded px-3 py-1",
+                  view === option ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                {option === "supplier" ? "By supplier" : "All bills"}
+              </Link>
+            ))}
+          </div>
         </div>
 
         {/* New Purchase records a supplier bill (payable + GST) for new or
@@ -87,18 +120,26 @@ export function PurchasesClient({ purchases, locations, pagination }: PurchasesC
         <div className="space-y-4">
           <PurchasesToolbar />
 
-          <PurchaseTable
-            purchases={purchases}
-            activePurchaseId={activePurchaseId}
-            onActivate={setActivePurchaseId}
-          />
+          {groups ? (
+            <PurchaseSupplierGroups
+              groups={groups}
+              activePurchaseId={activePurchaseId}
+              onActivate={setActivePurchaseId}
+            />
+          ) : (
+            <PurchaseTable
+              purchases={purchases}
+              activePurchaseId={activePurchaseId}
+              onActivate={setActivePurchaseId}
+            />
+          )}
 
           <DataTablePagination
             page={pagination.page}
             totalPages={pagination.totalPages}
             totalCount={pagination.totalCount}
             pageSize={pagination.pageSize}
-            itemLabel="purchases"
+            itemLabel={view === "supplier" ? "suppliers" : "purchases"}
             showPageSizeSelector
           />
         </div>

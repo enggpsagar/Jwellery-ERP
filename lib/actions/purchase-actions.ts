@@ -1083,6 +1083,64 @@ export async function getPurchases(params: GetPurchasesParams = {}) {
   };
 }
 
+/**
+ * Purchases grouped by supplier — one group per supplier with its bill
+ * count, total and balance, and its bills (newest first). Paginated over
+ * suppliers, not bills, so one supplier's bills never split across pages;
+ * same filters as getPurchases. Suppliers ordered by their latest bill.
+ */
+export async function getPurchasesBySupplier(params: GetPurchasesParams = {}) {
+  const page = Math.max(1, Number(params.page || 1));
+  const pageSize = Math.max(1, Number(params.pageSize || 10));
+
+  const storeId = await requireStoreScope();
+  const scope = await getLocationScope();
+  const where = buildPurchasesWhere(storeId, params, scope);
+
+  const allGroups = await prisma.purchase.groupBy({
+    by: ["vendorId"],
+    where,
+    _count: { _all: true },
+    _sum: { totalAmount: true, balanceAmount: true },
+    _max: { purchaseDate: true },
+    orderBy: { _max: { purchaseDate: "desc" } },
+  });
+  const totalCount = allGroups.length;
+  const pageGroups = allGroups.slice((page - 1) * pageSize, page * pageSize);
+  const vendorIds = pageGroups.map((group) => group.vendorId);
+
+  const purchases = vendorIds.length
+    ? await prisma.purchase.findMany({
+        where: { AND: [where, { vendorId: { in: vendorIds } }] },
+        orderBy: [{ purchaseDate: "desc" }, { createdAt: "desc" }],
+        include: { vendor: { select: { id: true, name: true, phone: true } } },
+      })
+    : [];
+  const mapped = purchases.map(mapPurchase);
+
+  const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+  return {
+    groups: pageGroups.map((group) => {
+      const bills = mapped.filter((purchase) => purchase.vendor?.id === group.vendorId);
+      return {
+        vendor: bills[0]?.vendor ?? { id: group.vendorId, name: "Unknown supplier", phone: null },
+        billCount: group._count._all,
+        totalAmount: Number(group._sum.totalAmount ?? 0),
+        balanceAmount: Number(group._sum.balanceAmount ?? 0),
+        purchases: bills,
+      };
+    }),
+    pagination: {
+      page,
+      pageSize,
+      totalCount,
+      totalPages,
+      hasNextPage: page < totalPages,
+      hasPrevPage: page > 1,
+    },
+  };
+}
+
 function toPurchaseStatus(value: string | undefined): InvoiceStatus | "ALL" {
   if (value && (Object.values(InvoiceStatus) as string[]).includes(value)) {
     return value as InvoiceStatus;

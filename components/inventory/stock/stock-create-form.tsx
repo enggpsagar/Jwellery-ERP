@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useEffect, useRef } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import type { PurityType } from "@prisma/client";
 
 import { createInventoryStock } from "@/lib/actions/inventory/stock-actions";
@@ -33,7 +33,19 @@ type StockCreateFormProps = {
 
 export function StockCreateForm({ products, locations, caratConversionRates, defaultLocationId, metals, suppliers, nextStockCode }: StockCreateFormProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const toast = useToast();
+  // Back to where Add Stock was started: an explicit same-site returnTo
+  // (Purchases' Add Stock button), else the product it was opened for
+  // (product panel's Add Stock), else the Stock list.
+  const returnTo = searchParams.get("returnTo");
+  const fromProductId = searchParams.get("productId");
+  const afterSaveHref =
+    returnTo && returnTo.startsWith("/") && !returnTo.startsWith("//")
+      ? returnTo
+      : fromProductId
+        ? `/inventory/products/${fromProductId}`
+        : "/inventory/stock";
   const formRef = useRef<HTMLFormElement>(null);
 
   const [state, formAction, pending] = useActionState(
@@ -46,7 +58,7 @@ export function StockCreateForm({ products, locations, caratConversionRates, def
       toast.success(state.message || "Stock added successfully");
 
       const timer = setTimeout(() => {
-        router.push("/inventory/stock");
+        router.push(afterSaveHref);
         router.refresh();
       }, 800);
 
@@ -56,7 +68,7 @@ export function StockCreateForm({ products, locations, caratConversionRates, def
     if (!state.success && state.message) {
       toast.error(state.message);
     }
-  }, [state, router, toast]);
+  }, [state, router, toast, afterSaveHref]);
 
   return (
     <form

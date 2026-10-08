@@ -96,7 +96,17 @@ export function PurchaseDetailContent({
               return (
               <tr key={item.id} className="border-b last:border-0">
                 <td className="px-4 py-3">
-                  {item.itemName}
+                  <Link href={`/inventory/products/${item.productId}`} className="text-primary underline-offset-4 hover:underline">
+                    {item.itemName}
+                  </Link>
+                  {item.inventoryStockId && item.stockCode ? (
+                    <Link
+                      href={`/inventory/stock/${item.inventoryStockId}`}
+                      className="ml-1.5 text-xs text-muted-foreground underline-offset-4 hover:underline"
+                    >
+                      {item.stockCode}
+                    </Link>
+                  ) : null}
                   {multiPart ? (
                     <ul className="mt-1 space-y-0.5 text-xs text-muted-foreground" data-testid="purchase-item-components">
                       {item.components.map((component: PurchaseItemComponent, index: number) => (

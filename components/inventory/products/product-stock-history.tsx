@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import Link from "next/link"
 
 import {
   getProductStockHistory,
@@ -66,10 +67,25 @@ export function ProductStockHistory({ productId, refreshToken }: { productId: st
                     >
                       {row.kind}
                     </span>
-                    {row.reference ? <span className="text-muted-foreground"> · {row.reference}</span> : null}
+                    {row.reference ? (
+                      <span className="text-muted-foreground">
+                        {" · "}
+                        {row.referenceHref ? (
+                          <Link href={row.referenceHref} className="text-primary underline-offset-4 hover:underline">
+                            {row.reference}
+                          </Link>
+                        ) : (
+                          row.reference
+                        )}
+                      </span>
+                    ) : null}
                     {row.party ? <div className="text-xs text-muted-foreground">{row.party}</div> : null}
                   </td>
-                  <td className="py-2 pr-3 whitespace-nowrap">{row.stockCode}</td>
+                  <td className="py-2 pr-3 whitespace-nowrap">
+                    <Link href={`/inventory/stock/${row.stockId}`} className="text-primary underline-offset-4 hover:underline">
+                      {row.stockCode}
+                    </Link>
+                  </td>
                   <td className="py-2 pr-3 text-right tabular-nums">
                     {row.direction === "NOTE" ? "—" : `${row.direction === "OUT" ? "−" : "+"}${row.quantity}`}
                   </td>

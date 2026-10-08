@@ -1,3 +1,4 @@
+import Link from "next/link"
 import { Boxes, IndianRupee, Scale, Truck } from "lucide-react"
 
 import type { getInventoryStockById } from "@/lib/actions/inventory/stock-actions"
@@ -59,6 +60,7 @@ export function StockDetailContent({
    * behavior. */
   showLocation?: boolean
 }) {
+  const purchase = stock.purchaseItems?.[0]?.purchase ?? null
   return (
     <div className="grid items-start gap-4 lg:grid-cols-2">
       <DetailSection title="Basic Information" icon={Boxes} tint="var(--chart-1)" compact>
@@ -67,7 +69,13 @@ export function StockDetailContent({
           <DetailField
             label="Product"
             span
-            value={`${stock.product?.productCode} — ${stock.product?.name}`}
+            value={
+              stock.product ? (
+                <Link href={`/inventory/products/${stock.product.id}`} className="text-primary underline-offset-4 hover:underline">
+                  {stock.product.productCode} — {stock.product.name}
+                </Link>
+              ) : null
+            }
           />
           <DetailField label="Status" value={<StockStatusBadge status={stock.status} />} />
           <DetailField label="Finish" value={<FinishBadge finish={stock.finish} />} />
@@ -107,10 +115,21 @@ export function StockDetailContent({
       )}
 
       {/* Every field here is optional — hide the card when none is set. */}
-      {(stock.vendorName || stock.purchaseDate || (showLocation && stock.location?.name) || stock.remarks) && (
+      {(stock.vendorName || stock.vendorInvoiceNumber || purchase || stock.purchaseDate || (showLocation && stock.location?.name) || stock.remarks) && (
         <DetailSection title="Source / Extra Details" icon={Truck} tint="var(--chart-4)" compact>
           <DetailGrid dense>
-            <DetailField label="Vendor Name" value={stock.vendorName} />
+            <DetailField label="Supplier" value={stock.vendorName} />
+            <DetailField label="Supplier Invoice No." value={stock.vendorInvoiceNumber} />
+            <DetailField
+              label="Purchase Bill"
+              value={
+                purchase ? (
+                  <Link href={`/purchases/${purchase.id}`} className="text-primary underline-offset-4 hover:underline">
+                    {purchase.purchaseNumber}
+                  </Link>
+                ) : null
+              }
+            />
             <DetailField label="Purchase Date" value={formatDate(stock.purchaseDate)} />
             {showLocation && <DetailField label="Location" value={stock.location?.name} />}
             <DetailField

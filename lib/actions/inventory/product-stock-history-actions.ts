@@ -33,6 +33,9 @@ export type ProductStockHistoryRow = {
   /** Supplier for an "in", stock code always. */
   party: string | null;
   stockCode: string;
+  stockId: string;
+  /** Page of the purchase bill / invoice / estimate / credit note, if any. */
+  referenceHref: string | null;
   quantity: number;
   grossWeight: number;
   netWeight: number;
@@ -83,7 +86,7 @@ export async function getProductStockHistory(productId: string): Promise<Product
       where: { inventoryStockId: { in: stockIds } },
       select: {
         inventoryStockId: true,
-        purchase: { select: { purchaseNumber: true, purchaseDate: true, vendor: { select: { name: true } } } },
+        purchase: { select: { id: true, purchaseNumber: true, purchaseDate: true, vendor: { select: { name: true } } } },
       },
     }),
     prisma.invoice.findMany({ where: { id: { in: idsOf("Invoice") }, storeId }, select: { id: true, invoiceNumber: true } }),
@@ -122,8 +125,10 @@ export async function getProductStockHistory(productId: string): Promise<Product
       direction: "IN",
       kind: purchase ? "Purchase" : artisan ? "Artisan receipt" : "Add Stock",
       reference: purchase?.purchaseNumber ?? null,
+      referenceHref: purchase ? `/purchases/${purchase.id}` : null,
       party: purchase?.vendor?.name ?? stock.vendorName ?? null,
       stockCode: stock.stockCode,
+      stockId: stock.id,
       quantity: originalQty,
       grossWeight: gross * originalQty,
       netWeight: net * originalQty,
@@ -148,8 +153,19 @@ export async function getProductStockHistory(productId: string): Promise<Product
               ? "Estimate sale"
               : "Sale",
         reference: t.referenceId ? numberOf.get(t.referenceId) ?? null : null,
+        referenceHref:
+          t.referenceId && numberOf.has(t.referenceId)
+            ? t.referenceType === "Invoice"
+              ? `/billing/${t.referenceId}`
+              : t.referenceType === "KachaInvoice"
+                ? `/billing/kacha/${t.referenceId}`
+                : t.referenceType === "CreditNote"
+                  ? `/billing/credit-notes/${t.referenceId}`
+                  : null
+            : null,
         party: null,
         stockCode: stock.stockCode,
+        stockId: stock.id,
         quantity: qty,
         grossWeight: gross * qty,
         netWeight: net * qty,

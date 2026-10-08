@@ -31,6 +31,7 @@ import {
 } from "@/components/ui/select";
 
 import { ProductSelect } from "@/components/inventory/shared/product-select";
+import { ProductStockLink } from "@/components/inventory/stock/product-stock-link";
 import { CustomerSelect } from "@/components/customers/customer-select";
 import { LocationSelect, useShowLocationField } from "@/components/shared/location-select";
 import { RequiredMark } from "@/components/shared/required-mark"
@@ -732,7 +733,10 @@ export function StockForm({
             carry — to change any of it, edit the product.
           */}
           <div className="lg:col-span-3">
-            <Label>From the product</Label>
+            <div className="flex flex-wrap items-baseline justify-between gap-2">
+              <Label>From the product</Label>
+              {selectedProduct ? <ProductStockLink productId={selectedProduct.id} /> : null}
+            </div>
 
             {selectedProduct ? (
               <dl className="mt-1.5 grid gap-x-6 gap-y-2 rounded-md border bg-muted/40 p-3 text-sm sm:grid-cols-2 lg:grid-cols-4">

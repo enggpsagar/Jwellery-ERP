@@ -640,6 +640,12 @@ export async function getInventoryStockById(id: string) {
           updatedAt: true,
         },
       },
+      // The purchase bill this piece came in on, if any — linked from the
+      // stock detail.
+      purchaseItems: {
+        take: 1,
+        select: { purchase: { select: { id: true, purchaseNumber: true } } },
+      },
     },
   })
 

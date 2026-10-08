@@ -72,7 +72,7 @@ export function PurchasesClient({ purchases, locations, pagination }: PurchasesC
             className="bg-[var(--chart-1)] text-white shadow-sm hover:bg-[color-mix(in_oklab,var(--chart-1)_88%,black)]"
             title="Add stock that isn't a supplier purchase — no payable or GST is recorded"
           >
-            <Link href="/inventory/stock/new">Add Stock</Link>
+            <Link href={`/inventory/stock/new?returnTo=${encodeURIComponent("/purchases")}`}>Add Stock</Link>
           </Button>
           <Button asChild>
             <Link href="/purchases/new">New Purchase</Link>

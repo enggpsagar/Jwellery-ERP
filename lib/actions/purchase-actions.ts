@@ -884,6 +884,9 @@ function mapPurchase(purchase: any) {
       gstRatePercent: item.gstRatePercent != null ? Number(item.gstRatePercent) : null,
       lineTotal: Number(item.lineTotal),
       inventoryStockId: item.inventoryStockId,
+      // Only getPurchaseById loads it — the detail page links each line to
+      // the stock piece it created.
+      stockCode: (item.inventoryStock?.stockCode as string | undefined) ?? null,
       // A multi-part piece's metal/stone rows (empty for a single-metal
       // line) — only getPurchaseById loads them.
       components: [...(item.components ?? [])]
@@ -1109,7 +1112,12 @@ export async function getPurchaseById(id: string) {
     where: { id, storeId },
     include: {
       vendor: { select: { id: true, name: true, phone: true } },
-      items: { include: { components: { include: { metalType: { select: { name: true } } } } } },
+      items: {
+        include: {
+          components: { include: { metalType: { select: { name: true } } } },
+          inventoryStock: { select: { stockCode: true } },
+        },
+      },
       ledgerEntries: { orderBy: { entryDate: "desc" } },
     },
   });
@@ -1447,6 +1455,8 @@ export async function createPurchase(
             storeId,
             productId: item.productId,
             stockCode: stockCodes[i],
+            // The supplier's bill no., so the stock piece shows it too.
+            vendorInvoiceNumber: vendorInvoiceNumber ?? undefined,
             metalTypeId: item.metalTypeId ?? undefined,
             purity: item.purity ?? undefined,
             purityLabel: item.purityLabel ?? undefined,
@@ -1990,6 +2000,8 @@ export async function updatePurchase(
             storeId,
             productId: item.productId,
             stockCode: stockCodes[i],
+            // The supplier's bill no., so the stock piece shows it too.
+            vendorInvoiceNumber: vendorInvoiceNumber ?? undefined,
             metalTypeId: item.metalTypeId ?? undefined,
             purity: item.purity ?? undefined,
             purityLabel: item.purityLabel ?? undefined,

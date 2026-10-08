@@ -146,14 +146,10 @@ export function PurchaseDetailContent({
                     // A loose-stone line (diamond, moissanite, any gemstone
                     // metal type) keeps its weight in carats + stone grams;
                     // netWeight is 0 by design, so showing it read "0 g".
-                    <>
-                      <WeightText value={item.caratWeight} unit="CARAT" fallback="-" />
-                      {item.stoneWeight ? (
-                        <span className="block text-xs text-muted-foreground">
-                          <WeightText value={item.stoneWeight} />
-                        </span>
-                      ) : null}
-                    </>
+                    // stoneWeight isn't shown as grams: for a stone metal whose
+                    // primary unit is carat it holds the carat figure too
+                    // (S-X-001: stoneWeight 20.5 = caratWeight 20.5).
+                    <WeightText value={item.caratWeight} unit="CARAT" fallback="-" />
                   ) : (
                     <WeightText value={item.netWeight} fallback="-" />
                   )}

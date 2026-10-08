@@ -575,15 +575,7 @@ export async function getProducts(params: GetProductsParams = {}) {
   const where = getProductWhere(storeId, search, params.metalTypeId, params.status, params.dateFrom, params.dateTo, params.categoryId, params.categoryTypeId, params.stoneOriginOptionId);
   const orderBy = getProductOrderBy(sortBy, sortOrder);
 
-  const fineWeightSelect = {
-    metalTypeId: true,
-    defaultPurity: true,
-    defaultNetWeight: true,
-    defaultGrossWeight: true,
-    storeMetalPurity: { select: { label: true } },
-  } as const;
-
-  const [totalCount, rows, weightSum, stockQtySum, fineWeightOf, fineRows] = await Promise.all([
+  const [totalCount, rows, stockQtySum, fineWeightOf] = await Promise.all([
     prisma.product.count({ where }),
     prisma.product.findMany({
       where,
@@ -592,8 +584,6 @@ export async function getProducts(params: GetProductsParams = {}) {
       take: pageSize,
       include: { ...PRODUCT_RELATIONS, storeMetalPurity: { select: { label: true } } },
     }),
-    // Footer totals across every matching product, not just this page.
-    prisma.product.aggregate({ where, _sum: { defaultNetWeight: true, defaultGrossWeight: true } }),
     prisma.inventoryStock.aggregate({
       where: { storeId, product: where },
       _sum: { quantity: true },
@@ -601,7 +591,6 @@ export async function getProducts(params: GetProductsParams = {}) {
     // Products store no fine weight of their own — net × the purity's
     // fineness, same resolver stock rows are stamped with (lib/fine-weight.ts).
     getFineWeightResolver(storeId),
-    prisma.product.findMany({ where, select: fineWeightSelect }),
   ]);
 
   const productFineWeight = (row: {
@@ -625,6 +614,36 @@ export async function getProducts(params: GetProductsParams = {}) {
   // remaining count (it only reaches 0, flipping status to SOLD, as pieces
   // sell), so a plain sum needs no status filter of its own.
   const stockQtyByProductId = new Map<string, number>();
+
+  // Weight actually in stock: every lot's per-piece weight × its remaining
+  // quantity (a sold-out lot has quantity 0, so it drops out on its own,
+  // same as stockQty). This is what the list's weight columns and footer
+  // show — the product's default weights are only the template a new stock
+  // entry starts from, so adding a second piece of a design left the list
+  // at the first piece's weight. Weights per piece, so can't be a groupBy
+  // _sum; the lots are fetched once for all matching products (the footer
+  // spans every page) and bucketed per product.
+  const stockLots = await prisma.inventoryStock.findMany({
+    where: { storeId, product: where, quantity: { gt: 0 } },
+    select: { productId: true, quantity: true, grossWeight: true, netWeight: true, fineWeight: true },
+  });
+  const stockWeightByProductId = new Map<string, { gross: number; net: number; fine: number }>();
+  const stockWeightTotals = { gross: 0, net: 0, fine: 0 };
+  for (const lot of stockLots) {
+    const qty = lot.quantity;
+    const gross = Number(lot.grossWeight ?? 0) * qty;
+    const net = Number(lot.netWeight ?? 0) * qty;
+    const fine = Number(lot.fineWeight ?? lot.netWeight ?? 0) * qty;
+    const bucket = stockWeightByProductId.get(lot.productId) ?? { gross: 0, net: 0, fine: 0 };
+    bucket.gross += gross;
+    bucket.net += net;
+    bucket.fine += fine;
+    stockWeightByProductId.set(lot.productId, bucket);
+    stockWeightTotals.gross += gross;
+    stockWeightTotals.net += net;
+    stockWeightTotals.fine += fine;
+  }
+
   if (rows.length > 0) {
     const stockTotals = await prisma.inventoryStock.groupBy({
       by: ["productId"],
@@ -640,15 +659,19 @@ export async function getProducts(params: GetProductsParams = {}) {
     ...mapProductRow(row),
     stockQty: stockQtyByProductId.get(row.id) ?? 0,
     fineWeight: productFineWeight(row),
+    stockGrossWeight: stockWeightByProductId.get(row.id)?.gross ?? 0,
+    stockNetWeight: stockWeightByProductId.get(row.id)?.net ?? 0,
+    stockFineWeight: stockWeightByProductId.get(row.id)?.fine ?? 0,
   }));
   const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
 
   return {
     products,
+    // In-stock weight across every matching product (see stockLots above).
     totals: {
-      grossWeight: Number(weightSum._sum.defaultGrossWeight ?? 0),
-      netWeight: Number(weightSum._sum.defaultNetWeight ?? 0),
-      fineWeight: fineRows.reduce((sum, row) => sum + (productFineWeight(row) ?? 0), 0),
+      grossWeight: stockWeightTotals.gross,
+      netWeight: stockWeightTotals.net,
+      fineWeight: stockWeightTotals.fine,
       stockQty: stockQtySum._sum.quantity ?? 0,
     },
     pagination: {

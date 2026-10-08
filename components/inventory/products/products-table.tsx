@@ -22,6 +22,10 @@ type ProductRow = {
   defaultGrossWeight: number | null
   defaultStoneWeight: number | null
   stockQty: number
+  /** Weight in stock (each lot's weight × remaining qty) — getProducts. */
+  stockGrossWeight?: number
+  stockNetWeight?: number
+  stockFineWeight?: number
   isActive: boolean
   createdAt: Date | string
 }
@@ -121,8 +125,12 @@ export function ProductsTable({
                   qty in stock beside it — "PRD-0012 (3)". */}
               <SortableTableHead label="Product Code (Qty)" sortKey="productCode" defaultSortBy="createdAt" />
               <SortableTableHead label="Title" sortKey="name" defaultSortBy="createdAt" />
-              <SortableTableHead label="Gross Weight" sortKey="defaultGrossWeight" defaultSortBy="createdAt" />
-              <SortableTableHead label="Net Weight" sortKey="defaultNetWeight" defaultSortBy="createdAt" />
+              {/* Weight in stock, summed over every piece — not sortable:
+                  it's computed per page, not a column the DB can order by
+                  (sorting on the product's default weight would disagree
+                  with what's shown). */}
+              <th className="px-4 py-3 text-left font-medium">Gross Weight</th>
+              <th className="px-4 py-3 text-left font-medium">Net Weight</th>
               <th className="px-4 py-3 text-left font-medium">Fine Weight</th>
             </tr>
           </thead>
@@ -223,24 +231,24 @@ export function ProductsTable({
                   </td>
 
                   <td className="px-4 py-3 text-foreground">
-                    {product.defaultGrossWeight != null ? (
-                      `${wf.g(product.defaultGrossWeight)} g`
+                    {product.stockQty > 0 ? (
+                      `${wf.g(product.stockGrossWeight ?? 0)} g`
                     ) : (
                       <span className="text-muted-foreground">—</span>
                     )}
                   </td>
 
                   <td className="px-4 py-3 text-foreground">
-                    {product.defaultNetWeight != null ? (
-                      `${wf.g(product.defaultNetWeight)} g`
+                    {product.stockQty > 0 ? (
+                      `${wf.g(product.stockNetWeight ?? 0)} g`
                     ) : (
                       <span className="text-muted-foreground">—</span>
                     )}
                   </td>
 
                   <td className="px-4 py-3 text-foreground">
-                    {product.fineWeight != null ? (
-                      `${wf.g(product.fineWeight)} g`
+                    {product.stockQty > 0 ? (
+                      `${wf.g(product.stockFineWeight ?? 0)} g`
                     ) : (
                       <span className="text-muted-foreground">—</span>
                     )}

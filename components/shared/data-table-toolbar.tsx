@@ -38,6 +38,7 @@ export type DataTableExportParams = {
   category?: string
   categoryType?: string
   stoneType?: string
+  purity?: string
   format?: DataTableExportFormat
 }
 
@@ -86,6 +87,10 @@ type DataTableToolbarProps = {
   gemstoneMetalIds?: string[]
   /** Each stone's own Stone Type options (e.g. Natural / Lab-Grown). */
   stoneTypeOptions?: (Option & { metalId: string })[]
+  /** Each metal's own Purities (Settings › Metals, URL param "purity") —
+   * shown once a metal with purities is picked, listing only that metal's
+   * own, so whatever the store configures appears with no code change. */
+  purityOptions?: (Option & { metalId: string })[]
   /** Hides the "Sort by …" and Ascending/Descending dropdowns — for a table
    * (Products, Stock) that sorts only via its own per-column
    * SortableTableHead clicks and doesn't want a second, redundant sort
@@ -136,6 +141,7 @@ export function DataTableToolbar({
   categoryTypeOptions,
   gemstoneMetalIds,
   stoneTypeOptions,
+  purityOptions,
   hideSort = false,
   dateField,
   hidePageSize = false,
@@ -157,6 +163,11 @@ export function DataTableToolbar({
   const currentCategory = searchParams.get("category") ?? "ALL"
   const currentCategoryType = searchParams.get("categoryType") ?? "ALL"
   const currentStoneType = searchParams.get("stoneType") ?? "ALL"
+  const currentPurity = searchParams.get("purity") ?? "ALL"
+  const puritiesForMetal = React.useMemo(
+    () => (purityOptions ?? []).filter((option) => option.metalId === currentType),
+    [purityOptions, currentType],
+  )
   const isStoneSelected = !!gemstoneMetalIds?.includes(currentType)
   const stoneTypesForMetal = React.useMemo(
     () => (stoneTypeOptions ?? []).filter((option) => option.metalId === currentType),
@@ -238,8 +249,9 @@ export function DataTableToolbar({
         params.delete("category")
         params.delete("categoryType")
       }
-      // Stone Types belong to one stone — never carried across a change.
+      // Stone Types and Purities belong to one metal — never carried across a change.
       params.delete("stoneType")
+      params.delete("purity")
       params.set("page", "1")
       router.replace(`${pathname}?${params.toString()}`)
     })
@@ -313,6 +325,7 @@ export function DataTableToolbar({
               category: currentCategory !== "ALL" ? currentCategory : undefined,
               categoryType: currentCategoryType !== "ALL" ? currentCategoryType : undefined,
               stoneType: currentStoneType !== "ALL" ? currentStoneType : undefined,
+              purity: currentPurity !== "ALL" ? currentPurity : undefined,
               dateFrom: currentDateFrom || undefined,
               dateTo: currentDateTo || undefined,
               format,
@@ -381,6 +394,22 @@ export function DataTableToolbar({
             <SelectContent>
               <SelectItem value="ALL">All {typeLabel}s</SelectItem>
               {typeOptions.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        ) : null}
+
+        {purityOptions && !isStoneSelected && puritiesForMetal.length > 0 ? (
+          <Select value={currentPurity} onValueChange={(value) => updateParam("purity", value)} disabled={isPending}>
+            <SelectTrigger className="h-9 w-[130px]" aria-label="Purity">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ALL">All Purities</SelectItem>
+              {puritiesForMetal.map((option) => (
                 <SelectItem key={option.value} value={option.value}>
                   {option.label}
                 </SelectItem>

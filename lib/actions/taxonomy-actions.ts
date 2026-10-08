@@ -1071,6 +1071,8 @@ export type CategoryFilterOptions = {
    *  Category/Type for Stone Type, same as Add Product hides Category for
    *  a Stone product. */
   gemstoneMetalIds: string[];
+  /** Each metal's own Purities (Settings › Metals) — the Purity filter. */
+  purities: { value: string; label: string; metalId: string }[];
   /** Each stone's own Stone Type options (StoreMetalOrigin, e.g. Natural /
    *  Lab-Grown) — what Product.stoneOriginOptionId points at. */
   stoneTypes: { value: string; label: string; metalId: string }[];
@@ -1085,7 +1087,7 @@ export type CategoryFilterOptions = {
 export async function getCategoryFilterOptions(): Promise<CategoryFilterOptions> {
   const storeId = await requireStoreScope();
 
-  const [categories, types, gemstones, origins] = await Promise.all([
+  const [categories, types, gemstones, origins, purities] = await Promise.all([
     prisma.storeCategory.findMany({
       where: { storeId, isActive: true },
       orderBy: { name: "asc" },
@@ -1105,6 +1107,11 @@ export async function getCategoryFilterOptions(): Promise<CategoryFilterOptions>
       orderBy: { name: "asc" },
       select: { id: true, name: true, storeMetalId: true },
     }),
+    prisma.storeMetalPurity.findMany({
+      where: { storeId, isActive: true },
+      orderBy: [{ sortOrder: "asc" }, { label: "asc" }],
+      select: { id: true, label: true, storeMetalId: true },
+    }),
   ]);
 
   return {
@@ -1115,6 +1122,7 @@ export async function getCategoryFilterOptions(): Promise<CategoryFilterOptions>
     })),
     categoryTypes: types.map((type) => ({ value: type.id, label: type.name, categoryId: type.categoryId })),
     gemstoneMetalIds: gemstones.map((metal) => metal.id),
+    purities: purities.map((purity) => ({ value: purity.id, label: purity.label, metalId: purity.storeMetalId })),
     stoneTypes: origins.map((origin) => ({
       value: origin.id,
       label: origin.name,

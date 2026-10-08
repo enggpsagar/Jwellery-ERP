@@ -30,6 +30,7 @@ type InventoryStockPageProps = {
     category?: string
     categoryType?: string
     stoneType?: string
+    purity?: string
   }>
 }
 
@@ -78,6 +79,12 @@ export default async function InventoryStockPage({
     categoryFilter.stoneTypes.some((t) => t.value === params.stoneType && t.metalId === metalTypeId)
       ? params.stoneType
       : undefined
+  // Only a Purity configured for the selected metal counts.
+  const storeMetalPurityId =
+    metalTypeId &&
+    categoryFilter.purities.some((p) => p.value === params.purity && p.metalId === metalTypeId)
+      ? params.purity
+      : undefined
 
   const { stockItems, pagination, totals } = await getInventoryStock({
     page,
@@ -92,6 +99,7 @@ export default async function InventoryStockPage({
     categoryId,
     categoryTypeId,
     stoneOriginOptionId,
+    storeMetalPurityId,
   })
 
   return (

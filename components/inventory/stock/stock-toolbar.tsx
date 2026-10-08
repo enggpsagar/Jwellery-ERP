@@ -74,6 +74,7 @@ export function StockToolbar({ selectedIds, metals, categoryFilter, bulkActions,
       categoryTypeOptions={categoryFilter?.categoryTypes}
       gemstoneMetalIds={categoryFilter?.gemstoneMetalIds}
       stoneTypeOptions={categoryFilter?.stoneTypes}
+            purityOptions={categoryFilter?.purities}
       bulkActions={
         <>
           {bulkActions}

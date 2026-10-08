@@ -406,6 +406,9 @@ export type GetProductsParams = {
   categoryTypeId?: string;
   /** StoreMetalOrigin id (Natural / Lab-Grown ...). */
   stoneOriginOptionId?: string;
+  /** StoreMetalPurity id (Settings › Metals › Purities) — matches the
+   *  product's primary purity or any of its metal rows' purities. */
+  storeMetalPurityId?: string;
 };
 
 type ExportProductsParams = {
@@ -420,6 +423,7 @@ type ExportProductsParams = {
   category?: string;
   categoryType?: string;
   stoneType?: string;
+  purity?: string;
   format?: "csv" | "xlsx" | "pdf";
 };
 
@@ -433,6 +437,7 @@ function getProductWhere(
   categoryId?: string,
   categoryTypeId?: string,
   stoneOriginOptionId?: string,
+  storeMetalPurityId?: string,
 ) {
   const query = String(search || "").trim();
   const from = parseDateRangeBoundary(dateFrom, false);
@@ -443,6 +448,19 @@ function getProductWhere(
     ...(categoryId ? { categoryId } : {}),
     ...(categoryTypeId ? { categoryTypeId } : {}),
     ...(stoneOriginOptionId ? { stoneOriginOptionId } : {}),
+    // AND-wrapped: the search below already owns the top-level OR.
+    ...(storeMetalPurityId
+      ? {
+          AND: [
+            {
+              OR: [
+                { storeMetalPurityId },
+                { metalComponents: { some: { storeMetalPurityId } } },
+              ],
+            },
+          ],
+        }
+      : {}),
     ...(metalTypeId === UNASSIGNED_METAL_TYPE
       ? { metalTypeId: null }
       : metalTypeId
@@ -572,7 +590,7 @@ export async function getProducts(params: GetProductsParams = {}) {
   const sortOrder: ProductSortOrder = params.sortOrder || "desc";
 
   const storeId = await requireStoreScope();
-  const where = getProductWhere(storeId, search, params.metalTypeId, params.status, params.dateFrom, params.dateTo, params.categoryId, params.categoryTypeId, params.stoneOriginOptionId);
+  const where = getProductWhere(storeId, search, params.metalTypeId, params.status, params.dateFrom, params.dateTo, params.categoryId, params.categoryTypeId, params.stoneOriginOptionId, params.storeMetalPurityId);
   const orderBy = getProductOrderBy(sortBy, sortOrder);
 
   const [totalCount, rows, stockQtySum, fineWeightOf] = await Promise.all([
@@ -625,19 +643,24 @@ export async function getProducts(params: GetProductsParams = {}) {
   // spans every page) and bucketed per product.
   const stockLots = await prisma.inventoryStock.findMany({
     where: { storeId, product: where, quantity: { gt: 0 } },
-    select: { productId: true, quantity: true, grossWeight: true, netWeight: true, fineWeight: true },
+    select: { productId: true, quantity: true, grossWeight: true, netWeight: true, fineWeight: true, caratWeight: true },
   });
-  const stockWeightByProductId = new Map<string, { gross: number; net: number; fine: number }>();
-  const stockWeightTotals = { gross: 0, net: 0, fine: 0 };
+  // carat: a loose stone's stock carries its weight in caratWeight with
+  // net/gross 0, so it gets its own total instead of reading "0.0000 g".
+  const stockWeightByProductId = new Map<string, { gross: number; net: number; fine: number; carat: number }>();
+  const stockWeightTotals = { gross: 0, net: 0, fine: 0, carat: 0 };
   for (const lot of stockLots) {
     const qty = lot.quantity;
     const gross = Number(lot.grossWeight ?? 0) * qty;
     const net = Number(lot.netWeight ?? 0) * qty;
     const fine = Number(lot.fineWeight ?? lot.netWeight ?? 0) * qty;
-    const bucket = stockWeightByProductId.get(lot.productId) ?? { gross: 0, net: 0, fine: 0 };
+    const carat = Number(lot.caratWeight ?? 0) * qty;
+    const bucket = stockWeightByProductId.get(lot.productId) ?? { gross: 0, net: 0, fine: 0, carat: 0 };
     bucket.gross += gross;
     bucket.net += net;
     bucket.fine += fine;
+    bucket.carat += carat;
+    stockWeightTotals.carat += net > 0 ? 0 : carat;
     stockWeightByProductId.set(lot.productId, bucket);
     stockWeightTotals.gross += gross;
     stockWeightTotals.net += net;
@@ -662,6 +685,7 @@ export async function getProducts(params: GetProductsParams = {}) {
     stockGrossWeight: stockWeightByProductId.get(row.id)?.gross ?? 0,
     stockNetWeight: stockWeightByProductId.get(row.id)?.net ?? 0,
     stockFineWeight: stockWeightByProductId.get(row.id)?.fine ?? 0,
+    stockCaratWeight: stockWeightByProductId.get(row.id)?.carat ?? 0,
   }));
   const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
 
@@ -672,6 +696,8 @@ export async function getProducts(params: GetProductsParams = {}) {
       grossWeight: stockWeightTotals.gross,
       netWeight: stockWeightTotals.net,
       fineWeight: stockWeightTotals.fine,
+      // Loose stones only (pieces with no gram weight), in carats.
+      caratWeight: stockWeightTotals.carat,
       stockQty: stockQtySum._sum.quantity ?? 0,
     },
     pagination: {
@@ -721,6 +747,7 @@ async function getAllProductsForExport(params: ExportProductsParams = {}) {
         params.category,
         params.categoryType,
         params.stoneType,
+        params.purity,
       );
 
   const rows = await prisma.product.findMany({

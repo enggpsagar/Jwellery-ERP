@@ -151,6 +151,7 @@ export function ProductsClient({
             categoryTypeOptions={categoryFilter?.categoryTypes}
             gemstoneMetalIds={categoryFilter?.gemstoneMetalIds}
             stoneTypeOptions={categoryFilter?.stoneTypes}
+            purityOptions={categoryFilter?.purities}
             bulkActions={
               <>
                 <BulkArchiveProductsButton

@@ -26,6 +26,7 @@ type ProductRow = {
   stockGrossWeight?: number
   stockNetWeight?: number
   stockFineWeight?: number
+  stockCaratWeight?: number
   isActive: boolean
   createdAt: Date | string
 }
@@ -49,7 +50,7 @@ type ProductsTableProps = {
   onActivate?: (id: string) => void
   /** Sums across every product matching the current filters (all pages),
    *  from getProducts — shown as the table's footer row. */
-  totals?: { grossWeight?: number; netWeight: number; fineWeight?: number; stockQty: number }
+  totals?: { grossWeight?: number; netWeight: number; fineWeight?: number; caratWeight?: number; stockQty: number }
 }
 
 export function ProductsTable({
@@ -231,7 +232,10 @@ export function ProductsTable({
                   </td>
 
                   <td className="px-4 py-3 text-foreground">
-                    {product.stockQty > 0 ? (
+                    {product.stockQty > 0 && !(product.stockNetWeight ?? 0) && (product.stockCaratWeight ?? 0) > 0 ? (
+                      // A loose stone: weighed in carats, no gram weight.
+                      `${wf.ct(product.stockCaratWeight ?? 0)} ct`
+                    ) : product.stockQty > 0 ? (
                       `${wf.g(product.stockGrossWeight ?? 0)} g`
                     ) : (
                       <span className="text-muted-foreground">—</span>
@@ -239,7 +243,10 @@ export function ProductsTable({
                   </td>
 
                   <td className="px-4 py-3 text-foreground">
-                    {product.stockQty > 0 ? (
+                    {product.stockQty > 0 && !(product.stockNetWeight ?? 0) && (product.stockCaratWeight ?? 0) > 0 ? (
+                      // A loose stone: weighed in carats, no gram weight.
+                      `${wf.ct(product.stockCaratWeight ?? 0)} ct`
+                    ) : product.stockQty > 0 ? (
                       `${wf.g(product.stockNetWeight ?? 0)} g`
                     ) : (
                       <span className="text-muted-foreground">—</span>
@@ -247,7 +254,10 @@ export function ProductsTable({
                   </td>
 
                   <td className="px-4 py-3 text-foreground">
-                    {product.stockQty > 0 ? (
+                    {product.stockQty > 0 && !(product.stockNetWeight ?? 0) && (product.stockCaratWeight ?? 0) > 0 ? (
+                      // A loose stone: weighed in carats, no gram weight.
+                      <span className="text-muted-foreground">—</span>
+                    ) : product.stockQty > 0 ? (
                       `${wf.g(product.stockFineWeight ?? 0)} g`
                     ) : (
                       <span className="text-muted-foreground">—</span>
@@ -273,7 +283,12 @@ export function ProductsTable({
                 <td className="px-4 py-3 tabular-nums">
                   {totals.grossWeight != null ? `${wf.g(totals.grossWeight)} g` : ""}
                 </td>
-                <td className="px-4 py-3 tabular-nums">{wf.g(totals.netWeight)} g</td>
+                <td className="px-4 py-3 tabular-nums">
+                  {wf.g(totals.netWeight)} g
+                  {totals.caratWeight ? (
+                    <div className="text-xs font-normal text-muted-foreground">+ {wf.ct(totals.caratWeight)} ct stones</div>
+                  ) : null}
+                </td>
                 <td className="px-4 py-3 tabular-nums">
                   {totals.fineWeight != null ? `${wf.g(totals.fineWeight)} g` : ""}
                 </td>

@@ -3,11 +3,13 @@
 import { useMemo, useState } from "react"
 import { ArrowDown, ArrowUp, ArrowUpDown, Truck } from "lucide-react"
 
-import type { SupplierLedgerEntryItem } from "@/lib/actions/customer-ledger-actions"
+import type { SupplierLedgerEntryItem, SupplierLedgerMetal } from "@/lib/actions/customer-ledger-actions"
+import { IconTooltip } from "@/components/ui/icon-tooltip"
 import {
   Table,
   TableBody,
   TableCell,
+  TableFooter,
   TableHead,
   TableHeader,
   TableRow,
@@ -26,6 +28,25 @@ function formatAmount(value: number) {
 }
 
 type SortKey = "entryDate" | "amount"
+
+function MetalList({
+  metals,
+  weightOf,
+}: {
+  metals: SupplierLedgerMetal[]
+  weightOf: (metal: SupplierLedgerMetal) => string
+}) {
+  if (metals.length === 0) return <span className="text-muted-foreground">—</span>
+  return (
+    <>
+      {metals.map((metal) => (
+        <div key={`${metal.label}|${metal.unit}`} className="whitespace-nowrap">
+          {metal.label}: <span className="tabular-nums">{weightOf(metal)}</span>
+        </div>
+      ))}
+    </>
+  )
+}
 
 /**
  * A simpler twin of CustomerLedgerHistoryTable — same search + sortable-
@@ -62,6 +83,26 @@ export function SupplierLedgerHistoryTable({ entries }: { entries: SupplierLedge
     })
     return copy
   }, [filtered, sortKey, sortDir])
+
+  const totals = useMemo(() => {
+    const metals = new Map<string, SupplierLedgerMetal>()
+    let owed = 0
+    let paid = 0
+    for (const entry of filtered) {
+      if (entry.type === "CREDIT") owed += entry.amount
+      else paid += entry.amount
+      for (const metal of entry.metals) {
+        const key = `${metal.label}|${metal.unit}`
+        const existing = metals.get(key)
+        if (existing) existing.weight += metal.weight
+        else metals.set(key, { ...metal })
+      }
+    }
+    return { owed, paid, metals: [...metals.values()] }
+  }, [filtered])
+  const balance = totals.owed - totals.paid
+  const weightText = (metal: SupplierLedgerMetal) =>
+    `${metal.unit === "ct" ? wf.ct(metal.weight) : wf.g(metal.weight)} ${metal.unit}`
 
   const totalPages = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE))
   const currentPage = Math.min(page, totalPages)
@@ -108,7 +149,7 @@ export function SupplierLedgerHistoryTable({ entries }: { entries: SupplierLedge
       />
 
       <div className="overflow-x-auto rounded-lg border">
-        <Table className="min-w-[480px]">
+        <Table className="min-w-[420px]">
           <TableHeader>
             <TableRow>
               <TableHead
@@ -117,52 +158,74 @@ export function SupplierLedgerHistoryTable({ entries }: { entries: SupplierLedge
               >
                 Date <SortIcon column="entryDate" />
               </TableHead>
-              <TableHead>Entry</TableHead>
               <TableHead>Metal</TableHead>
               <TableHead
                 className="cursor-pointer select-none text-right"
                 onClick={() => toggleSort("amount")}
               >
-                Amount <SortIcon column="amount" />
+                Owed <SortIcon column="amount" />
               </TableHead>
+              <TableHead className="text-right">Paid</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {pageEntries.map((entry) => (
               <TableRow key={entry.id} className="align-top">
-                <TableCell className="whitespace-nowrap">{entry.entryDate}</TableCell>
-                <TableCell className="whitespace-normal">
-                  <span
-                    className={cn(
-                      "text-xs font-medium",
-                      entry.type === "CREDIT" ? "text-red-600" : "text-emerald-600",
-                    )}
+                <TableCell className="whitespace-nowrap">
+                  {/* Entry details live in the tooltip to keep the table to
+                      four columns in the side panel. A button so it can be
+                      focused/tapped, not only hovered. */}
+                  <IconTooltip
+                    label={
+                      <div className="max-w-[260px] space-y-0.5">
+                        <div className="font-medium">
+                          {entry.type === "CREDIT" ? "Owed" : "Paid"} · {entry.sourceType}
+                        </div>
+                        {entry.description ? <div>{entry.description}</div> : null}
+                      </div>
+                    }
                   >
-                    {entry.type === "CREDIT" ? "Owed" : "Paid"}
-                  </span>
-                  <span className="text-xs text-muted-foreground"> · {entry.sourceType}</span>
-                  {entry.description ? (
-                    <div className="text-sm text-muted-foreground break-words">{entry.description}</div>
-                  ) : null}
+                    <button
+                      type="button"
+                      className="cursor-help underline decoration-dotted underline-offset-4"
+                    >
+                      {entry.entryDate}
+                    </button>
+                  </IconTooltip>
                 </TableCell>
                 <TableCell className="whitespace-normal text-sm">
-                  {entry.metals.length > 0 ? (
-                    entry.metals.map((metal) => (
-                      <div key={`${metal.label}|${metal.unit}`} className="whitespace-nowrap">
-                        {metal.label}:{" "}
-                        <span className="font-medium tabular-nums">
-                          {metal.unit === "ct" ? wf.ct(metal.weight) : wf.g(metal.weight)} {metal.unit}
-                        </span>
-                      </div>
-                    ))
-                  ) : (
-                    <span className="text-muted-foreground">—</span>
-                  )}
+                  <MetalList metals={entry.metals} weightOf={weightText} />
                 </TableCell>
-                <TableCell className="whitespace-nowrap text-right font-medium">{formatAmount(entry.amount)}</TableCell>
+                <TableCell className="whitespace-nowrap text-right font-medium text-red-600">
+                  {entry.type === "CREDIT" ? formatAmount(entry.amount) : ""}
+                </TableCell>
+                <TableCell className="whitespace-nowrap text-right font-medium text-emerald-600">
+                  {entry.type === "DEBIT" ? formatAmount(entry.amount) : ""}
+                </TableCell>
               </TableRow>
             ))}
           </TableBody>
+          {/* Totals over every entry matching the search, all pages — not
+              just the 10 rows on screen. */}
+          <TableFooter>
+            <TableRow className="align-top font-semibold">
+              <TableCell>Total</TableCell>
+              <TableCell className="whitespace-normal text-sm">
+                <MetalList metals={totals.metals} weightOf={weightText} />
+              </TableCell>
+              <TableCell className="whitespace-nowrap text-right text-red-600">{formatAmount(totals.owed)}</TableCell>
+              <TableCell className="whitespace-nowrap text-right text-emerald-600">{formatAmount(totals.paid)}</TableCell>
+            </TableRow>
+            <TableRow className="font-semibold">
+              <TableCell colSpan={2}>{balance >= 0 ? "Balance due" : "Advance paid"}</TableCell>
+              <TableCell
+                colSpan={2}
+                className={cn("whitespace-nowrap text-right", balance > 0 ? "text-red-600" : balance < 0 ? "text-blue-600" : "")}
+              >
+                {formatAmount(Math.abs(balance))}
+              </TableCell>
+            </TableRow>
+          </TableFooter>
         </Table>
       </div>
 

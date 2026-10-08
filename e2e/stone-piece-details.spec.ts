@@ -174,15 +174,15 @@ test("Add Stock of a gold + silver + diamond + ruby Product writes its rows, wit
       },
     },
   })
-  const stockCode = `E2E-SPDSTK-${suffix}`
+  let stockCode = `E2E-SPDSTK-${suffix}`
   try {
     await page.goto("/inventory/stock/new")
     await page.getByRole("combobox").filter({ hasText: "Select Product" }).click()
     await page.getByPlaceholder(/search/i).last().fill(product.productCode)
     await page.getByRole("option", { name: new RegExp(product.productCode) }).click()
-    // Stock Code is system-generated and hidden on Add Stock; the test pins
-    // its own so it can find the row afterwards.
-    await page.locator('input[name="stockCode"]').evaluate((el, value) => { (el as HTMLInputElement).value = value }, stockCode)
+    // Stock Code is system-generated (hidden on Add Stock) — read it so the
+    // row can be found afterwards.
+    stockCode = await page.locator('input[name="stockCode"]').inputValue()
     // Twice the Product's weight: the metals share it in the Product's
     // proportions. (Carats aren't asked for a gold piece — the stones keep
     // the Product's own.)

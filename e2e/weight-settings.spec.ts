@@ -134,20 +134,22 @@ async function cleanupOtherStore(seed: Awaited<ReturnType<typeof seedOtherStore>
   await db().storeMetal.deleteMany({ where: { id: seed.metalId } })
 }
 
-async function addStock(page: Page, productCode: string, stockCode: string, expectedNet: string) {
+/** Adds one piece and returns its system-generated stock code. */
+async function addStock(page: Page, productCode: string, expectedNet: string): Promise<string> {
   await page.goto("/inventory/stock/new")
   await page.getByRole("combobox").filter({ hasText: "Select Product" }).click()
   await page.getByPlaceholder(/search/i).last().fill(productCode)
   await page.getByRole("option", { name: new RegExp(productCode) }).click()
-  // Stock Code is system-generated and hidden on Add Stock; the test pins
-  // its own so it can find the row afterwards.
-  await page.locator('input[name="stockCode"]').evaluate((el, value) => { (el as HTMLInputElement).value = value }, stockCode)
+  // Stock Code is system-generated (hidden on Add Stock) — read it so the
+  // row can be found afterwards.
+  const stockCode = await page.locator('input[name="stockCode"]').inputValue()
   await page.locator("#grossWeight").fill("10")
   await page.locator("#lessWeight").fill("0.1")
   await page.locator("#stoneWeight").fill("0.2")
   await expect(page.locator("#netWeight")).toHaveValue(expectedNet)
   await page.getByRole("button", { name: "Add Stock" }).click()
   await page.waitForURL(/\/inventory\/stock$/)
+  return stockCode
 }
 
 /** A "Create New Line Item" 22K gold line: net 10 typed, gross 10. */
@@ -214,8 +216,10 @@ test("weight settings drive Add Stock and invoice lines, and recalculate only th
   })
   const other = await seedOtherStore(suffix)
   const otherBefore = await storeSnapshot(other.mainId)
-  const stockA = `E2E-WT-A-${suffix}`
-  const stockB = `E2E-WT-B-${suffix}`
+  // Set from Add Stock's generated codes; the placeholders keep cleanup safe
+  // if a step fails before then.
+  let stockA = `E2E-WT-A-${suffix}`
+  let stockB = `E2E-WT-B-${suffix}`
 
   try {
     // Default wastage for 22K, edited in Settings › Metals & Categories.
@@ -239,7 +243,7 @@ test("weight settings drive Add Stock and invoice lines, and recalculate only th
     await expect(example).toContainText("Net 9.700 g, Fine 8.885 g")
 
     // --- Defaults: today's behaviour -------------------------------------
-    await addStock(page, product.productCode, stockA, "9.7")
+    stockA = await addStock(page, product.productCode, "9.7")
     const a0 = await db().inventoryStock.findFirstOrThrow({ where: { storeId, stockCode: stockA } })
     expect(n(a0.netWeight)).toBeCloseTo(9.7, 5)
     expect(n(a0.fineWeight)).toBeCloseTo(8.8852, 5)
@@ -281,7 +285,7 @@ test("weight settings drive Add Stock and invoice lines, and recalculate only th
     expect(await storeSnapshot(other.mainId)).toBe(otherBefore)
 
     // --- New settings on the forms ---------------------------------------
-    await addStock(page, product.productCode, stockB, "9.9")
+    stockB = await addStock(page, product.productCode, "9.9")
     const b = await db().inventoryStock.findFirstOrThrow({ where: { storeId, stockCode: stockB } })
     expect(n(b.netWeight)).toBeCloseTo(9.9, 5)
     expect(n(b.fineWeight)).toBeCloseTo(9.2664, 5)

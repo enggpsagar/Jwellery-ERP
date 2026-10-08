@@ -1108,7 +1108,6 @@ export async function getInvoiceFormStockItems(includeInvoiceId?: string) {
       product: {
         select: {
           name: true,
-          hsnCode: true,
           productCode: true,
           // The real per-Metal Purity / per-Stone-Type configured Selling
           // Price this piece's product is actually linked to — the new
@@ -1202,7 +1201,6 @@ export async function getInvoiceFormStockItems(includeInvoiceId?: string) {
         product: {
           select: {
             name: true,
-            hsnCode: true,
             productCode: true,
             storeMetalPurityId: true,
             stoneOriginOptionId: true,

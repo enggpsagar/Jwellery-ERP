@@ -15,6 +15,7 @@ export const stockOptionProductDetailsSelect = {
   targetStyle: { select: { id: true, name: true } },
   storeMetalPurity: { select: { label: true, sellingPrice: true, finenessPercent: true } },
   hasStoneComponent: true,
+  hsnCode: true,
   defaultMakingCharge: true,
   defaultMakingChargeType: true,
   // Every metal / stone row (Add Product's components): the first metal's
@@ -69,6 +70,8 @@ export type StockOptionProductDetails = {
   gstRateId: string | null;
   defaultMakingCharge: number | null;
   defaultMakingChargeType: "FIXED" | "PERCENTAGE";
+  /** The Product's HSN code — searchable in the stock picker. */
+  productHsnCode: string | null;
 };
 
 export function toStockOptionProductDetails(product: ProductDetails): StockOptionProductDetails {
@@ -89,5 +92,6 @@ export function toStockOptionProductDetails(product: ProductDetails): StockOptio
     gstRateId: metal?.gstRateId ?? null,
     defaultMakingCharge: product.defaultMakingCharge != null ? Number(product.defaultMakingCharge) : null,
     defaultMakingChargeType: product.defaultMakingChargeType,
+    productHsnCode: product.hsnCode ?? null,
   };
 }

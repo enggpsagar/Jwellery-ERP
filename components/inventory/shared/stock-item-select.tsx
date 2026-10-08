@@ -41,6 +41,8 @@ type StockItemBase = {
    * — shown in the label and searchable, so a piece's category is visible
    * while picking, not only after. */
   categoryName?: string | null
+  /** The linked Product's HSN code — searchable, not shown in the label. */
+  productHsnCode?: string | null
 }
 
 /**
@@ -105,7 +107,8 @@ export function StockItemSelect<T extends StockItemBase>({
         stock.stockCode.toLowerCase().includes(query) ||
         stock.productName.toLowerCase().includes(query) ||
         (stock.productCode ?? "").toLowerCase().includes(query) ||
-        (stock.categoryName ?? "").toLowerCase().includes(query),
+        (stock.categoryName ?? "").toLowerCase().includes(query) ||
+        (stock.productHsnCode ?? "").toLowerCase().includes(query),
     )
   }, [stockItems, search])
 

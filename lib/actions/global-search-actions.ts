@@ -55,6 +55,7 @@ export async function globalSearch(
           { name: { contains: term, mode: "insensitive" } },
           { productCode: { contains: term, mode: "insensitive" } },
           { designCode: { contains: term, mode: "insensitive" } },
+          { hsnCode: { contains: term, mode: "insensitive" } },
           // IGI / certificate number on any of the product's stones.
           { stoneComponents: { some: { certificateNumber: { contains: term, mode: "insensitive" } } } },
         ],

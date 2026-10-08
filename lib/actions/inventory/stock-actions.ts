@@ -247,6 +247,7 @@ function getStockWhere(
               },
             },
             { product: { productCode: { contains: query, mode: "insensitive" as const } } },
+            { product: { hsnCode: { contains: query, mode: "insensitive" as const } } },
             // IGI / lab certificate number: the piece's own stone rows, or
             // its product's (a single-stone piece has no rows of its own).
             { components: { some: { certificateNumber: { contains: query, mode: "insensitive" as const } } } },

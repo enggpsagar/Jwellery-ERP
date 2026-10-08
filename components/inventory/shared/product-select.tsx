@@ -33,6 +33,8 @@ export type ProductOption = {
   ornamentType?: string | null
   metalType?: string | null
   defaultPurity?: string | null
+  /** Searchable, not shown in the label. */
+  hsnCode?: string | null
   isActive: boolean
 }
 
@@ -87,7 +89,8 @@ export function ProductSelect({
     return products.filter(
       (product) =>
         product.name.toLowerCase().includes(query) ||
-        product.productCode.toLowerCase().includes(query),
+        product.productCode.toLowerCase().includes(query) ||
+        (product.hsnCode ?? "").toLowerCase().includes(query),
     )
   }, [products, search])
 

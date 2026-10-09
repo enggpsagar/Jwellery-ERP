@@ -6,6 +6,7 @@ import type { DateRange } from "react-day-picker"
 
 import { cn, formatShortDate } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
+import { IconTooltip } from "@/components/ui/icon-tooltip"
 import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 
@@ -83,19 +84,24 @@ export function DateRangePicker({ value, onChange, placeholder = "Date range", d
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        {iconOnly && !range?.from ? (
-          <Button
-            type="button"
-            variant="outline"
-            disabled={disabled}
-            aria-label={placeholder}
-            title={placeholder}
-            className="h-9 w-9 shrink-0 border-input p-0 text-muted-foreground"
-          >
-            <CalendarIcon className="h-4 w-4" />
-          </Button>
-        ) : (
+      {iconOnly && !range?.from ? (
+        // Icon-only: the styled tooltip (button.tsx only adds one to
+        // size="icon" Buttons); wraps the trigger, not the asChild child.
+        <IconTooltip label={placeholder}>
+          <PopoverTrigger asChild>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={disabled}
+              aria-label={placeholder}
+              className="h-9 w-9 shrink-0 border-input p-0 text-muted-foreground"
+            >
+              <CalendarIcon className="h-4 w-4" />
+            </Button>
+          </PopoverTrigger>
+        </IconTooltip>
+      ) : (
+        <PopoverTrigger asChild>
           <Button
             type="button"
             variant="outline"
@@ -110,8 +116,8 @@ export function DateRangePicker({ value, onChange, placeholder = "Date range", d
             <span className="truncate">{label}</span>
             <CalendarIcon className="h-4 w-4 shrink-0 text-muted-foreground" />
           </Button>
-        )}
-      </PopoverTrigger>
+        </PopoverTrigger>
+      )}
       <PopoverContent className="w-auto gap-0 p-0" align="start">
         <Calendar
           mode="range"

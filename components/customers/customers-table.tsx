@@ -177,53 +177,59 @@ export function CustomersTable({
                   </td>
 
                   <td className="px-4 py-3 font-medium text-foreground">
-                    <RecordHoverCard
-                      label={toTitleCase(customer.name)}
-                      href={onActivate ? undefined : `/customers/${customer.id}`}
-                      title={toTitleCase(customer.name)}
-                      subtitle={customer.customerType ?? undefined}
-                      footerLabel="View party"
-                      sections={[
-                        {
-                          fields: [
-                            { label: "Phone", value: customer.phone },
-                            { label: "Alt. phone", value: customer.altPhone },
-                            { label: "Email", value: customer.email },
-                          ],
-                        },
-                        {
-                          fields: [
-                            { label: "City", value: customer.city },
-                            { label: "State", value: customer.state },
-                            { label: "GSTIN", value: customer.gstNumber },
-                          ],
-                        },
-                        {
-                          fields: [
-                            { label: "Opening balance", value: inr(customer.openingBalance) },
-                            {
-                              // currentBalance (ledger-derived), not
-                              // pendingAmount — see the main "Outstanding"
-                              // column's own comment below for why.
-                              label: "Outstanding",
-                              value:
-                                customer.balanceType === "Advance" ? (
-                                  <span className="text-blue-600">
-                                    {inr(Math.abs(customer.currentBalance ?? 0))} Advance
-                                  </span>
-                                ) : (customer.currentBalance ?? 0) > 0 ? (
-                                  <span className="text-red-600">{inr(customer.currentBalance)}</span>
-                                ) : (
-                                  inr(customer.currentBalance ?? 0)
-                                ),
-                            },
-                            { label: "Payable", value: <PayableAmount customer={customer} /> },
-                            { label: "Orders", value: customer.totalOrders },
-                            { label: "Last purchase", value: customer.lastPurchaseDate },
-                          ],
-                        },
-                      ]}
-                    />
+                    {/* With a side panel (onActivate) the click already shows
+                        all of this, so no hover card over the list. */}
+                    {onActivate ? (
+                      toTitleCase(customer.name)
+                    ) : (
+                      <RecordHoverCard
+                        label={toTitleCase(customer.name)}
+                        href={`/customers/${customer.id}`}
+                        title={toTitleCase(customer.name)}
+                        subtitle={customer.customerType ?? undefined}
+                        footerLabel="View party"
+                        sections={[
+                          {
+                            fields: [
+                              { label: "Phone", value: customer.phone },
+                              { label: "Alt. phone", value: customer.altPhone },
+                              { label: "Email", value: customer.email },
+                            ],
+                          },
+                          {
+                            fields: [
+                              { label: "City", value: customer.city },
+                              { label: "State", value: customer.state },
+                              { label: "GSTIN", value: customer.gstNumber },
+                            ],
+                          },
+                          {
+                            fields: [
+                              { label: "Opening balance", value: inr(customer.openingBalance) },
+                              {
+                                // currentBalance (ledger-derived), not
+                                // pendingAmount — see the main "Outstanding"
+                                // column's own comment below for why.
+                                label: "Outstanding",
+                                value:
+                                  customer.balanceType === "Advance" ? (
+                                    <span className="text-blue-600">
+                                      {inr(Math.abs(customer.currentBalance ?? 0))} Advance
+                                    </span>
+                                  ) : (customer.currentBalance ?? 0) > 0 ? (
+                                    <span className="text-red-600">{inr(customer.currentBalance)}</span>
+                                  ) : (
+                                    inr(customer.currentBalance ?? 0)
+                                  ),
+                              },
+                              { label: "Payable", value: <PayableAmount customer={customer} /> },
+                              { label: "Orders", value: customer.totalOrders },
+                              { label: "Last purchase", value: customer.lastPurchaseDate },
+                            ],
+                          },
+                        ]}
+                      />
+                    )}
                   </td>
 
                   <td className="px-4 py-3 text-foreground">

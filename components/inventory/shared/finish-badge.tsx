@@ -37,7 +37,8 @@ export function FinishBadge({ finish, className }: FinishBadgeProps) {
           <span className="hidden sm:inline">{FINISH_LABELS[finish]}</span>
         </span>
       </TooltipTrigger>
-      <TooltipContent>{FINISH_LABELS[finish]}</TooltipContent>
+      {/* Beside the badge, so it doesn't cover the table row above. */}
+      <TooltipContent side="right">{FINISH_LABELS[finish]}</TooltipContent>
     </Tooltip>
   );
 }

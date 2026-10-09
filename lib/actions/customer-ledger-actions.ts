@@ -320,7 +320,17 @@ export async function getSupplierLedgerEntries(
               caratWeight: true,
               purityLabel: true,
               stoneMetalTypeName: true,
-              metalType: { select: { name: true } },
+              metalType: { select: { name: true, isGemstone: true } },
+              components: {
+                select: {
+                  kind: true,
+                  netWeight: true,
+                  purityLabel: true,
+                  stoneMetalTypeName: true,
+                  caratWeight: true,
+                  metalType: { select: { name: true } },
+                },
+              },
             },
           },
         },
@@ -365,21 +375,40 @@ export async function getSupplierLedgerEntries(
     }
     if (entry.type !== "CREDIT" || entry.sourceType !== "PURCHASE" || !entry.purchase) return []
     const merged = new Map<string, SupplierLedgerMetal>()
-    for (const item of entry.purchase.items) {
-      const qty = item.quantity || 1
-      const net = Number(item.netWeight ?? 0) * qty
-      const carat = Number(item.caratWeight ?? 0) * qty
-      const line: SupplierLedgerMetal | null =
-        net > 0
-          ? { label: [item.metalType?.name, item.purityLabel].filter(Boolean).join(" ") || "Metal", weight: net, unit: "g" }
-          : carat > 0
-            ? { label: item.stoneMetalTypeName || item.metalType?.name || "Stone", weight: carat, unit: "ct" }
-            : null
-      if (!line) continue
+    const add = (line: SupplierLedgerMetal) => {
+      if (!(line.weight > 0)) return
       const key = `${line.label}|${line.unit}`
       const existing = merged.get(key)
       if (existing) existing.weight += line.weight
       else merged.set(key, line)
+    }
+    const metalLabel = (name: string | undefined, purity: string | null) =>
+      [name, purity].filter(Boolean).join(" ") || "Metal"
+    for (const item of entry.purchase.items) {
+      const qty = item.quantity || 1
+      // A multi-part line's own weights only summarise its rows.
+      const metalRows = item.components.filter((row) => row.kind === "METAL")
+      const stoneRows = item.components.filter((row) => row.kind === "STONE")
+      if (metalRows.length) {
+        for (const row of metalRows) {
+          add({ label: metalLabel(row.metalType?.name, row.purityLabel), weight: Number(row.netWeight ?? 0) * qty, unit: "g" })
+        }
+      } else if (!(item.metalType?.isGemstone && Number(item.caratWeight ?? 0) > 0)) {
+        // (An older line stocked under a gemstone is counted in carats below.)
+        add({ label: metalLabel(item.metalType?.name, item.purityLabel), weight: Number(item.netWeight ?? 0) * qty, unit: "g" })
+      }
+      // The stone counts too — a gold piece set with a stone brings both.
+      if (stoneRows.length) {
+        for (const row of stoneRows) {
+          add({ label: row.stoneMetalTypeName || "Stone", weight: Number(row.caratWeight ?? 0) * qty, unit: "ct" })
+        }
+      } else {
+        add({
+          label: item.stoneMetalTypeName || item.metalType?.name || "Stone",
+          weight: Number(item.caratWeight ?? 0) * qty,
+          unit: "ct",
+        })
+      }
     }
     return [...merged.values()]
   }

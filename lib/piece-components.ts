@@ -392,6 +392,29 @@ export function metalBreakdown(row: {
   ]
 }
 
+/**
+ * The stones a stored line/stock row holds, as carats per stone name (per
+ * piece / per line, same basis as the row). Stones are kept by name
+ * (stoneMetalTypeName), not by StoreMetal id. A multi-part row's own
+ * caratWeight is a summary of its STONE components, so those win when
+ * present — never both.
+ */
+export function stoneBreakdown(row: {
+  stoneMetalTypeName?: string | null
+  caratWeight?: unknown
+  components?: { kind: string; stoneMetalTypeName?: string | null; caratWeight?: unknown }[] | null
+}): { name: string; carats: number }[] {
+  const num = (value: unknown) => {
+    const n = Number(value ?? 0)
+    return Number.isFinite(n) ? n : 0
+  }
+  const stones = (row.components ?? []).filter((component) => component.kind === "STONE")
+  const parts = stones.length
+    ? stones.map((component) => ({ name: component.stoneMetalTypeName?.trim() ?? "", carats: num(component.caratWeight) }))
+    : [{ name: row.stoneMetalTypeName?.trim() ?? "", carats: num(row.caratWeight) }]
+  return parts.filter((part) => part.name && part.carats > 0)
+}
+
 /** All metals' pure weight together (for totals that don't split by metal). */
 export function totalFine(row: Parameters<typeof metalBreakdown>[0]) {
   return metalBreakdown(row).reduce((sum, part) => sum + part.fineWeight, 0)

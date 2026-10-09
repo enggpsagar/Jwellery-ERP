@@ -10,7 +10,7 @@ import { getLocationScope, locationWhere } from "@/lib/location-scope";
 import { formatShortDateTime } from "@/lib/utils";
 import { parseDateRangeBoundary } from "@/lib/date-range";
 import { fineOrNet, pieceMetalsSelect } from "@/lib/fine-weight-read";
-import { metalBreakdown } from "@/lib/piece-components";
+import { metalBreakdown, stoneBreakdown } from "@/lib/piece-components";
 
 /**
  * What counts as metal still on hand.
@@ -94,8 +94,34 @@ export type DashboardStat = {
 export type MetalStockStat = {
   metalId: string;
   metalName: string;
-  grams: number;
+  /** Grams of fine metal, or carats for a gemstone (see unit). */
+  weight: number;
+  unit: "g" | "ct";
 };
+
+type StockWeightRow = Parameters<typeof metalBreakdown>[0] & Parameters<typeof stoneBreakdown>[0];
+
+/** Only this metal's own pure weight in a (possibly multi-metal) piece. */
+function metalFineOf(row: StockWeightRow, metalId: string) {
+  return metalBreakdown(row)
+    .filter((part) => part.metalTypeId === metalId)
+    .reduce((acc, part) => acc + part.fineWeight, 0);
+}
+
+/**
+ * Carats of this gemstone in a piece: every stone of that name in it — a
+ * loose stone (its stock row carries the stone, metalTypeId null) or one
+ * set in a metal piece. An older row stocked directly under the gemstone
+ * with no stone recorded falls back to its own carat / net weight.
+ */
+function stoneCaratsOf(row: StockWeightRow, metal: { id: string; name: string }) {
+  const name = metal.name.trim().toLowerCase();
+  const carats = stoneBreakdown(row)
+    .filter((part) => part.name.toLowerCase() === name)
+    .reduce((acc, part) => acc + part.carats, 0);
+  if (carats > 0 || row.metalTypeId !== metal.id) return carats;
+  return Number(row.caratWeight ?? 0) || metalFineOf(row, metal.id);
+}
 
 export async function getDashboardStats(): Promise<DashboardStat[]> {
   const storeId = await requireStoreScope();
@@ -166,13 +192,38 @@ export async function getDashboardStats(): Promise<DashboardStat[]> {
         prisma.inventoryStock.findMany({
           where: {
             storeId,
-            // A piece of several metals counts under each of its metals.
-            OR: [{ metalTypeId: metal.id }, { components: { some: { metalTypeId: metal.id } } }],
+            // A piece of several metals counts under each of its metals; a
+            // stone counts wherever it sits — loose, or set in a gold piece
+            // (stones are kept by name, not by StoreMetal id).
+            OR: [
+              { metalTypeId: metal.id },
+              { components: { some: { metalTypeId: metal.id } } },
+              ...(metal.isGemstone
+                ? [
+                    { stoneMetalTypeName: { equals: metal.name, mode: "insensitive" as const } },
+                    {
+                      components: {
+                        some: { kind: "STONE" as const, stoneMetalTypeName: { equals: metal.name, mode: "insensitive" as const } },
+                      },
+                    },
+                  ]
+                : []),
+            ],
             isActive: true,
             status: { in: ON_HAND_STOCK_STATUSES },
             ...locationWhere(scope),
           },
-          select: { metalTypeId: true, netWeight: true, fineWeight: true, quantity: true, components: pieceMetalsSelect },
+          select: {
+            metalTypeId: true,
+            netWeight: true,
+            fineWeight: true,
+            caratWeight: true,
+            stoneMetalTypeName: true,
+            quantity: true,
+            components: {
+              select: { kind: true, metalTypeId: true, netWeight: true, fineWeight: true, stoneMetalTypeName: true, caratWeight: true },
+            },
+          },
         })
       )
     ),
@@ -204,18 +255,13 @@ export async function getDashboardStats(): Promise<DashboardStat[]> {
     .map((metal, index) => ({
       metalId: metal.id,
       metalName: metal.name,
-      // Only this metal's own share of a multi-metal piece (metalBreakdown).
-      grams: metalStockAggs[index].reduce(
-        (sum, row) =>
-          sum +
-          metalBreakdown(row)
-            .filter((part) => part.metalTypeId === metal.id)
-            .reduce((acc, part) => acc + part.fineWeight, 0) *
-            row.quantity,
+      unit: metal.isGemstone ? ("ct" as const) : ("g" as const),
+      weight: metalStockAggs[index].reduce(
+        (sum, row) => sum + (metal.isGemstone ? stoneCaratsOf(row, metal) : metalFineOf(row, metal.id)) * row.quantity,
         0
       ),
     }))
-    .filter((metal) => metal.grams > 0);
+    .filter((metal) => metal.weight > 0);
 
   return [
     {
@@ -237,10 +283,13 @@ export async function getDashboardStats(): Promise<DashboardStat[]> {
     },
     ...metalStats.map((metal) => ({
       label: `${metal.metalName} Stock`,
-      value: `${wf.gramsLocale(metal.grams)} g`,
+      value: metal.unit === "ct" ? `${wf.caratsLocale(metal.weight)} ct` : `${wf.gramsLocale(metal.weight)} g`,
       change: "",
       trend: "up" as const,
-      sub: `fine (24K) ${metal.metalName.toLowerCase()} on hand, excluding sold`,
+      sub:
+        metal.unit === "ct"
+          ? `${metal.metalName.toLowerCase()} on hand, loose and set in pieces, excluding sold`
+          : `fine (24K) ${metal.metalName.toLowerCase()} on hand, excluding sold`,
       icon: "metal" as const,
       metalName: metal.metalName,
     })),

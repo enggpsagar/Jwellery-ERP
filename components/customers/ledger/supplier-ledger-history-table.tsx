@@ -176,8 +176,11 @@ export function SupplierLedgerHistoryTable({ entries }: { entries: SupplierLedge
                 <TableCell className="whitespace-nowrap">
                   {/* Entry details live in the tooltip to keep the table to
                       four columns in the side panel. A button so it can be
-                      focused/tapped, not only hovered. */}
+                      focused/tapped, not only hovered. Opens beside the
+                      row (left, flipping right when there's no room) so it
+                      never covers the rows or the search above. */}
                   <IconTooltip
+                    side="left"
                     label={
                       <div className="max-w-[260px] space-y-0.5">
                         <div className="font-medium">

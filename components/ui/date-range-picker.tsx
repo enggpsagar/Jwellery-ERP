@@ -22,6 +22,10 @@ type DateRangePickerProps = {
   placeholder?: string
   disabled?: boolean
   className?: string
+  /** Filter bars: just a calendar icon until a range is picked (the
+   * placeholder becomes its tooltip / accessible name), then the dates —
+   * keeps a list's filters on one line. */
+  iconOnly?: boolean
 }
 
 /** "YYYY-MM-DD" (as stored in the dateFrom/dateTo URL params) <-> Date,
@@ -52,7 +56,7 @@ function toIso(date: Date | undefined): string {
  * plain "YYYY-MM-DD" pair every caller's URL params and server actions
  * already expect, so no caller-side filtering logic changes.
  */
-export function DateRangePicker({ value, onChange, placeholder = "Date range", disabled, className }: DateRangePickerProps) {
+export function DateRangePicker({ value, onChange, placeholder = "Date range", disabled, className, iconOnly = false }: DateRangePickerProps) {
   const [open, setOpen] = React.useState(false)
 
   const range: DateRange | undefined = React.useMemo(() => {
@@ -80,19 +84,33 @@ export function DateRangePicker({ value, onChange, placeholder = "Date range", d
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button
-          type="button"
-          variant="outline"
-          disabled={disabled}
-          className={cn(
-            "h-9 min-w-0 justify-between gap-2 border-input px-2.5 text-sm font-normal",
-            !range?.from && "text-muted-foreground",
-            className
-          )}
-        >
-          <span className="truncate">{label}</span>
-          <CalendarIcon className="h-4 w-4 shrink-0 text-muted-foreground" />
-        </Button>
+        {iconOnly && !range?.from ? (
+          <Button
+            type="button"
+            variant="outline"
+            disabled={disabled}
+            aria-label={placeholder}
+            title={placeholder}
+            className="h-9 w-9 shrink-0 border-input p-0 text-muted-foreground"
+          >
+            <CalendarIcon className="h-4 w-4" />
+          </Button>
+        ) : (
+          <Button
+            type="button"
+            variant="outline"
+            disabled={disabled}
+            title={iconOnly ? placeholder : undefined}
+            className={cn(
+              "h-9 min-w-0 justify-between gap-2 border-input px-2.5 text-sm font-normal",
+              !range?.from && "text-muted-foreground",
+              iconOnly ? "w-auto" : className
+            )}
+          >
+            <span className="truncate">{label}</span>
+            <CalendarIcon className="h-4 w-4 shrink-0 text-muted-foreground" />
+          </Button>
+        )}
       </PopoverTrigger>
       <PopoverContent className="w-auto gap-0 p-0" align="start">
         <Calendar

@@ -504,7 +504,7 @@ export function DataTableToolbar({
               onChange={({ from, to }) => updateDateRange(from, to)}
               placeholder={dateField}
               disabled={isPending}
-              className="w-[190px]"
+              iconOnly
             />
             {currentDateFrom || currentDateTo ? (
               <IconTooltip label="Clear date range">

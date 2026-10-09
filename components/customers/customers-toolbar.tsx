@@ -204,9 +204,9 @@ export function CustomersToolbar({
           <DateRangePicker
             value={{ from: currentDateFrom, to: currentDateTo }}
             onChange={({ from, to }) => updateDateRange(from, to)}
-            placeholder="Added"
+            placeholder="Date added"
             disabled={isPending}
-            className="w-[190px]"
+            iconOnly
           />
           {currentDateFrom || currentDateTo ? (
             <IconTooltip label="Clear date range">

@@ -16,6 +16,9 @@ async function seedBarLot() {
   const storeId = await demoStoreId()
   const suffix = Date.now()
   const gold = await db().storeMetal.findFirstOrThrow({ where: { storeId, name: "Gold" }, select: { id: true } })
+  // A real Category (and Style, when the store has any) so Edit Product can save.
+  const category = await db().storeCategory.findFirst({ where: { storeId, isActive: true }, select: { id: true } })
+  const style = await db().storeStyle.findFirst({ where: { storeId, isActive: true }, select: { id: true } })
   const product = await db().product.create({
     data: {
       storeId,
@@ -23,6 +26,8 @@ async function seedBarLot() {
       name: `E2E Gold Bar ${suffix}`,
       metalTypeId: gold.id,
       soldByWeight: true,
+      categoryId: category?.id,
+      targetStyleId: style?.id,
       defaultGrossWeight: 100,
       defaultNetWeight: 100,
       metalComponents: { create: { metalTypeId: gold.id, grossWeight: 100, netWeight: 100 } },
@@ -59,14 +64,15 @@ async function lot(stockId: string) {
 }
 
 /** New Invoice: one line taking `grams` off the lot. Returns the invoice id. */
-async function sellFromLot(page: Page, stockCode: string, grams: string) {
+async function sellFromLot(page: Page, productCode: string, grams: string) {
   await page.goto("/billing/new")
   await page.getByRole("combobox").filter({ hasText: "Select a party" }).click()
   await page.getByRole("option", { name: /Ananya Kulkarni/ }).click()
 
   await page.getByRole("combobox").filter({ hasText: "Search stock item" }).first().click()
-  await page.getByPlaceholder(/search/i).last().fill(stockCode)
-  await page.getByRole("option", { name: new RegExp(stockCode) }).click()
+  // The picker lists a piece by its Product Code.
+  await page.getByPlaceholder(/search/i).last().fill(productCode)
+  await page.getByRole("option", { name: new RegExp(productCode) }).click()
 
   // A lot's weight stays editable, defaults to everything left.
   const sold = page.getByLabel("Net weight", { exact: true }).first()
@@ -83,10 +89,10 @@ async function sellFromLot(page: Page, stockCode: string, grams: string) {
 
 test("a sold-by-weight lot sells part of its weight and gets exactly that back", async ({ page }) => {
   const crashes = watchForPageCrash(page)
-  const { stock } = await seedBarLot()
+  const { stock, product } = await seedBarLot()
 
   // 1. 30 g of the 100 g bar: the lot keeps 70 g and stays one piece in stock.
-  const firstId = await sellFromLot(page, stock.stockCode, "30")
+  const firstId = await sellFromLot(page, product.productCode, "30")
   expect(await lot(stock.id)).toMatchObject({ quantity: 1, status: "IN_STOCK", gross: 70, net: 70, fine: 70 })
   const firstLine = await db().invoiceItem.findFirstOrThrow({ where: { invoiceId: firstId, inventoryStockId: stock.id } })
   expect(Number(firstLine.netWeight)).toBe(30)
@@ -104,8 +110,8 @@ test("a sold-by-weight lot sells part of its weight and gets exactly that back",
   await page.getByRole("combobox").filter({ hasText: "Select a party" }).click()
   await page.getByRole("option", { name: /Ananya Kulkarni/ }).click()
   await page.getByRole("combobox").filter({ hasText: "Search stock item" }).first().click()
-  await page.getByPlaceholder(/search/i).last().fill(stock.stockCode)
-  await page.getByRole("option", { name: new RegExp(stock.stockCode) }).click()
+  await page.getByPlaceholder(/search/i).last().fill(product.productCode)
+  await page.getByRole("option", { name: new RegExp(product.productCode) }).click()
   await page.getByLabel("Net weight", { exact: true }).first().fill("80")
   await expect(page.getByText(/is left, but .* is on this bill/).first()).toBeVisible()
   await page.getByRole("button", { name: "Create Invoice" }).click()
@@ -113,7 +119,7 @@ test("a sold-by-weight lot sells part of its weight and gets exactly that back",
   expect(await lot(stock.id)).toMatchObject({ net: 70 })
 
   // 3. The remaining 70 g: the lot is sold out.
-  const secondId = await sellFromLot(page, stock.stockCode, "70")
+  const secondId = await sellFromLot(page, product.productCode, "70")
   expect(await lot(stock.id)).toMatchObject({ quantity: 0, status: "SOLD", gross: 0, net: 0, fine: 0 })
 
   // 4. Cancelling the first invoice gives back its 30 g — the sold-out lot

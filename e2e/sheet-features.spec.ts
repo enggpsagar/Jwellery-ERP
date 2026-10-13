@@ -78,7 +78,15 @@ test("style off: no Style column in product/stock sheets; an old file with Style
     await page.goto("/inventory/products")
     await page.getByRole("button", { name: /^Export / }).click()
     const exported = await download(page, () => page.getByRole("menuitem", { name: "Excel" }).click())
-    expect(headerRow(exported, "Products")).toEqual(templateHeaders)
+    // The export adds read-only live-stock columns after the template's own.
+    expect(headerRow(exported, "Products")).toEqual([
+      ...templateHeaders,
+      "In Stock Qty",
+      "In Stock Gross Weight",
+      "In Stock Net Weight",
+      "In Stock Fine Weight",
+      "In Stock Carats",
+    ])
     expect(instructionColumns(exported)).not.toContain("Style")
 
     // Stock template + export: no Style, and an old stock file with a Style column still imports.

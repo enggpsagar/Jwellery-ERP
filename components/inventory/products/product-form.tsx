@@ -326,6 +326,10 @@ export function ProductForm({
   // the form and still submit their values — hidden inputs / readOnly, never
   // a bare disabled input — so an unchanged save passes the server check.
   const identityLocked = mode === "edit" && Boolean(product?.identityLocked);
+  // A locked product saved before Category was required can still have one
+  // filled in — a missing value, not a different category (updateProduct
+  // allows exactly that).
+  const categoryLocked = identityLocked && Boolean(product?.categoryId);
   const [categoryId, setCategoryId] = useState(product?.categoryId ?? "");
 
   const [categoryTypeId, setCategoryTypeId] = useState(
@@ -1154,16 +1158,16 @@ export function ProductForm({
           <div>
             <Label>Category <RequiredMark /></Label>
 
-            {categories.length > 0 || identityLocked ? (
-              <LockedField locked={identityLocked}>
+            {categories.length > 0 || categoryLocked ? (
+              <LockedField locked={categoryLocked}>
               <div className="flex gap-1.5">
                 <Select
                   value={categoryId}
-                  disabled={identityLocked}
+                  disabled={categoryLocked}
                   // Ignore Radix's "" (fired when the value lands before its
                   // option renders — categories reload per metal).
                   onValueChange={(value) => {
-                    if (identityLocked || !value) return;
+                    if (categoryLocked || !value) return;
                     setCategoryId(value);
                   }}
                 >
@@ -1199,7 +1203,7 @@ export function ProductForm({
                   size="icon"
                   className="h-11 w-9 shrink-0 px-0"
                   aria-label="Add Category"
-                  disabled={identityLocked}
+                  disabled={categoryLocked}
                   onClick={() => setAddCategoryOpen(true)}
                 >
                   <Plus className="h-4 w-4" />

@@ -58,7 +58,8 @@ test("party net balance: sale then purchase nets to one figure with a running le
     await expect(page.getByTestId("party-ledger-net")).toContainText("4,000.00")
     await expect(page.getByTestId("party-ledger-net")).toContainText("Receivable")
     await expect(page.getByText("Supplier Ledger")).toHaveCount(0)
-    await expect(page.getByRole("link", { name: "Purchase", exact: true })).toHaveAttribute(
+    // The ledger's own Purchase button, not the top bar's.
+    await expect(page.locator("section").getByRole("link", { name: "Purchase", exact: true })).toHaveAttribute(
       "href",
       `/purchases/new?vendorId=${party.id}`,
     )
@@ -91,8 +92,8 @@ test("party net balance: sale then purchase nets to one figure with a running le
 
     // Dashboard: ledger-based totals replace "Outstanding Receivables".
     await page.goto("/dashboard")
-    await expect(page.getByText("Total Receivable")).toBeVisible()
-    await expect(page.getByText("Total Payable")).toBeVisible()
+    await expect(page.getByText("Total Receivable").first()).toBeVisible()
+    await expect(page.getByText("Total Payable").first()).toBeVisible()
     await expect(page.getByText("Outstanding Receivables")).toHaveCount(0)
 
     // No separate Suppliers section.

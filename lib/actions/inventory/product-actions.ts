@@ -1929,7 +1929,9 @@ export async function updateProduct(
 
       const identityChanged =
         identityName(name) !== identityName(existing.name) ||
-        identityId(categoryId) !== identityId(existing.categoryId) ||
+        // A blank stored category may be filled in (Category is required
+        // now; older products were saved without one) — never changed.
+        (identityId(existing.categoryId) !== null && identityId(categoryId) !== identityId(existing.categoryId)) ||
         identityId(metalTypeId) !== identityId(existing.metalTypeId) ||
         identityId(storeMetalPurityId) !== identityId(existing.storeMetalPurityId) ||
         // The legacy purity enum only stands on its own when no real purity

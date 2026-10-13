@@ -12,6 +12,7 @@ import { KarigarSelect } from "@/components/karigars/karigar-select"
 import { useToast } from "@/components/providers/toast-provider"
 
 import { Button } from "@/components/ui/button"
+import { PartyBalance } from "@/components/customers/party-balance"
 import {
   Dialog,
   DialogContent,
@@ -58,8 +59,8 @@ type PaymentOutDialogProps = {
  * post to the same PAYMENT_OUT ledger sourceType, so this list and those
  * flows never disagree.
  *
- * Also reachable pre-filled via ?vendorId=<id> (a party's own Supplier
- * Ledger "Pay Out" button — see supplier-ledger-body.tsx) — same
+ * Also reachable pre-filled via ?vendorId=<id> (a party's own Party
+ * Ledger "Payment Out" button — see customer-ledger-body.tsx) — same
  * query-param-opens-the-dialog convention as the sidebar's ?new=1, just
  * naming which party too.
  */
@@ -250,7 +251,7 @@ export function PaymentOutDialog({ vendors, karigars }: PaymentOutDialogProps) {
                     : "text-muted-foreground hover:bg-accent"
                 }`}
               >
-                Supplier
+                Party
               </button>
               <button
                 type="button"
@@ -270,7 +271,7 @@ export function PaymentOutDialog({ vendors, karigars }: PaymentOutDialogProps) {
           </div>
 
           <div className="space-y-2">
-            <Label required>{partyType === "VENDOR" ? "Supplier" : "Artisan"}</Label>
+            <Label required>{partyType === "VENDOR" ? "Party" : "Artisan"}</Label>
             {partyType === "VENDOR" ? (
               <CustomerSelect
                 customers={vendors}
@@ -278,7 +279,7 @@ export function PaymentOutDialog({ vendors, karigars }: PaymentOutDialogProps) {
                 defaultValue={partyId}
                 onChange={setPartyId}
                 onBeforeAddNew={() => saveDraft()}
-                termLabel="supplier"
+                termLabel="party"
               />
             ) : (
               <KarigarSelect
@@ -295,21 +296,8 @@ export function PaymentOutDialog({ vendors, karigars }: PaymentOutDialogProps) {
               />
             )}
             {selectedVendor && (
-              <p className="text-sm text-muted-foreground">
-                Outstanding:{" "}
-                <span
-                  className={
-                    selectedVendor.balanceType === "Advance"
-                      ? "font-medium text-blue-600"
-                      : selectedVendor.currentBalance > 0
-                        ? "font-medium text-red-600"
-                        : "font-medium text-muted-foreground"
-                  }
-                >
-                  {selectedVendor.balanceType === "Advance"
-                    ? `₹${Math.abs(selectedVendor.currentBalance).toLocaleString("en-IN")} Advance`
-                    : `₹${selectedVendor.currentBalance.toLocaleString("en-IN")}`}
-                </span>
+              <p className="flex items-center gap-2 text-sm text-muted-foreground" data-testid="party-picker-balance">
+                Balance: <PartyBalance net={selectedVendor.netBalance} />
               </p>
             )}
           </div>

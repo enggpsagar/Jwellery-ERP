@@ -49,8 +49,8 @@ export const metadata: Metadata = {
 const MODULES = [
   {
     icon: Users,
-    title: "Parties & Suppliers",
-    body: "One list for everyone you trade with. Each party shows what they owe you and what you owe them as separate balances, with a statement you can email from their page.",
+    title: "Parties",
+    body: "One list for everyone you buy from or sell to. Each party has one ledger and one running balance — Receivable or Payable — with a statement you can email or export from their page.",
     tint: "var(--chart-1)",
   },
   {
@@ -62,7 +62,7 @@ const MODULES = [
   {
     icon: PackagePlus,
     title: "Purchases",
-    body: "Record what you buy from any party and stock is created automatically, one entry per line. GST and HSN per line, diamonds in carats, and anything unpaid goes to that supplier's balance.",
+    body: "Record what you buy from any party and stock is created automatically, one entry per line. GST and HSN per line, diamonds in carats, and anything unpaid goes to that party's one running balance.",
     tint: "var(--chart-4)",
   },
   {

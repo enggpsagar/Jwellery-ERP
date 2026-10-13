@@ -15,6 +15,7 @@ import {
 import { computeRoundOff } from "@/lib/round-off"
 import { useToast } from "@/components/providers/toast-provider"
 import { cn } from "@/lib/utils"
+import { LOT_EPSILON, lotMeasure, previewLotDraw, toLotWeights, type LotMeasure, type LotWeights } from "@/lib/inventory/weight-lot"
 
 import { Input } from "@/components/ui/input"
 import { LinkedProductDetails } from "@/components/inventory/shared/linked-product-details"
@@ -91,6 +92,8 @@ type StockOption = {
   purityLabel: string | null
   grossWeight: number | null
   netWeight: number | null
+  /** Only read for a sold-by-weight lot (its Net Stone Weight share). */
+  stoneWeight?: number | null
   caratWeight: number | null
   stoneRate: number | null
   stoneMetalTypeName: string | null
@@ -108,6 +111,9 @@ type StockOption = {
   components?: StoredPieceComponent[]
   /** A single stone's pieces / clarity / certificate / catalog rate. */
   linkedStone?: LinkedStoneDetails | null
+  /** A sold-by-weight lot (lib/inventory/weight-lot.ts): its weights are the
+   * whole lot, and a line takes part of it by the lot's measure. */
+  sellsByWeight?: boolean
 } & StockOptionProductDetails
 
 type LineItem = {
@@ -543,11 +549,80 @@ export function KachaInvoiceForm({
   const availableForStock = (stockId: string, excludeKey: string) => {
     const stock = stockItems.find((s) => s.id === stockId)
     if (!stock) return 0
+    // A sold-by-weight lot can feed several lines until its weight runs out.
+    const lot = lotOfStock(stock)
+    if (lot) return lotLeftFor(stock.id, lot, excludeKey) > LOT_EPSILON ? 1 : 0
     const claimedByOtherLines = items
       .filter((item) => item.key !== excludeKey && item.inventoryStockId === stockId)
       .reduce((sum, item) => sum + (item.quantity || 0), 0)
     return Math.max(0, stock.quantity - claimedByOtherLines)
   }
+
+  // Sold-by-weight lots (lib/inventory/weight-lot.ts) — same as
+  // invoice-form.tsx. The lot is always the picked option's own weights
+  // (never the line's already-reduced ones), so the proportional maths
+  // runs from the whole lot.
+  const lotOfStock = (stock: StockOption | undefined) => {
+    if (!stock?.sellsByWeight || stock.components?.length) return null
+    const weights = toLotWeights(stock)
+    const measure = lotMeasure(weights)
+    return measure ? { weights, measure, label: stock.productName } : null
+  }
+  const lotFor = (item: LineItem) =>
+    item.inventoryStockId && !item.multiPart
+      ? lotOfStock(stockItems.find((s) => s.id === item.inventoryStockId))
+      : null
+  // What's left of a lot for one line: the lot less every other line on it.
+  const lotLeftFor = (stockId: string, lot: { weights: LotWeights; measure: LotMeasure }, excludeKey: string) =>
+    lot.weights[lot.measure] -
+    items
+      .filter((line) => line.key !== excludeKey && line.inventoryStockId === stockId && !line.multiPart)
+      .reduce((sum, line) => sum + (line[lot.measure] || 0), 0)
+  // The line's weights for `amount` of the lot (in its measure): every
+  // weight in proportion, so metal value, stone charge, % making and the
+  // total all re-derive from the existing line fields.
+  const lotLinePatch = (
+    item: Pick<LineItem, "stoneRate" | "stoneChargeTouched" | "caratWeight">,
+    lot: { weights: LotWeights; measure: LotMeasure },
+    amount: number,
+  ): Partial<LineItem> => {
+    const draw = previewLotDraw(lot.weights, amount)
+    const patch: Partial<LineItem> = draw
+      ? {
+          grossWeight: draw.grossWeight,
+          netWeight: draw.netWeight,
+          caratWeight: draw.caratWeight,
+          stoneWeightInput: draw.stoneWeight,
+        }
+      : { [lot.measure]: amount }
+    patch.quantity = 1
+    const carats = patch.caratWeight ?? item.caratWeight
+    if (!item.stoneChargeTouched && item.stoneRate > 0) {
+      patch.stoneCharge = Number((item.stoneRate * carats).toFixed(2))
+    }
+    return patch
+  }
+  const handleLotAmountChange = (item: LineItem, amount: number) => {
+    const lot = lotFor(item)
+    if (lot) updateItem(item.key, lotLinePatch(item, lot, amount))
+  }
+  const formatLotWeight = (measure: LotMeasure, value: number) =>
+    measure === "caratWeight" ? wf.carats(value) : wf.grams(value)
+  // A lot line's problem, if any: nothing sold, or the lines on this lot
+  // together asking for more than is left.
+  const lotProblem = (item: LineItem): string | null => {
+    const lot = lotFor(item)
+    if (!lot) return null
+    const amount = item[lot.measure] || 0
+    if (!(amount > LOT_EPSILON)) return `Enter how much of ${lot.label} is sold.`
+    const billed = lot.weights[lot.measure] - lotLeftFor(item.inventoryStockId, lot, "")
+    if (billed > lot.weights[lot.measure] + LOT_EPSILON) {
+      return `Only ${formatLotWeight(lot.measure, lot.weights[lot.measure])} of ${lot.label} is left, but ${formatLotWeight(lot.measure, billed)} is on this estimate.`
+    }
+    return null
+  }
+  const lotHint = (item: LineItem, lot: { weights: LotWeights; measure: LotMeasure }) =>
+    `of ${formatLotWeight(lot.measure, Math.max(0, lotLeftFor(item.inventoryStockId, lot, item.key)))} left — sold by weight`
 
   const applyStockToItem = (key: string, stockId: string) => {
     const stock = stockItems.find((s) => s.id === stockId)
@@ -582,6 +657,17 @@ export function KachaInvoiceForm({
       linkedStoneRate > 0 && (stock.caratWeight ?? 0) > 0
         ? Number((linkedStoneRate * (stock.caratWeight ?? 0)).toFixed(2))
         : 0
+
+    const lot = lotOfStock(stock)
+    const lotLeft = lot ? lotLeftFor(stock.id, lot, key) : 0
+    const lotFields: Partial<LineItem> =
+      lot && lotLeft > LOT_EPSILON
+        ? lotLinePatch(
+            { stoneRate: linkedStoneRate, stoneChargeTouched: false, caratWeight: stock.caratWeight ?? 0 },
+            lot,
+            lotLeft,
+          )
+        : {}
 
     // A multi-metal / multi-stone piece (its own rows, else its Product's —
     // lib/inventory/stock-piece-rows.ts) brings every row; physical facts
@@ -666,6 +752,9 @@ export function KachaInvoiceForm({
       // as invoice-form.tsx's applyStockToItem.
       // Last, so a multi-part piece's summary wins — see linkedPieceFields.
       ...linkedPieceFields,
+      // A sold-by-weight lot starts on everything the other lines leave of
+      // it, every weight (incl. Net Stone Weight) in proportion.
+      ...lotFields,
     })
     for (const component of stock.components ?? []) {
       if (component.metalTypeId) ensureMetalPurities(component.metalTypeId)
@@ -928,6 +1017,13 @@ export function KachaInvoiceForm({
         // sidesteps that auto-reset while keeping identical pending/error-
         // state behavior.
         event.preventDefault()
+        // A sold-by-weight line must take more than 0 and, with the other
+        // lines on the same lot, no more than is left (the server re-checks).
+        const invalidLotItem = items.find((item) => lotProblem(item) !== null)
+        if (invalidLotItem) {
+          toast.error(lotProblem(invalidLotItem) ?? "")
+          return
+        }
         formAction(new FormData(event.currentTarget))
       }}
       className="space-y-6"
@@ -1018,6 +1114,18 @@ export function KachaInvoiceForm({
             // same as Invoice already does — see isLinked there.
             const isLinked = Boolean(item.inventoryStockId)
             const linkedStock = isLinked ? stockItems.find((s) => s.id === item.inventoryStockId) : undefined
+            // A sold-by-weight lot: its measure field (net g / carats / gross)
+            // stays editable on the linked line; quantity is always 1.
+            const lot = lotFor(item)
+            const lotError = lot ? lotProblem(item) : null
+            const lotHintText = lot ? (
+              <>
+                <p className="text-xs text-muted-foreground" data-testid="kacha-line-lot-hint">
+                  {lotHint(item, lot)}
+                </p>
+                {lotError && <p className="text-xs text-destructive">{lotError}</p>}
+              </>
+            ) : null
             // Multi-part piece: rows drive the line's own metal/purity/weights
             // (first metal; combined net) — same as invoice-form.tsx.
             const setComponents = (rows: PieceComponentDraft[]) => {
@@ -1115,7 +1223,11 @@ export function KachaInvoiceForm({
                     // back to 1 on every keystroke made it impossible to
                     // ever delete/replace that digit.
                     value={item.quantity === 0 ? "" : item.quantity}
+                    readOnly={Boolean(lot)}
+                    className={lot ? "bg-muted" : undefined}
+                    aria-label="Quantity"
                     onChange={(e) => {
+                      if (lot) return
                       const requested = e.target.value === "" ? 0 : Number(e.target.value) || 0
                       const quantity = item.inventoryStockId
                         ? Math.min(requested, Math.max(availableForStock(item.inventoryStockId, item.key), 1))
@@ -1126,7 +1238,7 @@ export function KachaInvoiceForm({
                       if (!item.quantity) updateItem(item.key, { quantity: 1 })
                     }}
                   />
-                  {item.inventoryStockId && (
+                  {item.inventoryStockId && !lot && (
                     <p className="text-xs text-muted-foreground">
                       {availableForStock(item.inventoryStockId, item.key)} in stock
                     </p>
@@ -1294,8 +1406,10 @@ export function KachaInvoiceForm({
                     <Input
                       type="number"
                       step="any"
-                      className={isLinked ? "flex-1 bg-muted" : "flex-1"}
-                      readOnly={isLinked}
+                      className={isLinked && lot?.measure !== "grossWeight" ? "flex-1 bg-muted" : "flex-1"}
+                      readOnly={isLinked && lot?.measure !== "grossWeight"}
+                      aria-label="Gross weight"
+                      aria-invalid={lot?.measure === "grossWeight" && lotError ? true : undefined}
                       value={
                         item.grossWeight === 0
                           ? ""
@@ -1309,6 +1423,10 @@ export function KachaInvoiceForm({
                       onChange={(e) => {
                         const gramsPerCarat = resolveGramsPerCarat(item.purity, caratConversionRates)
                         const grossWeight = toPrimaryUnit(Number(e.target.value) || 0, item.grossWeightUnit, "GRAM", gramsPerCarat)
+                        if (lot?.measure === "grossWeight") {
+                          handleLotAmountChange(item, grossWeight)
+                          return
+                        }
                         const derived = item.netTouched
                           ? null
                           : deriveNetWeight(grossWeight, item.stoneWeightInput, item.dmoWeight, weightSettings)
@@ -1332,6 +1450,7 @@ export function KachaInvoiceForm({
                       </SelectContent>
                     </Select>
                   </div>
+                  {lot?.measure === "grossWeight" && lotHintText}
                 </div>
 
                 <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
@@ -1340,8 +1459,10 @@ export function KachaInvoiceForm({
                     <Input
                       type="number"
                       step="any"
-                      className={isLinked ? "flex-1 bg-muted" : "flex-1"}
-                      readOnly={isLinked}
+                      className={isLinked && lot?.measure !== "netWeight" ? "flex-1 bg-muted" : "flex-1"}
+                      readOnly={isLinked && lot?.measure !== "netWeight"}
+                      aria-label="Net weight"
+                      aria-invalid={lot?.measure === "netWeight" && lotError ? true : undefined}
                       value={
                         item.netWeight === 0
                           ? ""
@@ -1352,7 +1473,19 @@ export function KachaInvoiceForm({
                               resolveGramsPerCarat(item.purity, caratConversionRates),
                             )
                       }
-                      onChange={(e) => handleNetWeightChange(item, e.target.value)}
+                      onChange={(e) =>
+                        lot?.measure === "netWeight"
+                          ? handleLotAmountChange(
+                              item,
+                              toPrimaryUnit(
+                                Number(e.target.value) || 0,
+                                item.netWeightUnit,
+                                "GRAM",
+                                resolveGramsPerCarat(item.purity, caratConversionRates),
+                              ),
+                            )
+                          : handleNetWeightChange(item, e.target.value)
+                      }
                     />
                     <Select
                       value={item.netWeightUnit}
@@ -1371,6 +1504,7 @@ export function KachaInvoiceForm({
                   {!item.netTouched && (
                     <p className="text-xs text-muted-foreground">{netWeightHint(weightSettings, "dust/other")}</p>
                   )}
+                  {lot?.measure === "netWeight" && lotHintText}
                 </div>
 
                 {/* For a carat-weighed line (no "Includes a Stone" toggle
@@ -1418,22 +1552,32 @@ export function KachaInvoiceForm({
                   </div>
                 )}
 
-                {isCaratLine(item) && (
+                {(isCaratLine(item) || lot?.measure === "caratWeight") && (
                   <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
                     <Label className="text-xs">Carat Weight (ct)</Label>
                     <Input
                       type="number"
                       step="any"
-                      readOnly={isLinked}
-                      className={isLinked ? "bg-muted" : undefined}
+                      readOnly={isLinked && lot?.measure !== "caratWeight"}
+                      className={isLinked && lot?.measure !== "caratWeight" ? "bg-muted" : undefined}
+                      aria-label="Carat weight"
+                      aria-invalid={lot?.measure === "caratWeight" && lotError ? true : undefined}
                       value={item.caratWeight === 0 ? "" : item.caratWeight}
-                      onChange={(e) => handleCaratWeightChange(item, e.target.value)}
+                      onChange={(e) =>
+                        lot?.measure === "caratWeight"
+                          ? handleLotAmountChange(item, Number(e.target.value) || 0)
+                          : handleCaratWeightChange(item, e.target.value)
+                      }
                     />
-                    <p className="text-xs text-muted-foreground">
-                      {item.purity === "DIAMOND"
-                        ? "Priced per carat, not per gram"
-                        : "1 ct = 0.2 g — converts with Net Weight"}
-                    </p>
+                    {lot?.measure === "caratWeight" ? (
+                      lotHintText
+                    ) : (
+                      <p className="text-xs text-muted-foreground">
+                        {item.purity === "DIAMOND"
+                          ? "Priced per carat, not per gram"
+                          : "1 ct = 0.2 g — converts with Net Weight"}
+                      </p>
+                    )}
                   </div>
                 )}
 

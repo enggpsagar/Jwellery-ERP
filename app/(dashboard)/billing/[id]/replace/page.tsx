@@ -176,7 +176,6 @@ export default async function ReplaceInvoicePage({ params }: Props) {
         customers={customers}
         stockItems={stockItems}
         suppliers={suppliers}
-        supplierModuleEnabled={businessSettings.supplierModuleEnabled}
         enumFineness={enumFineness}
         fineRates={{
           gold: metalRates.latest ? Number(metalRates.latest.gold24k) : null,

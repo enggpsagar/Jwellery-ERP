@@ -1,5 +1,6 @@
 // lib/report-rows.ts
 
+import { partyBalanceDirection } from "@/lib/party-balance"
 import {
   getSalesReport,
   getSalesByUserReport,
@@ -159,7 +160,10 @@ export async function getReportRows(type: ReportType, range: DateRange) {
         Party: customer.name,
         Phone: customer.phone ?? "",
         Invoices: customer.invoiceCount,
-        "Total Due (₹)": customer.totalDue,
+        "Unpaid Bills (₹)": customer.totalDue,
+        // The party's one net balance, unsigned + direction (lib/party-balance.ts).
+        "Net Balance (₹)": Math.abs(customer.netBalance),
+        "Balance Type": partyBalanceDirection(customer.netBalance),
       }))
     }
     case "goldFlow": {

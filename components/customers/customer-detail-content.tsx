@@ -1,8 +1,8 @@
-import { IndianRupee, MapPin, User, Truck } from "lucide-react"
+import { IndianRupee, MapPin, User } from "lucide-react"
 
 import type { Customer } from "@/lib/actions/customer-actions"
-import { toTitleCase } from "@/lib/utils"
-import { SupplierStatusToggle } from "@/components/customers/supplier-status-toggle"
+import { PartyBalance } from "@/components/customers/party-balance"
+import { formatPartyBalanceText } from "@/lib/party-balance"
 import {
   DetailField,
   DetailGrid,
@@ -29,24 +29,10 @@ type StateItem = {
 export function CustomerDetailContent({
   customer,
   ledger,
-  supplierModuleEnabled = false,
-  supplierLedger,
 }: {
   customer: Customer
   states: StateItem[]
   ledger: React.ReactNode
-  /** BusinessSettings.supplierModuleEnabled — hides the "Also Supplier"
-   * action and the Supplier Ledger section entirely when off, same
-   * "module UI off, underlying data untouched" convention as every other
-   * feature toggle in this app. Defaults false so an existing caller not
-   * yet passing this keeps hiding both, matching this module being new
-   * and opt-in. */
-  supplierModuleEnabled?: boolean
-  /** This Party's own supplier-side ledger, a separate slot from `ledger`
-   * above (same reasoning as that prop's own doc comment — server-fetched
-   * on the standalone page, client-fetched on the inline panel). Rendered
-   * whenever customer.isSupplier, module on or off. */
-  supplierLedger?: React.ReactNode
 }) {
   const money = (value: unknown) => `₹ ${Number(value || 0).toLocaleString("en-IN")}`
 
@@ -58,6 +44,23 @@ export function CustomerDetailContent({
 
   return (
     <div className="space-y-6">
+      {/* The party's ONE net balance (lib/party-balance.ts) — sales,
+          purchases, payments in and out all in one figure, Receivable when
+          they owe the store, Payable when the store owes them. */}
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-card p-4 shadow-sm">
+        <div>
+          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Net Balance</p>
+          <p className="text-xs text-muted-foreground">
+            {customer.balanceType === "Receivable"
+              ? "This party owes you"
+              : customer.balanceType === "Payable"
+                ? "You owe this party"
+                : "Nothing owed either way"}
+          </p>
+        </div>
+        <PartyBalance net={customer.netBalance} size="lg" />
+      </div>
+
       {/* Ledger first — it's the primary reason this page gets opened day
           to day (financial activity), not the contact-card details below
           it. The customer's own identity is already established by this
@@ -91,17 +94,6 @@ export function CustomerDetailContent({
             <DetailField label="Email" value={customer.email} />
             <DetailField label="GST Number" value={customer.gstNumber} />
             <DetailField label="Party Type" value={customer.customerType} />
-            {supplierModuleEnabled ? (
-              <DetailField
-                label="Also a Supplier"
-                value={
-                  <SupplierStatusToggle
-                    customerId={customer.id}
-                    isSupplier={customer.isSupplier ?? false}
-                  />
-                }
-              />
-            ) : null}
           </DetailGrid>
         </DetailSection>
 
@@ -159,26 +151,8 @@ export function CustomerDetailContent({
             />
             <DetailField
               label="Opening Balance"
-              value={customer.openingBalance !== 0 ? money(customer.openingBalance) : undefined}
+              value={customer.openingBalance !== 0 ? formatPartyBalanceText(customer.openingBalance) : undefined}
             />
-            <DetailField
-              label="Current Balance"
-              value={
-                // Was `money(customer.currentBalance)` verbatim — for a
-                // negative balance (the customer has paid more than they've
-                // been billed, an advance) that rendered as the confusing
-                // "₹ -X" in the same red used for money owed, when a
-                // negative balance here means the opposite.
-                customer.balanceType === "Advance" ? (
-                  <span className="text-blue-600">{money(Math.abs(customer.currentBalance ?? 0))} Advance</span>
-                ) : customer.currentBalance ? (
-                  <span className="text-red-600">{money(customer.currentBalance)}</span>
-                ) : (
-                  money(0)
-                )
-              }
-            />
-            <DetailField label="Balance Type" value={customer.balanceType} />
             <DetailField label="Last Purchase" value={customer.lastPurchaseDate} />
             <DetailField label="Last Payment" value={customer.lastPaymentDate} />
           </DetailGrid>
@@ -186,41 +160,6 @@ export function CustomerDetailContent({
         ) : null}
       </div>
 
-      {/* Tracked independently from the Customer ledger/balance above, not
-          netted into it — see lib/core/customer.ts' mapCustomer doc
-          comment on why. Shown once this Party has actually been used as
-          one (isSupplier — set by its first purchase), whether or not the
-          Supplier module is on: with it off, a party you only bought from
-          showed an empty Party Ledger and no trace of the purchase, the
-          same gap the Parties list's Payable column closes. The module
-          still gates the standalone Suppliers section and "Also Supplier". */}
-      {customer.isSupplier ? (
-        <DetailSection
-          title="Supplier Ledger"
-          description="This party's own activity as a supplier — tracked separately from its Customer balance above."
-          icon={Truck}
-          tint="var(--chart-4)"
-        >
-          <DetailGrid>
-            <DetailField
-              label="Supplier Balance"
-              value={
-                customer.supplierBalanceType === "Advance" ? (
-                  <span className="text-blue-600">
-                    {money(Math.abs(customer.supplierBalance ?? 0))} Advance
-                  </span>
-                ) : customer.supplierBalance ? (
-                  <span className="text-red-600">{money(customer.supplierBalance)}</span>
-                ) : (
-                  money(0)
-                )
-              }
-            />
-            <DetailField label="Balance Type" value={customer.supplierBalanceType} />
-          </DetailGrid>
-          {supplierLedger}
-        </DetailSection>
-      ) : null}
     </div>
   )
 }

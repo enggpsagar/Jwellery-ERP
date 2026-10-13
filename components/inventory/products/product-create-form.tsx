@@ -1,6 +1,6 @@
 "use client";
 
-import { startTransition, useActionState, useEffect } from "react";
+import { startTransition, useActionState, useEffect, type ComponentProps } from "react";
 import { useRouter } from "next/navigation";
 import type { PurityType } from "@prisma/client";
 
@@ -35,6 +35,9 @@ type ProductCreateFormProps = {
   returnTo?: string
   /** Settings > Metals, Stones & Categories > "Require Style on products" — see the same prop on ProductForm. */
   styleFieldEnabled?: boolean;
+  /** "Create new product" from a locked product: the form starts as a copy
+   * of it (?fromProductId=) — every field still editable, saved as new. */
+  initialProduct?: ComponentProps<typeof ProductForm>["product"];
 };
 
 export function ProductCreateForm({
@@ -49,6 +52,7 @@ export function ProductCreateForm({
   returnTo,
   styleFieldEnabled,
   gstRates,
+  initialProduct,
 }: ProductCreateFormProps) {
   const router = useRouter();
   const toast = useToast();
@@ -104,6 +108,7 @@ export function ProductCreateForm({
     >
       <ProductForm
         mode="create"
+        product={initialProduct}
         state={state}
         pending={pending}
         metals={metals}

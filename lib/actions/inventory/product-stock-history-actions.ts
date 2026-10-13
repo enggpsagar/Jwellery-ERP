@@ -19,7 +19,15 @@ import { getStoreIdForRead } from "@/lib/store-context";
  * SALE_RETURN); DAMAGE is shown as a status note with no quantity change,
  * matching markStockDamaged. RESERVE/UNRESERVE don't move stock and are left
  * out. Weights are per piece × quantity, the same basis the Products list
- * uses for its in-stock weight.
+ * uses for its in-stock weight; carats likewise (a loose stone's stock has
+ * carats and no gram weight).
+ *
+ * Sold-by-weight lots (Product.soldByWeight, lib/inventory/weight-lot.ts):
+ * a byWeight transaction carries exactly the weights that moved, and its
+ * quantity is 1 only when it emptied (SALE) or refilled (SALE_RETURN) the
+ * lot, else 0 — so those rows use their own weights and quantity. The lot's
+ * stock row holds only what's left, so its "in" row is rebuilt as remaining
+ * + Σ byWeight sales − Σ byWeight returns, quantity 1.
  */
 
 export type ProductStockHistoryRow = {
@@ -39,9 +47,13 @@ export type ProductStockHistoryRow = {
   quantity: number;
   grossWeight: number;
   netWeight: number;
+  caratWeight: number;
+  /** Part of a sold-by-weight lot moved (weights exact, quantity 0 or 1). */
+  byWeight: boolean;
   /** Running totals after this row. */
   balanceQty: number;
   balanceNetWeight: number;
+  balanceCaratWeight: number;
 };
 
 const OUT_TYPES = new Set<InventoryTransactionType>([InventoryTransactionType.SALE]);
@@ -58,6 +70,7 @@ export async function getProductStockHistory(productId: string): Promise<Product
       quantity: true,
       grossWeight: true,
       netWeight: true,
+      caratWeight: true,
       vendorName: true,
       purchaseDate: true,
       createdAt: true,
@@ -66,6 +79,10 @@ export async function getProductStockHistory(productId: string): Promise<Product
           id: true,
           transactionType: true,
           quantity: true,
+          grossWeight: true,
+          netWeight: true,
+          caratWeight: true,
+          byWeight: true,
           referenceType: true,
           referenceId: true,
           createdAt: true,
@@ -101,19 +118,45 @@ export async function getProductStockHistory(productId: string): Promise<Product
     ...creditNotes.map((row) => [row.id, row.creditNoteNumber] as [string, string]),
   ]);
 
-  type Event = Omit<ProductStockHistoryRow, "balanceQty" | "balanceNetWeight"> & { sortKey: number };
+  type Event = Omit<ProductStockHistoryRow, "balanceQty" | "balanceNetWeight" | "balanceCaratWeight"> & { sortKey: number };
   const events: Event[] = [];
 
   for (const stock of stocks) {
     const gross = Number(stock.grossWeight ?? 0);
     const net = Number(stock.netWeight ?? 0);
-    const sold = stock.transactions
-      .filter((t) => OUT_TYPES.has(t.transactionType))
-      .reduce((sum, t) => sum + (t.quantity || 1), 0);
-    const returned = stock.transactions
-      .filter((t) => IN_TYPES.has(t.transactionType))
-      .reduce((sum, t) => sum + (t.quantity || 1), 0);
-    const originalQty = Math.max(stock.quantity + sold - returned, stock.quantity, 0);
+    const carat = Number(stock.caratWeight ?? 0);
+    const lotMoves = stock.transactions.filter(
+      (t) => t.byWeight && (OUT_TYPES.has(t.transactionType) || IN_TYPES.has(t.transactionType)),
+    );
+    const isLot = lotMoves.length > 0;
+
+    let inQty: number;
+    let inGross: number;
+    let inNet: number;
+    let inCarat: number;
+    if (isLot) {
+      // What's left + what was sold − what came back = the lot as it arrived.
+      const moved = (field: "grossWeight" | "netWeight" | "caratWeight") =>
+        lotMoves.reduce(
+          (sum, t) => sum + (OUT_TYPES.has(t.transactionType) ? 1 : -1) * Number(t[field] ?? 0),
+          0,
+        );
+      inQty = 1;
+      inGross = Math.max(0, gross + moved("grossWeight"));
+      inNet = Math.max(0, net + moved("netWeight"));
+      inCarat = Math.max(0, carat + moved("caratWeight"));
+    } else {
+      const sold = stock.transactions
+        .filter((t) => OUT_TYPES.has(t.transactionType))
+        .reduce((sum, t) => sum + (t.quantity || 1), 0);
+      const returned = stock.transactions
+        .filter((t) => IN_TYPES.has(t.transactionType))
+        .reduce((sum, t) => sum + (t.quantity || 1), 0);
+      inQty = Math.max(stock.quantity + sold - returned, stock.quantity, 0);
+      inGross = gross * inQty;
+      inNet = net * inQty;
+      inCarat = carat * inQty;
+    }
 
     const purchase = purchaseByStock.get(stock.id);
     const artisan = stock.transactions.find((t) => t.transactionType === InventoryTransactionType.KARIGAR_RECEIPT);
@@ -129,9 +172,11 @@ export async function getProductStockHistory(productId: string): Promise<Product
       party: purchase?.vendor?.name ?? stock.vendorName ?? null,
       stockCode: stock.stockCode,
       stockId: stock.id,
-      quantity: originalQty,
-      grossWeight: gross * originalQty,
-      netWeight: net * originalQty,
+      quantity: inQty,
+      grossWeight: inGross,
+      netWeight: inNet,
+      caratWeight: inCarat,
+      byWeight: false,
     });
 
     for (const t of stock.transactions) {
@@ -139,7 +184,10 @@ export async function getProductStockHistory(productId: string): Promise<Product
       const isIn = IN_TYPES.has(t.transactionType);
       const isDamage = t.transactionType === InventoryTransactionType.DAMAGE;
       if (!isOut && !isIn && !isDamage) continue;
-      const qty = isDamage ? 0 : t.quantity || 1;
+      // A byWeight row's quantity is real (0 = part of the lot moved); an
+      // older by-piece row with no quantity counts as one piece.
+      const qty = isDamage ? 0 : t.byWeight ? t.quantity : t.quantity || 1;
+      const lotRow = t.byWeight && !isDamage;
       events.push({
         id: t.id,
         date: t.createdAt.toISOString(),
@@ -167,8 +215,10 @@ export async function getProductStockHistory(productId: string): Promise<Product
         stockCode: stock.stockCode,
         stockId: stock.id,
         quantity: qty,
-        grossWeight: gross * qty,
-        netWeight: net * qty,
+        grossWeight: lotRow ? Number(t.grossWeight ?? 0) : gross * qty,
+        netWeight: lotRow ? Number(t.netWeight ?? 0) : net * qty,
+        caratWeight: lotRow ? Number(t.caratWeight ?? 0) : carat * qty,
+        byWeight: lotRow,
       });
     }
   }
@@ -176,10 +226,19 @@ export async function getProductStockHistory(productId: string): Promise<Product
   events.sort((a, b) => a.sortKey - b.sortKey);
   let balanceQty = 0;
   let balanceNetWeight = 0;
+  let balanceCaratWeight = 0;
   return events.map(({ sortKey: _sortKey, ...event }) => {
     const sign = event.direction === "IN" ? 1 : event.direction === "OUT" ? -1 : 0;
     balanceQty += sign * event.quantity;
     balanceNetWeight += sign * event.netWeight;
-    return { ...event, balanceQty, balanceNetWeight };
+    balanceCaratWeight += sign * event.caratWeight;
+    // Stored precision (grams 5 dp, carats 3 dp) — no float dust like −0.000.
+    const round = (value: number, decimals: number) => Number(value.toFixed(decimals)) || 0;
+    return {
+      ...event,
+      balanceQty,
+      balanceNetWeight: round(balanceNetWeight, 5),
+      balanceCaratWeight: round(balanceCaratWeight, 3),
+    };
   });
 }

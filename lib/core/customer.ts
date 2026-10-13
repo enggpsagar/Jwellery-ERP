@@ -25,6 +25,12 @@ import { isValidPanNumber, normalizePanNumber, PAN_INVALID_MESSAGE } from "@/lib
 import { formatShortDate } from "@/lib/utils";
 import { logger } from "@/lib/logger";
 import { parseDateRangeBoundary } from "@/lib/date-range";
+import {
+  partyBalanceDirection,
+  partyLedgerDelta,
+  partyNetBalance,
+  type PartyBalanceDirection,
+} from "@/lib/party-balance";
 
 export type CustomerRecord = {
   id: string;
@@ -37,9 +43,15 @@ export type CustomerRecord = {
   state?: string;
   pincode?: string;
   customerType?: string;
+  /** Signed: positive = the party owed the store at the start (Receivable),
+   *  negative = the store owed them (Payable). */
   openingBalance: number;
+  /** The party's ONE net balance — see lib/party-balance.ts. Positive =
+   *  Receivable, negative = Payable. Same number as netBalance; kept under
+   *  this name because REST/MCP callers already read it. */
   currentBalance?: number;
-  balanceType?: string;
+  netBalance: number;
+  balanceType: PartyBalanceDirection;
   goldBalance?: number;
   silverBalance?: number;
   creditLimit?: string;
@@ -62,23 +74,12 @@ export type CustomerRecord = {
   lastPaymentDate?: string;
   notes?: string;
   createdAt?: string;
-  /** Whether this Party is also tracked as a supplier — see
-   *  Customer.isSupplier's doc comment in schema.prisma. Only actionable
-   *  (an explicit "Also Supplier" toggle) while
-   *  BusinessSettings.supplierModuleEnabled is on; the flag itself can
-   *  still be true from earlier Purchase/Payment-Out use even while off. */
+  /** Kept on the record (schema unchanged) but no longer drives any UI —
+   *  every party is one Party with one ledger since 2026-10-13. */
   isSupplier?: boolean;
   /** Parallel to customerCode, carried over for a Party that started life
    *  as a standalone Vendor row before the merge, or assigned since. */
   vendorCode?: string | null;
-  /** This same Party's own supplier-side ledger balance — tracked
-   *  independently from currentBalance above (customer/receivable side),
-   *  not netted against it. Only meaningful once isSupplier is true;
-   *  undefined for a pure customer. Positive = the store owes them
-   *  (Payable); negative = they owe the store (Advance) — see
-   *  supplierBalanceType. */
-  supplierBalance?: number;
-  supplierBalanceType?: "Advance" | "Payable";
 };
 
 export type CustomerFormState = {
@@ -106,9 +107,6 @@ export type GetCustomersParams = {
   archived?: boolean;
   dateFrom?: string;
   dateTo?: string;
-  /** Set true to list only Parties tagged isSupplier — the Suppliers page's
-   *  own list, backed by this same Customer table/query. */
-  supplierOnly?: boolean;
 };
 
 export type CustomersListResponse = {
@@ -141,6 +139,8 @@ export type CustomerInput = {
   aadhaarNumber?: string;
   registrationId?: string;
   notes?: string;
+  /** Signed — positive Receivable, negative Payable (see
+   *  signedOpeningBalance in lib/party-balance.ts). */
   openingBalance?: number;
 };
 
@@ -172,7 +172,6 @@ export function getCustomerWhere(
   archived = false,
   dateFrom?: string,
   dateTo?: string,
-  supplierOnly = false,
 ) {
   const query = String(search || "").trim();
   const from = parseDateRangeBoundary(dateFrom, false);
@@ -181,7 +180,6 @@ export function getCustomerWhere(
   return {
     storeId,
     isArchived: archived,
-    ...(supplierOnly ? { isSupplier: true } : {}),
     ...(from || to ? { createdAt: { ...(from ? { gte: from } : {}), ...(to ? { lte: to } : {}) } } : {}),
     ...(query
       ? {
@@ -231,12 +229,12 @@ export const CUSTOMER_LIST_INCLUDE = {
     select: { id: true, amount: true, type: true, entryDate: true },
     orderBy: { entryDate: "desc" as const },
   },
-  // This same Party's own supplier-side ledger activity (LedgerEntry rows
-  // where vendorId, not customerId, points at this row) — folded into
-  // currentBalance below (see mapCustomer's combinedBalance) now that a
-  // Party's customer-side and supplier-side activity live on one row
-  // instead of two linked ones.
+  // The same Party's purchase-side ledger rows (vendorId = this party) —
+  // part of its one net balance (mapCustomer). Rows that also carry a
+  // customerId are already counted through `ledgerEntries` above, so they
+  // are skipped here (none are written today; this keeps it that way).
   ledgerEntriesAsVendor: {
+    where: { customerId: null },
     select: { amount: true, type: true },
   },
 };
@@ -253,14 +251,11 @@ export function mapCustomer(customer: any): CustomerRecord {
     0,
   );
 
-  // Outstanding = unpaid Invoices + unpaid Kacha slips + opening balance —
-  // matches getCustomerLedgerSummary's own currentBalance exactly (that
-  // function was the only one of the three independent "how much does this
-  // customer owe" implementations in this app that got this right). Every
-  // other display of "pending"/"outstanding"/"current balance" for a
-  // customer reads from this same number now, via mapCustomer, so the
-  // Parties list, a customer's detail page, and the Payment In picker can
-  // no longer disagree with the Ledger tab.
+  // Unpaid Invoices + unpaid Kacha slips + opening balance: which specific
+  // sale documents are still open. Not a balance shown anywhere — the one
+  // party figure is netBalance below; this only stays on the record (and
+  // the export's read-only columns used to carry it) for callers that ask
+  // "what's still unpaid on bills", e.g. a payment allocator.
   const invoiceBalance = customer.invoices.reduce(
     (sum: number, invoice: any) =>
       invoice.status === "CANCELLED" ? sum : sum + Number(invoice.balanceAmount || 0),
@@ -283,40 +278,15 @@ export function mapCustomer(customer: any): CustomerRecord {
       ? formatDate(customer.ledgerEntries[0].entryDate)
       : "-";
 
-  // Same formula as getCustomerLedgerSummary (customer-ledger-actions.ts):
-  // opening balance plus every DEBIT (sales) minus every CREDIT (payments/
-  // refunds/write-offs) since. This used to just copy openingBalance
-  // straight through here — correct only for a customer with zero activity
-  // since creation, silently wrong (and rendered as the list's "Balance"
-  // column) for every other one.
-  const ledgerBalanceDelta = customer.ledgerEntries.reduce(
-    (sum: number, entry: any) =>
-      sum + (entry.type === "DEBIT" ? Number(entry.amount ?? 0) : -Number(entry.amount ?? 0)),
-    0,
-  );
-
-  const ownBalance = Number(customer.openingBalance ?? 0) + ledgerBalanceDelta;
-
-  // This same Party's own supplier-side ledger activity (LedgerEntry rows
-  // where vendorId, not customerId, is this row — Purchases bought from
-  // them, Payments Out made to them) is tracked as its OWN independent
-  // balance (supplierBalance below), not netted into the customer-side
-  // figure above — the Supplier module's own spec calls for the two to be
-  // "maintained separately"/"tracked independently," since a store owner
-  // reasoning about what it owes a supplier doesn't want that number
-  // silently offset by an unrelated sale to the same party. Purchase-side
-  // CREDIT (an amount owed TO them) increases what's owed; a Payment Out
-  // DEBIT reduces it — the opposite polarity from customer-side DEBIT/
-  // CREDIT above. openingBalance is a single shared field, already spent
-  // above on the customer-side figure, so it isn't counted a second time
-  // here — a party's opening balance predates this merge and was always a
-  // receivable-direction number in practice (see the merge migration's own
-  // notes on this).
-  const supplierLedgerBalance = (customer.ledgerEntriesAsVendor ?? []).reduce(
-    (sum: number, entry: any) =>
-      sum + (entry.type === "CREDIT" ? Number(entry.amount ?? 0) : -Number(entry.amount ?? 0)),
-    0,
-  );
+  // The party's ONE net balance (lib/party-balance.ts): opening balance
+  // plus every DEBIT minus every CREDIT on both its sale-side (customerId)
+  // and purchase-side (vendorId) ledger rows. Positive = Receivable,
+  // negative = Payable. Replaces the old separate "Outstanding" and
+  // "Payable" figures (user decision 2026-10-13).
+  const netBalance = partyNetBalance(customer.openingBalance, [
+    ...(customer.ledgerEntries ?? []),
+    ...(customer.ledgerEntriesAsVendor ?? []),
+  ]);
 
   return {
     id: customer.id,
@@ -330,22 +300,9 @@ export function mapCustomer(customer: any): CustomerRecord {
     pincode: customer.pincode ?? "",
     customerType: "",
     openingBalance: Number(customer.openingBalance ?? 0),
-    // Ledger-derived (opening balance + DEBIT total - CREDIT total) rather
-    // than pendingAmountNumber above — this is the account's actual running
-    // balance from its full transaction history, the same figure
-    // getCustomerLedgerSummary computes, and it stays correct even where a
-    // cached document balanceAmount might not (e.g. it already reflects a
-    // Credit Note's return via that return's own ledger CREDIT, with no
-    // dependency on also having fixed every document-balance write path).
-    // pendingAmountNumber (unpaid Invoices/Kacha + opening) remains the
-    // right figure for "which specific documents are still open," used by
-    // the Payment In picker's allocator — a different question that happens
-    // to usually match this one in a fully consistent ledger.
-    currentBalance: ownBalance,
-    // Was hardcoded to "Receivable" for every customer regardless of sign —
-    // a customer who has prepaid (currentBalance < 0) is owed money BY the
-    // store, not the other way around.
-    balanceType: ownBalance < 0 ? "Advance" : "Receivable",
+    currentBalance: netBalance,
+    netBalance,
+    balanceType: partyBalanceDirection(netBalance),
     goldBalance: 0,
     silverBalance: 0,
     creditLimit: "",
@@ -367,8 +324,6 @@ export function mapCustomer(customer: any): CustomerRecord {
     createdAt: customer.createdAt.toISOString(),
     isSupplier: customer.isSupplier ?? false,
     vendorCode: customer.vendorCode ?? null,
-    supplierBalance: supplierLedgerBalance,
-    supplierBalanceType: supplierLedgerBalance < 0 ? "Advance" : "Payable",
   };
 }
 
@@ -387,7 +342,6 @@ export async function getCustomersCore(
     params.archived,
     params.dateFrom,
     params.dateTo,
-    params.supplierOnly,
   );
   const orderBy = getCustomerOrderBy(sortBy, sortOrder);
 
@@ -633,30 +587,48 @@ export async function updateCustomerCore(
 }
 
 /**
- * The "Also Supplier" action on a Party's detail page — an explicit,
- * user-triggered mark/unmark, distinct from the automatic flip
- * createPurchase/recordPaymentOut already do the first time a Party is
- * actually used as one. Caller (lib/actions/customer-actions.ts) is
- * responsible for checking BusinessSettings.supplierModuleEnabled first;
- * this core function doesn't know about Settings at all, same separation
- * as every other core function in this file.
+ * Net balance (lib/party-balance.ts) for many parties at once — two
+ * grouped sums over the ledger instead of loading every entry. Used by the
+ * dashboard totals, the payment pickers and the dues report. `partyIds`
+ * limits it to those parties; omitted = every party in the store
+ * (archived included — an archived party can still owe or be owed).
  */
-export async function setCustomerSupplierStatusCore(
-  id: string,
+export async function getPartyNetBalances(
   storeId: string,
-  isSupplier: boolean,
-): Promise<CustomerFormState> {
-  const { count } = await prisma.customer.updateMany({
-    where: { id, storeId },
-    data: { isSupplier },
-  });
+  partyIds?: string[],
+): Promise<Map<string, number>> {
+  const idFilter = partyIds ? { in: partyIds } : { not: null };
+  const [parties, saleSide, purchaseSide] = await Promise.all([
+    prisma.customer.findMany({
+      where: { storeId, ...(partyIds ? { id: { in: partyIds } } : {}) },
+      select: { id: true, openingBalance: true },
+    }),
+    prisma.ledgerEntry.groupBy({
+      by: ["customerId", "type"],
+      where: { storeId, customerId: idFilter },
+      _sum: { amount: true },
+    }),
+    // Same rule as CUSTOMER_LIST_INCLUDE.ledgerEntriesAsVendor: a row with a
+    // customerId is already counted on the sale side.
+    prisma.ledgerEntry.groupBy({
+      by: ["vendorId", "type"],
+      where: { storeId, customerId: null, vendorId: idFilter },
+      _sum: { amount: true },
+    }),
+  ]);
 
-  if (count === 0) {
-    return { success: false, message: "Party not found" };
-  }
-
-  return {
-    success: true,
-    message: isSupplier ? "Marked as a supplier" : "Removed supplier status",
+  const deltas = new Map<string, number>();
+  const add = (id: string | null, type: string, amount: unknown) => {
+    if (!id) return;
+    deltas.set(id, (deltas.get(id) ?? 0) + partyLedgerDelta({ type, amount }));
   };
+  for (const row of saleSide) add(row.customerId, row.type, row._sum.amount);
+  for (const row of purchaseSide) add(row.vendorId, row.type, row._sum.amount);
+
+  return new Map(
+    parties.map((party) => [
+      party.id,
+      partyNetBalance(party.openingBalance, [{ type: "DEBIT", amount: deltas.get(party.id) ?? 0 }]),
+    ]),
+  );
 }

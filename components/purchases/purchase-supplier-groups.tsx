@@ -1,7 +1,7 @@
 "use client"
 
 import { cn } from "@/lib/utils"
-import { SupplierLedgerCardClient } from "@/components/customers/ledger/supplier-ledger-card-client"
+import { CustomerLedgerCardClient } from "@/components/customers/ledger/customer-ledger-card-client"
 import Link from "next/link"
 
 type PurchaseRow = {
@@ -50,7 +50,7 @@ export function PurchaseSupplierGroups({
         <table className="min-w-full text-sm">
           <thead className="bg-muted/40">
             <tr className="border-b text-left">
-              <th className="px-4 py-3 font-medium">Supplier</th>
+              <th className="px-4 py-3 font-medium">Party</th>
               <th className="px-4 py-3 text-right font-medium">Bills</th>
               <th className="px-4 py-3 text-right font-medium">Total</th>
               <th className="px-4 py-3 text-right font-medium">Balance</th>
@@ -97,7 +97,7 @@ export function SupplierPurchasePanel({ group }: { group: SupplierGroup | null }
   if (!group) {
     return (
       <div className="flex min-h-[24rem] items-center justify-center rounded-xl border bg-card p-6 text-sm text-muted-foreground">
-        Select a supplier to see its ledger.
+        Select a party to see its ledger.
       </div>
     )
   }
@@ -114,7 +114,7 @@ export function SupplierPurchasePanel({ group }: { group: SupplierGroup | null }
           {group.vendor.phone ? ` · ${group.vendor.phone}` : ""}
         </p>
       </div>
-      <SupplierLedgerCardClient customerId={group.vendor.id} defaultShowDetails />
+      <CustomerLedgerCardClient customerId={group.vendor.id} hasEmail={false} defaultShowDetails />
     </div>
   )
 }

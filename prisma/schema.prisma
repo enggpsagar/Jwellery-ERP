@@ -716,6 +716,12 @@ model Product {
   defaultNetWeight          Decimal?             @db.Decimal(12, 5)
   defaultStoneWeight        Decimal?             @db.Decimal(12, 5)
   defaultCaratWeight        Decimal?             @db.Decimal(10, 3)
+  // Bulk stock sold by weight (loose stones, bars, bullion, raw metal): each
+  // stock row is one lot (quantity 1, weights = the whole lot) and a sale
+  // takes part of it by net weight (carats for a stone) instead of whole
+  // pieces — see lib/inventory/weight-lot.ts. Multi-part rows (with
+  // PieceComponent) stay whole-piece even when this is on.
+  soldByWeight              Boolean              @default(false)
   // A composite piece — one metal (priced by weight, unchanged) plus one
   // embedded stone/diamond component (priced by defaultStoneRate × the
   // existing defaultCaratWeight above, auto-summed into Stone Charge)
@@ -975,6 +981,13 @@ model InventoryTransaction {
   quantity         Int                      @default(1)
   grossWeight      Decimal?                 @db.Decimal(12, 5)
   netWeight        Decimal?                 @db.Decimal(12, 5)
+  // Carats moved — set on sold-by-weight lot movements (byWeight below).
+  caratWeight      Decimal?                 @db.Decimal(10, 3)
+  // True when this row moved part of a sold-by-weight lot: its weights are
+  // exactly what moved, and quantity is 1 only when the movement emptied
+  // (SALE) or refilled (SALE_RETURN) the lot, else 0 — see
+  // lib/inventory/weight-lot.server.ts.
+  byWeight         Boolean                  @default(false)
   referenceType    String?
   referenceId      String?
   notes            String?
@@ -1292,6 +1305,12 @@ model KachaInvoiceItem {
   stoneCertificateNumber String?
   lineTotal          Decimal         @default(0) @db.Decimal(12, 2)
   inventoryStockId   String?
+  // Set only when this line drew part of a sold-by-weight lot (Product.
+  // soldByWeight): the exact weights taken off the stock row
+  // ({grossWeight, netWeight, fineWeight, caratWeight, stoneWeight}), so
+  // every restore path (cancel/delete/edit/return) puts back exactly that —
+  // see lib/inventory/weight-lot.ts. Null = an ordinary by-quantity line.
+  lotDraw            Json?
   createdAt          DateTime        @default(now())
   updatedAt          DateTime        @updatedAt
   inventoryStock     InventoryStock? @relation(fields: [inventoryStockId], references: [id])
@@ -1383,6 +1402,12 @@ model InvoiceItem {
   createdAt          DateTime         @default(now())
   updatedAt          DateTime         @updatedAt
   inventoryStockId   String?
+  // Set only when this line drew part of a sold-by-weight lot (Product.
+  // soldByWeight): the exact weights taken off the stock row
+  // ({grossWeight, netWeight, fineWeight, caratWeight, stoneWeight}), so
+  // every restore path (cancel/delete/edit/return) puts back exactly that —
+  // see lib/inventory/weight-lot.ts. Null = an ordinary by-quantity line.
+  lotDraw            Json?
   purity             PurityType?
   purityLabel        String?
   inventoryStock     InventoryStock?  @relation(fields: [inventoryStockId], references: [id])

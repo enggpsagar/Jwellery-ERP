@@ -24,7 +24,8 @@ async function download(page: Page, trigger: () => Promise<unknown>) {
 }
 
 /** The Party template and export share one column layout, the import applies
- *  the Add Party form's rules, and an exported row imports back unchanged. */
+ *  the Add Party form's rules (incl. Receivable / Payable opening balance),
+ *  and an exported row imports back unchanged. */
 test("party import/export: shared layout, validation, round trip", async ({ page }) => {
   const storeId = await demoStoreId()
   const tag = `E2E Party ${Date.now()}`
@@ -99,21 +100,22 @@ test("party import/export: shared layout, validation, round trip", async ({ page
       expect(String(copy[field]), field).toBe(String(full[field]))
     }
 
-    // Suppliers page exports suppliers only.
-    await db().customer.updateMany({ where: { storeId, name: `${tag} full` }, data: { isSupplier: true } })
-    const settings = await db().businessSettings.findUniqueOrThrow({ where: { storeId }, select: { supplierModuleEnabled: true } })
-    await db().businessSettings.update({ where: { storeId }, data: { supplierModuleEnabled: true } })
-    try {
-      await page.goto("/suppliers")
-      const suppliers = await download(page, () => page.getByRole("button", { name: "Export suppliers" }).click())
-      const names = XLSX.utils.sheet_to_json<Record<string, unknown>>(suppliers.Sheets[suppliers.SheetNames[0]]).map((r) => r["Party Name"])
-      expect(names).toContain(`${tag} full`)
-      expect(names).not.toContain(`${tag} copy`)
-      const supplierCount = await db().customer.count({ where: { storeId, isArchived: false, isSupplier: true } })
-      expect(names.length).toBe(supplierCount)
-    } finally {
-      await db().businessSettings.update({ where: { storeId }, data: { supplierModuleEnabled: settings.supplierModuleEnabled } })
-    }
+    // Opening Balance Type: Payable is stored negative; the export writes the
+    // amount + type back so it round-trips.
+    await importParties(page, sheet([
+      { "Party Name": `${tag} payable`, "Opening Balance": 700, "Opening Balance Type": "Payable" },
+      { "Party Name": `${tag} bad opening`, "Opening Balance": 10, "Opening Balance Type": "Sideways" },
+    ], "test-results/party-opening-bad.xlsx"))
+    await expect(page.getByText(/Row 3: Opening Balance Type "Sideways" is not one of/)).toBeVisible()
+    await importParties(page, sheet([
+      { "Party Name": `${tag} payable`, "Opening Balance": 700, "Opening Balance Type": "Payable" },
+    ], "test-results/party-opening.xlsx"))
+    await expect
+      .poll(async () => {
+        const row = await db().customer.findFirst({ where: { storeId, name: `${tag} payable` }, select: { openingBalance: true } })
+        return row ? Number(row.openingBalance) : null
+      }, { timeout: 15000 })
+      .toBe(-700)
   } finally {
     await cleanup()
   }

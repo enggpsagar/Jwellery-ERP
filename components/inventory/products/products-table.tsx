@@ -7,6 +7,7 @@ import { RecordHoverCard } from "@/components/shared/record-hover-card"
 import { DataTablePagination } from "@/components/shared/data-table-pagination"
 import { SortableTableHead } from "@/components/shared/sortable-table-head"
 import { cn } from "@/lib/utils"
+import { Badge } from "@/components/ui/badge"
 
 type ProductRow = {
   id: string
@@ -27,6 +28,8 @@ type ProductRow = {
   stockNetWeight?: number
   stockFineWeight?: number
   stockCaratWeight?: number
+  /** Bulk stock sold by weight (Product.soldByWeight). */
+  soldByWeight?: boolean
   isActive: boolean
   createdAt: Date | string
 }
@@ -181,29 +184,45 @@ export function ProductsTable({
                           ],
                         },
                         {
+                          // Live stock — IN_STOCK rows only (getProducts).
+                          fields: [
+                            { label: "In stock", value: `${product.stockQty}` },
+                            { label: "Selling", value: product.soldByWeight ? "Sold by weight" : null },
+                            ...(product.stockQty > 0 &&
+                            ((product.stockGrossWeight ?? 0) > 0 || (product.stockNetWeight ?? 0) > 0)
+                              ? [
+                                  { label: "Gross weight in stock", value: `${wf.g(product.stockGrossWeight ?? 0)} g` },
+                                  { label: "Net weight in stock", value: `${wf.g(product.stockNetWeight ?? 0)} g` },
+                                  { label: "Fine weight in stock", value: `${wf.g(product.stockFineWeight ?? 0)} g` },
+                                ]
+                              : []),
+                            {
+                              label: "Carats in stock",
+                              value:
+                                product.stockQty > 0 && (product.stockCaratWeight ?? 0) > 0
+                                  ? `${wf.ct(product.stockCaratWeight ?? 0)} ct`
+                                  : null,
+                            },
+                          ],
+                        },
+                        {
+                          // The product's template weights — what a new stock
+                          // entry starts from, not what's on hand.
                           fields: [
                             {
-                              label: "Gross weight",
+                              label: "Default gross (template)",
                               value:
                                 product.defaultGrossWeight != null
                                   ? `${wf.g(product.defaultGrossWeight)} g`
                                   : null,
                             },
                             {
-                              label: "Net weight",
+                              label: "Default net (template)",
                               value:
                                 product.defaultNetWeight != null
                                   ? `${wf.g(product.defaultNetWeight)} g`
                                   : null,
                             },
-                            {
-                              label: "Stone weight",
-                              value:
-                                product.defaultStoneWeight != null
-                                  ? `${wf.g(product.defaultStoneWeight)} g`
-                                  : null,
-                            },
-                            { label: "In stock", value: `${product.stockQty}` },
                           ],
                         },
                       ]}
@@ -221,6 +240,11 @@ export function ProductsTable({
 
                   <td className="px-4 py-3 text-foreground">
                     {product.name}
+                    {product.soldByWeight && (
+                      <Badge variant="secondary" className="ml-2 align-middle text-[10px]">
+                        Sold by weight
+                      </Badge>
+                    )}
                     {/* Category · Type, matching the toolbar's Category → Type filter. */}
                     {(product.category !== "-" || product.ornamentType) && (
                       <div className="text-xs text-muted-foreground">

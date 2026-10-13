@@ -120,7 +120,6 @@ export const ROLE_BADGE_CLASSES: Record<UserRole, string> = {
 export type ModuleKey =
   | "dashboard"
   | "customers"
-  | "vendors"
   | "inventory"
   | "billing"
   | "quotations"
@@ -151,21 +150,11 @@ export const MODULE_DEFINITIONS: {
       PERMISSIONS.CUSTOMER_UPDATE,
     ],
   },
-  {
-    // Key left as "vendors" (not renamed to "suppliers") since a Staff
-    // user's saved per-module permission customization is keyed by this
-    // string — renaming it would silently drop any store's existing
-    // Vendors/Suppliers access grant. Label/href updated to match the
-    // Supplier module's own current naming.
-    key: "vendors",
-    label: "Suppliers",
-    href: "/suppliers",
-    permissions: [
-      PERMISSIONS.SUPPLIER_VIEW,
-      PERMISSIONS.SUPPLIER_CREATE,
-      PERMISSIONS.SUPPLIER_UPDATE,
-    ],
-  },
+  // No "vendors"/Suppliers module any more (2026-10-13): every party is a
+  // Party under "customers", and /suppliers just redirects there. Stored
+  // Staff permissions are permission strings, not module keys, so dropping
+  // the entry breaks nothing — a saved "supplier.*" string is simply no
+  // longer tied to a toggle (SUPPLIER_* stay in the role bundles above).
   {
     key: "inventory",
     label: "Inventory",

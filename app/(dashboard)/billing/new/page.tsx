@@ -83,7 +83,6 @@ export default async function NewInvoicePage({ searchParams }: Props) {
           customers={customers}
           stockItems={stockItems}
           suppliers={suppliers}
-          supplierModuleEnabled={businessSettings.supplierModuleEnabled}
           enumFineness={enumFineness}
           fineRates={{
             gold: metalRates.latest ? Number(metalRates.latest.gold24k) : null,

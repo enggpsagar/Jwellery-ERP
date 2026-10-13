@@ -17,7 +17,6 @@ const PAGES = [
   "/billing/offers",
   "/purchases/exchanges",
   "/customers",
-  "/suppliers",
   "/purchases",
   "/purchases/new",
   "/quotations",

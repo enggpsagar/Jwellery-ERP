@@ -52,6 +52,8 @@ import {
   getInvoiceFormStockItems,
 } from "@/lib/actions/invoice-actions";
 import { OversellError } from "@/lib/inventory/oversell-error";
+import { lotDrawJson, parseLotDraw, type LotDraw } from "@/lib/inventory/weight-lot";
+import { drawFromLot, planLineLotDraws, restoreToLot } from "@/lib/inventory/weight-lot.server";
 import { markSourcePartiesAsSuppliers, resolveLineSourceParties } from "@/lib/inventory/line-source-party";
 import { resolveGstRateSnapshot } from "@/lib/actions/gst-rate-actions";
 import { conversionGst, toConversionGstItem } from "@/lib/conversion-gst";
@@ -122,6 +124,9 @@ export type KachaInvoiceLineItemInput = {
   // convention as InvoiceLineItemInput.hmCharge's own doc comment.
   hmCharge?: number;
   inventoryStockId?: string | null;
+  // Server-only: what this line takes off a sold-by-weight lot
+  // (planLineLotDraws overwrites whatever a client sends).
+  lotDraw?: LotDraw | null;
   // "Purchased From" — required on a line with no linked stock, see
   // lib/inventory/line-source-party.ts.
   vendorId?: string | null;
@@ -471,6 +476,7 @@ async function writeKachaSlip(tx: Prisma.TransactionClient, input: WriteKachaSli
           hmCharge: item.hmCharge ?? 0,
           lineTotal: lineTotal(item),
           inventoryStockId: isManualLine(item) ? undefined : (item.inventoryStockId as string),
+          lotDraw: isManualLine(item) ? undefined : lotDrawJson(item.lotDraw),
           vendorId: isManualLine(item) ? item.vendorId ?? undefined : undefined,
           vendorName: isManualLine(item) && item.vendorId ? sourcePartyNames.get(item.vendorId) : undefined,
         })),
@@ -483,6 +489,20 @@ async function writeKachaSlip(tx: Prisma.TransactionClient, input: WriteKachaSli
   for (const item of items) {
     if (isManualLine(item)) continue;
     const stockId = item.inventoryStockId as string;
+
+    // A sold-by-weight lot gives up only the weight this line sold
+    // (lib/inventory/weight-lot.server.ts).
+    if (item.lotDraw) {
+      await drawFromLot(tx, {
+        storeId,
+        stockId,
+        draw: item.lotDraw,
+        label: item.itemName,
+        referenceType: "KachaInvoice",
+        referenceId: created.id,
+      });
+      continue;
+    }
 
     // Decrement rather than flipping the whole row to SOLD: a row of
     // 100 pieces that sells 2 still has 98 on hand. Marking it SOLD
@@ -641,10 +661,15 @@ async function lockLinkedStockFields(
       metalTypeId: stock.metalTypeId,
       purity: stock.purity,
       purityLabel: stock.purityLabel,
-      grossWeight: stock.grossWeight ? Number(stock.grossWeight) : null,
-      netWeight: stock.netWeight ? Number(stock.netWeight) : null,
-      caratWeight: stock.caratWeight ? Number(stock.caratWeight) : null,
-      stoneWeight: stock.stoneWeight ? Number(stock.stoneWeight) : null,
+      // A sold-by-weight lot line keeps the part it draws (planLineLotDraws).
+      ...(item.lotDraw
+        ? {}
+        : {
+            grossWeight: stock.grossWeight ? Number(stock.grossWeight) : null,
+            netWeight: stock.netWeight ? Number(stock.netWeight) : null,
+            caratWeight: stock.caratWeight ? Number(stock.caratWeight) : null,
+            stoneWeight: stock.stoneWeight ? Number(stock.stoneWeight) : null,
+          }),
       stoneMetalTypeName: stock.stoneMetalTypeName,
       stoneTypeNames: stock.stoneTypeNames,
     };
@@ -1035,6 +1060,11 @@ export async function createKachaInvoice(
     // lineQuantity), which this can change, so pricing has to see the
     // locked, trustworthy value rather than whatever the client submitted
     // for a field the UI no longer lets it edit.
+    // A sold-by-weight lot line sells the weight typed on it — planned first
+    // so the lock below leaves those weights alone (same as createInvoice).
+    const lotPlan = await planLineLotDraws(storeId, items);
+    if ("error" in lotPlan) return { success: false, message: lotPlan.error };
+    items = lotPlan.items;
     items = await lockLinkedStockFields(storeId, items, explicitStockIds);
     const pieceLines = await resolvePieceLines(storeId, items);
     if ("error" in pieceLines) return { success: false, message: pieceLines.error };
@@ -1157,6 +1187,8 @@ export async function createKachaInvoice(
     const requestedQtyByStock = new Map<string, number>();
     for (const item of items) {
       if (!item.inventoryStockId || !validStockIds.has(item.inventoryStockId)) continue;
+      // A lot is checked by weight (planLineLotDraws), not by pieces.
+      if (item.lotDraw) continue;
       requestedQtyByStock.set(
         item.inventoryStockId,
         (requestedQtyByStock.get(item.inventoryStockId) ?? 0) + Math.max(1, item.quantity || 1),
@@ -1467,6 +1499,9 @@ export async function convertKachaToPakka(
               hmCharge: item.hmCharge,
               lineTotal: item.lineTotal,
               inventoryStockId: item.inventoryStockId ?? undefined,
+              // The weight the slip drew off a lot moves with the line, so
+              // cancelling/deleting the new invoice gives back exactly that.
+              lotDraw: lotDrawJson(parseLotDraw(item.lotDraw)),
               sgstAmount: itemGst[index].sgst,
               cgstAmount: itemGst[index].cgst,
               igstAmount: itemGst[index].igst,
@@ -1552,7 +1587,10 @@ export async function deleteKachaInvoice(id: string): Promise<KachaInvoiceFormSt
   try {
     const storeId = await requireStoreScope();
 
-    const kachaInvoice = await prisma.kachaInvoice.findFirst({ where: { id, storeId } });
+    const kachaInvoice = await prisma.kachaInvoice.findFirst({
+      where: { id, storeId },
+      include: { items: { select: { inventoryStockId: true, quantity: true, lotDraw: true } } },
+    });
 
     if (!kachaInvoice) return { success: false, message: "Estimate not found" };
 
@@ -1567,10 +1605,65 @@ export async function deleteKachaInvoice(id: string): Promise<KachaInvoiceFormSt
       };
     }
 
-    const { count } = await prisma.kachaInvoice.deleteMany({ where: { id, storeId } });
-    if (count === 0) return { success: false, message: "Estimate not found" };
+    // createKachaInvoice took the stock and debited the party, so deleting
+    // the slip gives both back — otherwise its pieces/weight stay out of
+    // stock and its SALE debit stays on the party's net balance forever.
+    // Only a DRAFT with no payments gets here, so that DEBIT is the slip's
+    // only ledger row (it carries no kachaInvoiceId — matched by its
+    // description, kachaSaleLedgerDescription).
+    const deleted = await prisma.$transaction(async (tx) => {
+      const { count } = await tx.kachaInvoice.deleteMany({ where: { id, storeId } });
+      if (count === 0) return false;
+
+      for (const item of kachaInvoice.items) {
+        if (!item.inventoryStockId) continue;
+        const draw = parseLotDraw(item.lotDraw);
+        if (draw) {
+          await restoreToLot(tx, {
+            storeId,
+            stockId: item.inventoryStockId,
+            draw,
+            referenceType: "KachaInvoice",
+            referenceId: kachaInvoice.id,
+            notes: "Stock restored — Estimate deleted",
+          });
+          continue;
+        }
+        const restoreQty = Math.max(1, item.quantity || 1);
+        await tx.inventoryStock.updateMany({
+          where: { id: item.inventoryStockId, storeId },
+          data: { quantity: { increment: restoreQty } },
+        });
+        await tx.inventoryStock.updateMany({
+          where: { id: item.inventoryStockId, storeId, quantity: { gt: 0 }, status: InventoryStockStatus.SOLD },
+          data: { status: InventoryStockStatus.IN_STOCK },
+        });
+        await tx.inventoryTransaction.create({
+          data: {
+            inventoryStockId: item.inventoryStockId,
+            transactionType: InventoryTransactionType.SALE_RETURN,
+            quantity: restoreQty,
+            referenceType: "KachaInvoice",
+            referenceId: kachaInvoice.id,
+            notes: "Stock restored — Estimate deleted",
+          },
+        });
+      }
+
+      await tx.ledgerEntry.deleteMany({
+        where: {
+          storeId,
+          customerId: kachaInvoice.customerId,
+          sourceType: LedgerSourceType.SALE,
+          description: kachaSaleLedgerDescription(kachaInvoice.slipNumber),
+        },
+      });
+      return true;
+    });
+    if (!deleted) return { success: false, message: "Estimate not found" };
 
     revalidatePath("/billing/kacha");
+    revalidatePath("/inventory/products");
 
     return { success: true, message: "Estimate deleted" };
   } catch (error) {
@@ -1581,7 +1674,7 @@ export async function deleteKachaInvoice(id: string): Promise<KachaInvoiceFormSt
 
 /** The template/export dropdown lists, from this store's own masters. */
 async function loadKachaSheetDropdowns(storeId: string): Promise<Record<string, string[]>> {
-  const [metals, purities, parties, locations, settings] = await Promise.all([
+  const [metals, purities, parties, locations] = await Promise.all([
     prisma.storeMetal.findMany({
       where: { storeId, isActive: true },
       select: { name: true, isGemstone: true },
@@ -1594,20 +1687,17 @@ async function loadKachaSheetDropdowns(storeId: string): Promise<Record<string, 
     }),
     prisma.customer.findMany({
       where: { storeId, isArchived: false, isActive: true },
-      select: { name: true, isSupplier: true },
+      select: { name: true },
       orderBy: { name: "asc" },
     }),
     prisma.storeLocation.findMany({ where: { storeId, isActive: true }, select: { name: true }, orderBy: { name: "asc" } }),
-    prisma.businessSettings.findUnique({ where: { storeId }, select: { supplierModuleEnabled: true } }),
   ]);
   const methods = Object.values(KACHA_PAYMENT_METHOD_LABELS);
 
   return {
     "Party Name": parties.map((party) => party.name),
     // Same list as the form's Purchased From picker (getSupplierOptions).
-    "Purchased From": parties
-      .filter((party) => !settings?.supplierModuleEnabled || party.isSupplier)
-      .map((party) => party.name),
+    "Purchased From": parties.map((party) => party.name),
     Location: locations.map((location) => location.name),
     Metal: metals.map((metal) => metal.name),
     Purity: purities.map((purity) => purity.label),

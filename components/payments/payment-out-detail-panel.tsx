@@ -47,7 +47,7 @@ export function PaymentOutDetailPanel({
 
       <div className="grid grid-cols-2 gap-4 text-sm">
         <div>
-          <p className="text-muted-foreground">{row.partyType === "VENDOR" ? "Supplier" : "Artisan"}</p>
+          <p className="text-muted-foreground">{row.partyType === "VENDOR" ? "Party" : "Artisan"}</p>
           <Link href={partyHref} className="font-medium hover:underline">
             {row.partyName}
           </Link>

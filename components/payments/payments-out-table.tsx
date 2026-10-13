@@ -178,7 +178,7 @@ export function PaymentsOutTable({
                           {row.partyName}
                         </Link>
                         <Badge variant="outline" className="font-normal">
-                          {row.partyType === "VENDOR" ? "Supplier" : "Artisan"}
+                          {row.partyType === "VENDOR" ? "Party" : "Artisan"}
                         </Badge>
                       </div>
                     </TableCell>

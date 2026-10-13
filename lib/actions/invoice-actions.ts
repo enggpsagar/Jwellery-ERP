@@ -69,6 +69,8 @@ import { logger } from "@/lib/logger";
 import { parseDateRangeBoundary } from "@/lib/date-range";
 import { stockOptionProductDetailsSelect, toStockOptionProductDetails } from "@/lib/inventory/stock-option-details";
 import { lockedStockPieceRows, stockPieceOption } from "@/lib/inventory/stock-piece-rows";
+import { addLotWeights, lotDrawJson, parseLotDraw, stockSellsByWeight, toLotWeights, type LotDraw } from "@/lib/inventory/weight-lot";
+import { drawFromLot, heldLotWeights, planLineLotDraws, restoreToLot } from "@/lib/inventory/weight-lot.server";
 
 export type InvoiceLineItemInput = {
   itemName: string;
@@ -134,6 +136,9 @@ export type InvoiceLineItemInput = {
   components?: PieceComponentPayload[] | null;
   // Server-only: the resolved rows (resolvePieceLines), never from the client.
   piece?: ResolvedPiece;
+  // Server-only: what this line takes off a sold-by-weight lot
+  // (planLineLotDraws overwrites whatever a client sends).
+  lotDraw?: LotDraw | null;
 };
 
 export type InvoiceFormState = {
@@ -494,10 +499,16 @@ async function lockLinkedStockFields(
       metalTypeId: stock.metalTypeId,
       purity: stock.purity,
       purityLabel: stock.purityLabel,
-      grossWeight: stock.grossWeight !== null ? Number(stock.grossWeight) : null,
-      netWeight: stock.netWeight !== null ? Number(stock.netWeight) : null,
-      caratWeight: stock.caratWeight !== null ? Number(stock.caratWeight) : null,
-      stoneWeight: stock.stoneWeight !== null ? Number(stock.stoneWeight) : null,
+      // A sold-by-weight lot line keeps the part it draws (planLineLotDraws
+      // already set its weights from the lot); anything else is the piece.
+      ...(item.lotDraw
+        ? {}
+        : {
+            grossWeight: stock.grossWeight !== null ? Number(stock.grossWeight) : null,
+            netWeight: stock.netWeight !== null ? Number(stock.netWeight) : null,
+            caratWeight: stock.caratWeight !== null ? Number(stock.caratWeight) : null,
+            stoneWeight: stock.stoneWeight !== null ? Number(stock.stoneWeight) : null,
+          }),
       stoneMetalTypeName: stock.stoneMetalTypeName,
       stoneTypeNames: stock.stoneTypeNames,
       // The piece's own HSN first (it can differ per stock), else the Product's.
@@ -1172,13 +1183,16 @@ export async function getInvoiceFormStockItems(includeInvoiceId?: string) {
     // Product's (lib/inventory/stock-piece-rows.ts) — plus a single stone's
     // pieces / clarity / certificate / catalog rate.
     ...stockPieceOption(stock),
+    // A sold-by-weight lot: the line's weight is editable, up to what's left
+    // (lib/inventory/weight-lot.ts).
+    sellsByWeight: stockSellsByWeight(stock),
   }));
 
   if (!includeInvoiceId) return mapped;
 
   const currentItems = await prisma.invoiceItem.findMany({
     where: { invoiceId: includeInvoiceId, inventoryStockId: { not: null } },
-    select: { inventoryStockId: true, quantity: true },
+    select: { inventoryStockId: true, quantity: true, lotDraw: true },
   });
   const claimedByThisInvoice = new Map<string, number>();
   for (const item of currentItems) {
@@ -1247,7 +1261,23 @@ export async function getInvoiceFormStockItems(includeInvoiceId?: string) {
       quantity: stock.quantity + claimed,
       ...toStockOptionProductDetails(stock.product),
       ...stockPieceOption(stock),
+      sellsByWeight: stockSellsByWeight({ ...stock, quantity: stock.quantity + claimed }),
     });
+  }
+
+  // On an edit, a lot this invoice drew from offers what's left PLUS what
+  // this invoice took (it's given back first when the edit saves).
+  const heldByThisInvoice = heldLotWeights(currentItems, parseLotDraw);
+  for (const [stockId, held] of heldByThisInvoice) {
+    const option = mapped.find((stock) => stock.id === stockId);
+    if (!option || !option.sellsByWeight) continue;
+    const total = addLotWeights(toLotWeights(option), held);
+    option.grossWeight = total.grossWeight || null;
+    option.netWeight = total.netWeight || null;
+    option.caratWeight = total.caratWeight || null;
+    option.stoneWeight = total.stoneWeight || null;
+    // claimed counted the lot line as 1 piece; a lot is always 1.
+    option.quantity = 1;
   }
 
   return mapped;
@@ -1324,6 +1354,12 @@ export async function createInvoice(
     // lineQuantity), which this can change, so pricing has to see the
     // locked, trustworthy value rather than whatever the client submitted
     // for a field the UI no longer lets it edit.
+    // A sold-by-weight lot line sells the weight typed on it (validated
+    // against what's left; other weights in proportion) — planned first so
+    // the lock below leaves those weights alone.
+    const lotPlan = await planLineLotDraws(storeId, items);
+    if ("error" in lotPlan) return { success: false, message: lotPlan.error };
+    items = lotPlan.items;
     items = await lockLinkedStockFields(storeId, items, explicitStockIds);
     const pieceLines = await resolvePieceLines(storeId, items);
     if ("error" in pieceLines) return { success: false, message: pieceLines.error };
@@ -1600,6 +1636,8 @@ export async function createInvoice(
     const requestedQtyByStock = new Map<string, number>();
     for (const item of items) {
       if (!item.inventoryStockId || !validStockIds.has(item.inventoryStockId)) continue;
+      // A lot is checked by weight (planLineLotDraws), not by pieces.
+      if (item.lotDraw) continue;
       requestedQtyByStock.set(
         item.inventoryStockId,
         (requestedQtyByStock.get(item.inventoryStockId) ?? 0) + Math.max(1, item.quantity || 1),
@@ -1732,6 +1770,7 @@ export async function createInvoice(
               hsnCode: item.hsnCode ?? undefined,
               lineTotal: lineTotal(item),
               inventoryStockId: item.inventoryStockId ?? undefined,
+              lotDraw: lotDrawJson(item.lotDraw),
             })),
           },
         },
@@ -1739,6 +1778,20 @@ export async function createInvoice(
 
       for (const item of soldItems) {
         if (!item.inventoryStockId) continue;
+
+        // A sold-by-weight lot gives up only the weight this line sold —
+        // guarded the same way (lib/inventory/weight-lot.server.ts).
+        if (item.lotDraw) {
+          await drawFromLot(tx, {
+            storeId,
+            stockId: item.inventoryStockId,
+            draw: item.lotDraw,
+            label: item.itemName,
+            referenceType: "Invoice",
+            referenceId: created.id,
+          });
+          continue;
+        }
 
         // Decrement rather than flipping the whole row to SOLD: a row of
         // 100 pieces that sells 2 still has 98 on hand. Marking it SOLD
@@ -2262,6 +2315,11 @@ export async function updateInvoice(
     const explicitStockIds = new Set(
       items.filter((item) => item.inventoryStockId).map((item) => item.inventoryStockId as string),
     );
+    // Same lot planning as createInvoice, counting the weight this invoice
+    // already took as available — it's given back first in the transaction.
+    const lotPlan = await planLineLotDraws(storeId, items, heldLotWeights(invoice.items, parseLotDraw));
+    if ("error" in lotPlan) return { success: false, message: lotPlan.error };
+    items = lotPlan.items;
     items = await lockLinkedStockFields(storeId, items, explicitStockIds);
     const pieceLines = await resolvePieceLines(storeId, items);
     if ("error" in pieceLines) return { success: false, message: pieceLines.error };
@@ -2448,6 +2506,20 @@ export async function updateInvoice(
       for (const item of invoice.items) {
         if (!item.inventoryStockId) continue;
 
+        // A lot line gives back exactly the weight it drew.
+        const oldDraw = parseLotDraw(item.lotDraw);
+        if (oldDraw) {
+          await restoreToLot(tx, {
+            storeId,
+            stockId: item.inventoryStockId,
+            draw: oldDraw,
+            referenceType: "Invoice",
+            referenceId: invoice.id,
+            notes: "Stock restored — invoice edited",
+          });
+          continue;
+        }
+
         const restoreQty = Math.max(1, item.quantity || 1);
 
         await tx.inventoryStock.updateMany({
@@ -2552,6 +2624,7 @@ export async function updateInvoice(
               hsnCode: item.hsnCode ?? undefined,
               lineTotal: lineTotal(item),
               inventoryStockId: item.inventoryStockId ?? undefined,
+              lotDraw: lotDrawJson(item.lotDraw),
             })),
           },
         },
@@ -2561,6 +2634,18 @@ export async function updateInvoice(
       // back the restoration above too, leaving the invoice untouched.
       for (const item of soldItems) {
         if (!item.inventoryStockId) continue;
+
+        if (item.lotDraw) {
+          await drawFromLot(tx, {
+            storeId,
+            stockId: item.inventoryStockId,
+            draw: item.lotDraw,
+            label: item.itemName,
+            referenceType: "Invoice",
+            referenceId: invoice.id,
+          });
+          continue;
+        }
 
         const soldQty = Math.max(1, item.quantity || 1);
 
@@ -2767,6 +2852,16 @@ export async function updateInvoiceLineItem(
     const round = (value: number) => Math.round(value * 100) / 100;
 
     const oldQuantity = isDiamond ? toNumber(item.caratWeight) : toNumber(item.netWeight);
+
+    // A line that drew part of a sold-by-weight lot can't change its weight
+    // here — the lot gave up exactly that much (lotDraw); re-weigh it through
+    // Edit Invoice, which gives the old draw back and takes the new one.
+    if (parseLotDraw(item.lotDraw) && Math.abs(weight - oldQuantity) >= 0.000005) {
+      return {
+        success: false,
+        message: "This line was sold by weight from a lot — change its weight with Edit Invoice so the stock follows.",
+      };
+    }
 
     // Only the stone's details changed: nothing is re-priced (re-deriving
     // GST from the line's ratio can move a paisa and post a "revised" entry).
@@ -3105,6 +3200,20 @@ export async function cancelInvoice(
       for (const item of invoice.items) {
         if (!item.inventoryStockId) continue;
 
+        // A lot line gives back exactly the weight it drew.
+        const draw = parseLotDraw(item.lotDraw);
+        if (draw) {
+          await restoreToLot(tx, {
+            storeId,
+            stockId: item.inventoryStockId,
+            draw,
+            referenceType: "Invoice",
+            referenceId: invoice.id,
+            notes: "Stock restored — invoice cancelled",
+          });
+          continue;
+        }
+
         const restoreQty = Math.max(1, item.quantity || 1);
 
         // No `gte` guard needed for an increment — there's no way to
@@ -3232,6 +3341,20 @@ export async function deleteInvoice(id: string): Promise<InvoiceFormState> {
     await prisma.$transaction(async (tx) => {
       for (const item of invoice.items) {
         if (!item.inventoryStockId) continue;
+
+        // A lot line gives back exactly the weight it drew.
+        const draw = parseLotDraw(item.lotDraw);
+        if (draw) {
+          await restoreToLot(tx, {
+            storeId,
+            stockId: item.inventoryStockId,
+            draw,
+            referenceType: "Invoice",
+            referenceId: invoice.id,
+            notes: "Stock restored — draft invoice deleted",
+          });
+          continue;
+        }
 
         const restoreQty = Math.max(1, item.quantity || 1);
 

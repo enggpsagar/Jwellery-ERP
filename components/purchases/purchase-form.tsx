@@ -79,9 +79,12 @@ type ProductOption = {
   name: string
   category: string | null
   ornamentType: string | null
-  metalType: { id: string; name: string } | null
+  metalType: { id: string; name: string; isGemstone?: boolean } | null
   defaultPurity: string | null
   storeMetalPurity: { id: string; label: string } | null
+  /** Bulk stock sold by weight (Product.soldByWeight) — qty N on a purchase
+   * comes in as ONE stock lot of N × the weight (purchaseStockWeights). */
+  soldByWeight?: boolean
   defaultMakingCharge: number | null
   defaultMakingChargeType: "FIXED" | "PERCENTAGE"
   defaultStoneCharge: number | null
@@ -296,6 +299,28 @@ function deriveNetWeight(grossWeight: number, stoneWeight: number, dmoWeight: nu
 }
 
 const initialState: PurchaseFormState = { success: false, message: "" }
+
+// "+ New product" line → an existing product with the same identity, so the
+// form can suggest adding to it instead of minting a near-duplicate. Only a
+// suggestion: the server still mints a new product if it's ignored.
+function normText(value: string | null | undefined) {
+  return (value ?? "").trim().replace(/\s+/g, " ").toLowerCase()
+}
+
+function normStoneTypes(value: string[] | string | null | undefined) {
+  const list = Array.isArray(value) ? value : (value ?? "").split(",")
+  return list.map(normText).filter(Boolean).sort().join("|")
+}
+
+/** Match key for a metal piece: name + metal + purity. */
+function metalMatchKey(name: string, metalTypeId: string, purityLabel: string) {
+  return `${normText(name)}\u0000${metalTypeId}\u0000${normText(purityLabel)}`
+}
+
+/** Match key for a loose stone: stone name + stone type(s). */
+function stoneMatchKey(stoneName: string, stoneTypes: string[] | string | null | undefined) {
+  return `${normText(stoneName)}\u0000${normStoneTypes(stoneTypes)}`
+}
 
 type LocationOption = {
   id: string
@@ -800,6 +825,54 @@ export function PurchaseForm({
   // regardless of what unit is currently toggled for display/entry.
   const metalById = useMemo(() => new Map(metals.map((m) => [m.id, m])), [metals])
   const primaryUnitFor = (item: LineItem) => metalById.get(item.metalTypeId)?.primaryUnit ?? "GRAM"
+
+  const productById = useMemo(() => new Map(products.map((p) => [p.id, p])), [products])
+
+  // Existing products by identity, for the "already exists — add to it?"
+  // suggestion on a "+ New product" line. A loose stone (gemstone metal, or
+  // no metal with a stone) matches on stone name + type; anything else on
+  // name + metal + purity. First product (by name, code) wins.
+  const existingProductIndex = useMemo(() => {
+    const byMetal = new Map<string, ProductOption>()
+    const byStone = new Map<string, ProductOption>()
+    for (const product of products) {
+      if (product.pieceComponents?.length) continue
+      const metal = product.metalType ? metalById.get(product.metalType.id) : undefined
+      const isGemstone = product.metalType?.isGemstone ?? metal?.isGemstone ?? false
+      if (isGemstone || (!product.metalType && product.defaultStoneMetalTypeName)) {
+        const stoneName = isGemstone ? product.metalType?.name : product.defaultStoneMetalTypeName
+        if (!stoneName) continue
+        const key = stoneMatchKey(stoneName, product.defaultStoneTypeNames)
+        if (!byStone.has(key)) byStone.set(key, product)
+      } else if (product.metalType) {
+        const key = metalMatchKey(product.name, product.metalType.id, product.storeMetalPurity?.label ?? "")
+        if (!byMetal.has(key)) byMetal.set(key, product)
+      }
+    }
+    return { byMetal, byStone }
+  }, [products, metalById])
+
+  const existingProductFor = (item: LineItem): ProductOption | null => {
+    if (item.productId || !item.productLinkDecided || item.multiPart || item.existingStockId) return null
+    const lineMetal = metalById.get(item.metalTypeId)
+    const isLooseStone =
+      Boolean(lineMetal?.isGemstone) || (item.itemKind === "STONE" && !item.metalTypeId)
+    if (isLooseStone) {
+      const stoneName = lineMetal?.isGemstone ? lineMetal.name : item.stoneMetalTypeName
+      if (!normText(stoneName)) return null
+      return existingProductIndex.byStone.get(stoneMatchKey(stoneName, item.stoneTypeNames)) ?? null
+    }
+    if (!item.metalTypeId || !normText(item.itemName)) return null
+    return existingProductIndex.byMetal.get(metalMatchKey(item.itemName, item.metalTypeId, item.purityLabel)) ?? null
+  }
+
+  // "Use existing product": exactly what picking it from "Existing
+  // product — search…" does (applyProductToItem — weights/HSN prefill from
+  // the product, qty kept), then remount the picker so it shows it.
+  const adoptExistingProduct = (key: string, productId: string) => {
+    applyProductToItem(key, productId)
+    setProductSelectKeys((prev) => ({ ...prev, [key]: (prev[key] ?? 0) + 1 }))
+  }
 
   // Real per-Metal Purity options (Settings > Taxonomy > Purities),
   // replacing the old hardcoded PURITY_OPTIONS enum list — cached per
@@ -1357,6 +1430,9 @@ export function PurchaseForm({
               // of inventoryStockId since Purchase reads from Product.
               const isLinked = Boolean(item.productId)
               const piece = item.multiPart ? pieceTotals(item.components, PIECE_VALUE) : null
+              const existingMatch = existingProductFor(item)
+              const linkedProduct = item.productId ? productById.get(item.productId) : undefined
+              const showSoldByWeight = Boolean(linkedProduct?.soldByWeight) && !item.multiPart && !item.existingStockId
 
               return (
               <div key={item.key} className="rounded-lg border">
@@ -1570,6 +1646,35 @@ export function PurchaseForm({
                     )}
                   </div>
                 </div>
+
+                {/* Non-blocking: ignoring it still saves a new product. */}
+                {existingMatch && (
+                  <div
+                    className="mx-2 mb-2 flex flex-wrap items-center gap-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs text-amber-900"
+                    data-testid="purchase-existing-product-suggestion"
+                  >
+                    <span>
+                      {existingMatch.productCode} {existingMatch.name} already exists — add to it?
+                    </span>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-6 px-2 text-xs"
+                      onClick={() => adoptExistingProduct(item.key, existingMatch.id)}
+                    >
+                      Use existing product
+                    </Button>
+                  </div>
+                )}
+                {showSoldByWeight && (
+                  <p className="mx-2 mb-2 text-xs text-muted-foreground" data-testid="purchase-sold-by-weight-hint">
+                    Sold by weight —{" "}
+                    {item.quantity > 1
+                      ? `these ${item.quantity} come in as one lot of ${item.quantity} × the weight, sold part at a time.`
+                      : "comes in as one lot, sold part at a time."}
+                  </p>
+                )}
 
                 {isExpanded && (
                   <div className="space-y-3 border-t p-4">

@@ -39,7 +39,6 @@ import {
   getCustomerByIdCore,
   createCustomerCore,
   updateCustomerCore,
-  setCustomerSupplierStatusCore,
   validateCustomerInput,
   getCustomerWhere,
   getCustomerOrderBy,
@@ -56,6 +55,11 @@ import {
 import { getBusinessSettings } from "@/lib/actions/settings-actions"
 import { logger } from "@/lib/logger";
 import { earlierRowHint, existingRecordHint, namesAsCandidates, suggestFrom } from "@/lib/import-suggest"
+import {
+  OPENING_BALANCE_TYPE_LABELS,
+  parseOpeningBalanceType,
+  signedOpeningBalance,
+} from "@/lib/party-balance"
 
 // Re-declared (not re-exported via `export type {...} from`, which Next's
 // "use server" export transform can't handle) so every existing
@@ -77,8 +81,6 @@ type ExportCustomersParams = {
   dateFrom?: string
   dateTo?: string
   format?: "csv" | "xlsx" | "pdf"
-  /** The Suppliers page's export — only parties tagged isSupplier. */
-  supplierOnly?: boolean
 }
 
 function toNumber(value: FormDataEntryValue | null, fallback = 0) {
@@ -110,8 +112,19 @@ function formDataToCustomerInput(formData: FormData): CustomerInput {
     aadhaarNumber: String(formData.get("aadhaarNumber") || "").trim(),
     registrationId: String(formData.get("registrationId") || "").trim(),
     notes: String(formData.get("notes") || "").trim(),
-    openingBalance: toNumber(formData.get("openingBalance"), 0),
+    openingBalance: openingBalanceFromForm(formData),
   }
+}
+
+/**
+ * The form sends a non-negative amount plus `openingBalanceType`
+ * (RECEIVABLE / PAYABLE); it's stored signed (lib/party-balance.ts). With no
+ * type (an older client), the number is taken as already signed.
+ */
+function openingBalanceFromForm(formData: FormData) {
+  const amount = toNumber(formData.get("openingBalance"), 0)
+  const type = parseOpeningBalanceType(formData.get("openingBalanceType"))
+  return type ? signedOpeningBalance(amount, type) : amount
 }
 
 export async function getCustomers(
@@ -127,32 +140,19 @@ export async function getCustomerById(id: string): Promise<Customer | null> {
 }
 
 /**
- * Lightweight, unpaginated Supplier picker for a plain dropdown (Stock's
- * own Vendor Name field) — same isSupplier scoping as the /suppliers list
- * (getCustomers({ supplierOnly: true })), but that one is paginated for a
- * table and this needs every active supplier at once, same shape as
- * getPurchaseFormParties() in purchase-actions.ts.
- *
- * With the Supplier module off, isSupplier can never actually be set on any
- * party — toggleCustomerSupplierStatus above refuses while it's off, same
- * as the module's own UI being hidden then — so filtering on it here would
- * silently return nothing for a store in that mode. Falls back to every
- * active party in that case, same "no distinction, any party can be a
- * vendor" shape getPurchaseFormParties() already always uses.
+ * Lightweight, unpaginated party picker for a "supplier" dropdown (Stock's
+ * Vendor Name, a line's Purchased From). Every active party — there is no
+ * separate Supplier list any more (user decision 2026-10-13: only Parties,
+ * one ledger each), so the old isSupplier / supplierModuleEnabled filter is
+ * gone. Same shape as getPurchaseFormParties() in purchase-actions.ts.
  */
 export async function getSupplierOptions(): Promise<
   { id: string; name: string; phone: string | null }[]
 > {
   const storeId = await requireStoreScope()
-  const settings = await getBusinessSettings()
 
   return prisma.customer.findMany({
-    where: {
-      storeId,
-      isActive: true,
-      isArchived: false,
-      ...(settings.supplierModuleEnabled ? { isSupplier: true } : {}),
-    },
+    where: { storeId, isActive: true, isArchived: false },
     orderBy: { name: "asc" },
     select: { id: true, name: true, phone: true },
   })
@@ -172,7 +172,6 @@ async function getAllCustomersForExport(
         },
         storeId,
         isArchived: false,
-        ...(params.supplierOnly ? { isSupplier: true } : {}),
       }
     : getCustomerWhere(
         storeId,
@@ -180,7 +179,6 @@ async function getAllCustomersForExport(
         false,
         params.dateFrom,
         params.dateTo,
-        params.supplierOnly,
       )
 
   const customers = await prisma.customer.findMany({
@@ -209,7 +207,7 @@ export async function exportCustomersToExcel(
     if (!customers.length) {
       return {
         success: false,
-        message: params.supplierOnly ? "No suppliers found to export." : "No parties found to export.",
+        message: "No parties found to export.",
       }
     }
 
@@ -234,12 +232,16 @@ export async function exportCustomersToExcel(
         "PAN Number": customer.panNumber || "",
         "Aadhaar Number": customer.aadhaarNumber || "",
         "Registration Id": customer.registrationId || "",
-        "Opening Balance": customer.openingBalance ?? 0,
-        "Current Balance": customer.currentBalance ?? 0,
-        "Balance Type": customer.balanceType || "",
+        // Amount + direction, the way the form and the import take it.
+        "Opening Balance": Math.abs(customer.openingBalance ?? 0),
+        "Opening Balance Type":
+          OPENING_BALANCE_TYPE_LABELS[(customer.openingBalance ?? 0) < 0 ? "PAYABLE" : "RECEIVABLE"],
+        // The party's one net balance (lib/party-balance.ts), unsigned, with
+        // its direction beside it.
+        "Net Balance": Math.abs(customer.netBalance),
+        "Balance Type": customer.balanceType,
         "Total Orders": customer.totalOrders ?? 0,
         "Total Purchase Value": customer.totalPurchaseValueAmount ?? 0,
-        "Pending Amount": customer.pendingAmountValue ?? 0,
         "Last Purchase Date": dash(customer.lastPurchaseDate),
         "Last Payment Date": dash(customer.lastPaymentDate),
         "Created At": customer.createdAt ? formatShortDateTime(customer.createdAt) : "",
@@ -247,14 +249,14 @@ export async function exportCustomersToExcel(
       return Object.fromEntries(columns.map((header) => [header, values[header] ?? ""]))
     })
 
-    const filePrefix = params.supplierOnly ? "suppliers" : "parties"
+    const filePrefix = "parties"
     const { fileName, fileBase64 } =
       params.format === "csv"
         ? buildCsvExportBase64(rows, filePrefix)
         : params.format === "pdf"
-          ? buildPdfExportBase64(rows, params.supplierOnly ? "Suppliers" : "Parties", filePrefix)
+          ? buildPdfExportBase64(rows, "Parties", filePrefix)
           : buildImportTemplateWithDropdowns({
-              sheetName: params.supplierOnly ? "Suppliers" : "Parties",
+              sheetName: "Parties",
               rows,
               columns,
               dropdowns: await loadPartySheetDropdowns(),
@@ -397,42 +399,6 @@ export async function unarchiveCustomer(id: string): Promise<CustomerFormState> 
   }
 }
 
-/**
- * The "Also Supplier" action on a Party's detail page — see
- * setCustomerSupplierStatusCore's own doc comment. Refuses outright while
- * the Supplier module is off, same as that action's own UI being hidden
- * then — a direct call here (bypassing the UI) shouldn't work either.
- */
-export async function toggleCustomerSupplierStatus(
-  id: string,
-  isSupplier: boolean,
-): Promise<CustomerFormState> {
-  try {
-    const storeId = await requireStoreScope()
-
-    const settings = await getBusinessSettings()
-    if (!settings.supplierModuleEnabled) {
-      return { success: false, message: "The Supplier module is turned off in Settings" }
-    }
-
-    const result = await setCustomerSupplierStatusCore(id, storeId, isSupplier)
-
-    if (result.success) {
-      revalidatePath("/customers")
-      revalidatePath("/suppliers")
-      revalidatePath(`/customers/${id}`)
-    }
-
-    return result
-  } catch (error) {
-    logger.error("toggleCustomerSupplierStatus error", error)
-    return {
-      success: false,
-      message: actionErrorMessage(error, "Failed to update supplier status"),
-    }
-  }
-}
-
 export async function deleteCustomer(id: string): Promise<CustomerFormState> {
   try {
     const storeId = await requireStoreScope()
@@ -529,6 +495,7 @@ async function loadPartySheetDropdowns(): Promise<Record<string, string[]>> {
   const states = await prisma.state.findMany({ orderBy: { name: "asc" }, select: { name: true } })
   return {
     "GST Type": PARTY_GST_TYPE_OPTIONS.map((option) => option.label),
+    "Opening Balance Type": Object.values(OPENING_BALANCE_TYPE_LABELS),
     State: states.map((state) => state.name),
   }
 }
@@ -706,10 +673,24 @@ export async function importCustomersFromExcel(
         if (!earlierLine) firstLineByPhone.set(phone, line)
       }
 
+      // Amount + Receivable/Payable, stored signed (lib/party-balance.ts).
+      // A blank type keeps the number's own sign, so an older sheet with a
+      // negative opening balance still reads as Payable.
       const rawOpeningBalance = customerImportCell(row, "Opening Balance")
-      const openingBalance = rawOpeningBalance === "" ? 0 : Number(rawOpeningBalance)
-      if (!Number.isFinite(openingBalance)) {
+      const rawOpeningAmount = rawOpeningBalance === "" ? 0 : Number(rawOpeningBalance)
+      const rawOpeningType = customerImportCell(row, "Opening Balance Type")
+      const openingType = parseOpeningBalanceType(rawOpeningType)
+      let openingBalance = rawOpeningAmount
+      if (!Number.isFinite(rawOpeningAmount)) {
         rowErrors.push("Opening Balance must be a number")
+      } else if (rawOpeningType && !openingType) {
+        rowErrors.push(
+          `Opening Balance Type "${rawOpeningType}" is not one of: ${Object.values(OPENING_BALANCE_TYPE_LABELS).join(", ")}`,
+        )
+      } else if (openingType && rawOpeningAmount < 0) {
+        rowErrors.push("Opening Balance must be a positive amount when Opening Balance Type is given")
+      } else if (openingType) {
+        openingBalance = signedOpeningBalance(rawOpeningAmount, openingType)
       }
 
       if (rowErrors.length) {

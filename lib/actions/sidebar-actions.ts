@@ -24,7 +24,6 @@ export type SidebarCounts = {
   paymentsOut: number
   users: number
   stores: number
-  suppliers: number
 }
 
 const EMPTY_COUNTS: SidebarCounts = {
@@ -41,7 +40,6 @@ const EMPTY_COUNTS: SidebarCounts = {
   paymentsOut: 0,
   users: 0,
   stores: 0,
-  suppliers: 0,
 }
 
 /**
@@ -109,7 +107,6 @@ async function storeCounts(
     paymentsOut,
     users,
     stores,
-    suppliers,
   ] = await Promise.all([
     prisma.customer.count({ where: { storeId, isArchived: false } }),
     prisma.product.count({ where: { storeId } }),
@@ -134,7 +131,6 @@ async function storeCounts(
     // enough to skip gating twice, but there's no reason to run it for
     // roles that will never render the badge.
     role === UserRole.SUPER_ADMIN ? prisma.store.count() : Promise.resolve(0),
-    prisma.customer.count({ where: { storeId, isSupplier: true, isArchived: false } }),
   ])
 
   return {
@@ -151,6 +147,5 @@ async function storeCounts(
     paymentsOut,
     users,
     stores,
-    suppliers,
   }
 }

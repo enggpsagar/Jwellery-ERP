@@ -11,6 +11,8 @@ import { requirePermission } from "@/lib/auth/auth"
 import { PERMISSIONS } from "@/lib/permissions"
 import { formatShortDate } from "@/lib/utils"
 import { logger } from "@/lib/logger";
+import { getPartyNetBalances } from "@/lib/core/customer"
+import { partyBalanceDirection, type PartyBalanceDirection } from "@/lib/party-balance"
 
 export type PaymentFormState = {
   success: boolean
@@ -250,19 +252,16 @@ export type PaymentVendorOption = {
   vendorCode: string | null
   /** Sum of every unpaid/partial purchase's own balanceAmount — used only
    * to decide which purchases a specific payment applies against
-   * (allocatePaymentOldestFirst), NOT for display — see currentBalance for
-   * that. */
+   * (allocatePaymentOldestFirst), NOT for display — see netBalance. */
   pendingAmount: number
-  /** This Party's own supplier-side ledger balance — tracked independently
-   * from its customer-side balance (Payment In's own picker), same
-   * separation as lib/core/customer.ts' mapCustomer/supplierBalance; the
-   * two are never netted against each other. */
-  currentBalance: number
-  balanceType: "Advance" | "Payable"
+  /** The party's ONE net balance (lib/party-balance.ts) — the same figure
+   * the Parties list shows: positive Receivable, negative Payable. */
+  netBalance: number
+  balanceType: PartyBalanceDirection
 }
 
-/** Party list for the Payment Out supplier picker, carrying each party's
- * outstanding supplier-side balance alongside the usual name/phone. */
+/** Party list for the Payment Out picker, carrying each party's net
+ * balance alongside the usual name/phone. */
 export async function getPaymentFormPartiesWithBalance(): Promise<PaymentVendorOption[]> {
   const storeId = await requireStoreScope()
 
@@ -275,23 +274,16 @@ export async function getPaymentFormPartiesWithBalance(): Promise<PaymentVendorO
       phone: true,
       vendorCode: true,
       purchasesAsVendor: { select: { balanceAmount: true, status: true } },
-      ledgerEntriesAsVendor: { select: { amount: true, type: true } },
     },
   })
+  const nets = await getPartyNetBalances(storeId, parties.map((party) => party.id))
 
   return parties.map((party) => {
     const pendingAmount = party.purchasesAsVendor.reduce(
       (sum, p) => (p.status === "CANCELLED" ? sum : sum + Number(p.balanceAmount || 0)),
       0,
     )
-
-    // Same formula as mapCustomer's supplierBalance — purely this Party's
-    // own vendorId-side ledger activity, no opening-balance term (that's
-    // spent on the customer-side figure instead) and no netting against it.
-    const currentBalance = party.ledgerEntriesAsVendor.reduce(
-      (sum, e) => sum + (e.type === "CREDIT" ? Number(e.amount ?? 0) : -Number(e.amount ?? 0)),
-      0,
-    )
+    const netBalance = nets.get(party.id) ?? 0
 
     return {
       id: party.id,
@@ -299,8 +291,8 @@ export async function getPaymentFormPartiesWithBalance(): Promise<PaymentVendorO
       phone: party.phone,
       vendorCode: party.vendorCode,
       pendingAmount,
-      currentBalance,
-      balanceType: currentBalance < 0 ? "Advance" : "Payable",
+      netBalance,
+      balanceType: partyBalanceDirection(netBalance),
     }
   })
 }
@@ -314,16 +306,13 @@ export type PaymentCustomerOption = {
    * for FIFO allocation, not display. See PaymentVendorOption.pendingAmount
    * for why, mirrored for the customer side. */
   pendingAmount: number
-  /** The real, ledger-derived outstanding shown to whoever is recording the
-   * payment — same figure as lib/core/customer.ts' mapCustomer. See
-   * PaymentVendorOption.currentBalance's own comment for the payable-side
-   * mirror of this. */
-  currentBalance: number
-  balanceType: "Advance" | "Receivable"
+  /** The party's ONE net balance — see PaymentVendorOption.netBalance. */
+  netBalance: number
+  balanceType: PartyBalanceDirection
 }
 
-/** Customer list for the Payment In party picker, carrying each customer's
- * outstanding balance alongside the usual name/phone. */
+/** Party list for the Payment In picker, carrying each party's net
+ * balance alongside the usual name/phone. */
 export async function getPaymentFormCustomersWithBalance(): Promise<PaymentCustomerOption[]> {
   const storeId = await requireStoreScope()
 
@@ -338,14 +327,13 @@ export async function getPaymentFormCustomersWithBalance(): Promise<PaymentCusto
       openingBalance: true,
       invoices: { select: { balanceAmount: true, status: true } },
       kachaInvoices: { select: { balanceAmount: true, status: true } },
-      ledgerEntries: { select: { amount: true, type: true } },
     },
   })
+  const nets = await getPartyNetBalances(storeId, customers.map((customer) => customer.id))
 
   return customers.map((customer) => {
-    // Same fix as mapCustomer's own pendingAmount (lib/core/customer.ts) —
-    // this used to ignore Kacha slips, any CANCELLED invoice, and
-    // openingBalance entirely.
+    // Same as mapCustomer's pendingAmount (lib/core/customer.ts): open
+    // Invoices + Kacha slips + opening balance — the FIFO allocator's input.
     const pendingAmount =
       customer.invoices.reduce(
         (sum, i) => (i.status === "CANCELLED" ? sum : sum + Number(i.balanceAmount || 0)),
@@ -356,17 +344,7 @@ export async function getPaymentFormCustomersWithBalance(): Promise<PaymentCusto
         0,
       ) +
       Number(customer.openingBalance ?? 0)
-
-    // Identical formula to mapCustomer's currentBalance — purely this
-    // Party's own customer-side ledger activity, tracked independently
-    // from any supplier-side (ledgerEntriesAsVendor) balance it might also
-    // have — see mapCustomer's own comment on why the two aren't netted.
-    const currentBalance =
-      Number(customer.openingBalance ?? 0) +
-      customer.ledgerEntries.reduce(
-        (sum, e) => sum + (e.type === "DEBIT" ? Number(e.amount ?? 0) : -Number(e.amount ?? 0)),
-        0,
-      )
+    const netBalance = nets.get(customer.id) ?? 0
 
     return {
       id: customer.id,
@@ -374,8 +352,8 @@ export async function getPaymentFormCustomersWithBalance(): Promise<PaymentCusto
       phone: customer.phone,
       customerCode: customer.customerCode,
       pendingAmount,
-      currentBalance,
-      balanceType: currentBalance < 0 ? "Advance" : "Receivable",
+      netBalance,
+      balanceType: partyBalanceDirection(netBalance),
     }
   })
 }

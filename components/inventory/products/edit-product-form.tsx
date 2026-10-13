@@ -50,6 +50,9 @@ type EditProductFormProps = {
     description: string | null;
     notes: string | null;
     isActive: boolean;
+    soldByWeight: boolean;
+    /** Has stock or bills — name / metal / purity / stone / category are locked. */
+    identityLocked: boolean;
     createdAt: string;
     updatedAt: string;
   };

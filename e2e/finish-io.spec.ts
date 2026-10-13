@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test"
 import * as XLSX from "xlsx"
 import fs from "node:fs"
 import { db, demoStoreId } from "./helpers"
-import { PRODUCT_SHEET_HEADERS } from "../lib/inventory/product-sheet"
+import { PRODUCT_SHEET_EXPORT_ONLY_HEADERS, PRODUCT_SHEET_HEADERS } from "../lib/inventory/product-sheet"
 
 function sheet(rows: Record<string, unknown>[], path: string) {
   const wb = XLSX.utils.book_new()
@@ -84,16 +84,16 @@ test("finish: product import, stock import, both exports", async ({ page }) => {
   const productCsv = await exportCsv(page, "/inventory/products")
   expect(productCsv).toContain("Finished / Hallmarked")
   expect(productCsv).not.toMatch(/(?<![\w-])(KACHA|PAKKA)(?![\w-])/)
-  // CSV and Excel exports carry exactly the import template's columns.
+  // CSV and Excel exports carry the import template's columns, then the read-only live-stock ones.
   const csvHeader = XLSX.utils.sheet_to_json<string[]>(XLSX.read(productCsv.replace(/^\uFEFF/, ""), { type: "string" }).Sheets.Sheet1, { header: 1 })[0]
-  expect(csvHeader).toEqual(PRODUCT_SHEET_HEADERS)
+  expect(csvHeader).toEqual([...PRODUCT_SHEET_HEADERS, ...PRODUCT_SHEET_EXPORT_ONLY_HEADERS])
 
   // Excel export = a filled-in template: same sheets (data, Instructions,
   // Options with this store's lists), same columns.
   const workbook = XLSX.read(await exportFile(page, "/inventory/products", "Excel"))
   expect(workbook.SheetNames).toEqual(["Products", "Instructions", "Options"])
   const xlsxHeader = XLSX.utils.sheet_to_json<string[]>(workbook.Sheets.Products, { header: 1 })[0]
-  expect(xlsxHeader).toEqual(PRODUCT_SHEET_HEADERS)
+  expect(xlsxHeader).toEqual([...PRODUCT_SHEET_HEADERS, ...PRODUCT_SHEET_EXPORT_ONLY_HEADERS])
   const options = XLSX.utils.sheet_to_json<string[]>(workbook.Sheets.Options, { header: 1 })
   expect(options[0]).toContain("Stone Metal Type Name")
   expect(options[0]).toContain("Finish")

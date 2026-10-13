@@ -2,7 +2,7 @@
 
 import { useActionState, useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
-import { User, Phone, Mail, MapPin, Hash, IndianRupee } from "lucide-react"
+import { User, Phone, Mail, MapPin, Hash } from "lucide-react"
 
 import type { GstScheme } from "@prisma/client"
 
@@ -13,6 +13,7 @@ import {
 } from "@/lib/actions/customer-actions"
 import { getCitiesByStateId } from "@/lib/actions/location-actions"
 import { Button } from "@/components/ui/button"
+import { OpeningBalanceField } from "@/components/customers/opening-balance-field"
 import { Card, CardContent } from "@/components/ui/card"
 import { useToast } from "@/components/providers/toast-provider"
 import { RequiredMark } from "@/components/shared/required-mark"
@@ -350,19 +351,7 @@ export function CustomerEditForm({
             />
           </div>
 
-          <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
-            <label className="flex items-center gap-2 text-sm font-medium">
-              <IndianRupee className="h-4 w-4 text-muted-foreground" />
-              Opening Balance
-            </label>
-            <input
-              name="openingBalance"
-              type="number"
-              step="0.01"
-              className={FIELD}
-              defaultValue={customer.openingBalance ?? 0}
-            />
-          </div>
+          <OpeningBalanceField defaultValue={customer.openingBalance ?? 0} />
 
           <div className="flex justify-end gap-3 pt-2 md:col-span-2">
             <Button type="submit" disabled={pending} size="lg">

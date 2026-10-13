@@ -91,6 +91,7 @@ import { LinkedProductDetails } from "@/components/inventory/shared/linked-produ
 import type { StockOptionProductDetails } from "@/lib/inventory/stock-option-details"
 import { stockPieceDrafts, stoneSellingRate, type LinkedStoneDetails } from "@/lib/inventory/stock-pick-rates"
 import { IconTooltip } from "@/components/ui/icon-tooltip"
+import { LOT_EPSILON, lotMeasure, previewLotDraw, toLotWeights, type LotMeasure, type LotWeights } from "@/lib/inventory/weight-lot"
 
 type CustomerOption = {
   id: string
@@ -130,6 +131,10 @@ type StockOption = {
   components?: StoredPieceComponent[]
   /** A single stone's pieces / clarity / certificate / catalog rate. */
   linkedStone?: LinkedStoneDetails | null
+  /** A sold-by-weight lot (lib/inventory/weight-lot.ts): its weights are the
+   * whole lot (on an edit, what's left plus what this invoice took), and a
+   * line takes part of it by the lot's measure. */
+  sellsByWeight?: boolean
 } & StockOptionProductDetails
 
 /**
@@ -757,11 +762,84 @@ export function InvoiceForm({
   const availableForStock = (stockId: string, excludeKey: string) => {
     const stock = stockItems.find((s) => s.id === stockId)
     if (!stock) return 0
+    // A sold-by-weight lot can feed several lines until its weight runs out.
+    const lot = lotOfStock(stock)
+    if (lot) return lotLeftFor(stock.id, lot, excludeKey) > LOT_EPSILON ? 1 : 0
     const claimedByOtherLines = items
       .filter((item) => item.key !== excludeKey && item.inventoryStockId === stockId)
       .reduce((sum, item) => sum + (item.quantity || 0), 0)
     return Math.max(0, stock.quantity - claimedByOtherLines)
   }
+
+  // Sold-by-weight lots (lib/inventory/weight-lot.ts). The lot is always
+  // the picked option's own weights (never the line's, which are already
+  // the reduced draw), so the proportional maths runs from the whole lot.
+  const lotOfStock = (stock: StockOption | undefined) => {
+    if (!stock?.sellsByWeight || stock.components?.length) return null
+    const weights = toLotWeights(stock)
+    const measure = lotMeasure(weights)
+    return measure ? { weights, measure, label: stock.productName } : null
+  }
+  const lotFor = (item: LineItem) =>
+    item.inventoryStockId && !item.multiPart
+      ? lotOfStock(stockItems.find((s) => s.id === item.inventoryStockId))
+      : null
+  // What's left of a lot for one line: the lot less every other line on it.
+  const lotLeftFor = (
+    stockId: string,
+    lot: { weights: LotWeights; measure: LotMeasure },
+    excludeKey: string,
+    lines: LineItem[] = items,
+  ) =>
+    lot.weights[lot.measure] -
+    lines
+      .filter((line) => line.key !== excludeKey && line.inventoryStockId === stockId && !line.multiPart)
+      .reduce((sum, line) => sum + (line[lot.measure] || 0), 0)
+  // The line's weights for `amount` of the lot (in its measure): every
+  // weight in proportion, so metal value, stone charge, % making and GST
+  // all re-derive from the existing line fields.
+  const lotLinePatch = (
+    item: Pick<LineItem, "stoneRate" | "stoneChargeTouched" | "caratWeight">,
+    lot: { weights: LotWeights; measure: LotMeasure },
+    amount: number,
+  ): Partial<LineItem> => {
+    const draw = previewLotDraw(lot.weights, amount)
+    const patch: Partial<LineItem> = draw
+      ? {
+          grossWeight: draw.grossWeight,
+          netWeight: draw.netWeight,
+          caratWeight: draw.caratWeight,
+          stoneWeightInput: draw.stoneWeight,
+        }
+      : { [lot.measure]: amount }
+    patch.quantity = 1
+    const carats = patch.caratWeight ?? item.caratWeight
+    if (!item.stoneChargeTouched && item.stoneRate > 0) {
+      patch.stoneCharge = Number((item.stoneRate * carats).toFixed(2))
+    }
+    return patch
+  }
+  const handleLotAmountChange = (item: LineItem, amount: number) => {
+    const lot = lotFor(item)
+    if (lot) updateItem(item.key, lotLinePatch(item, lot, amount))
+  }
+  const formatLotWeight = (measure: LotMeasure, value: number) =>
+    measure === "caratWeight" ? wf.carats(value) : wf.grams(value)
+  // A lot line's problem, if any: nothing sold, or the lines on this lot
+  // together asking for more than is left.
+  const lotProblem = (item: LineItem): string | null => {
+    const lot = lotFor(item)
+    if (!lot) return null
+    const amount = item[lot.measure] || 0
+    if (!(amount > LOT_EPSILON)) return `Enter how much of ${lot.label} is sold.`
+    const billed = lot.weights[lot.measure] - lotLeftFor(item.inventoryStockId, lot, "")
+    if (billed > lot.weights[lot.measure] + LOT_EPSILON) {
+      return `Only ${formatLotWeight(lot.measure, lot.weights[lot.measure])} of ${lot.label} is left, but ${formatLotWeight(lot.measure, billed)} is on this bill.`
+    }
+    return null
+  }
+  const lotHint = (item: LineItem, lot: { weights: LotWeights; measure: LotMeasure }) =>
+    `of ${formatLotWeight(lot.measure, Math.max(0, lotLeftFor(item.inventoryStockId, lot, item.key)))} left — sold by weight`
 
   /**
    * Everything a picked or scanned stock piece puts on its line — one
@@ -880,9 +958,26 @@ export function InvoiceForm({
     const available = availableForStock(stockId, key)
     if (stock.metalType?.id) ensureMetalPurities(stock.metalType.id)
 
+    const fields = linkedStockFields(stock)
+    // A lot line starts on everything the other lines leave of it.
+    const lot = lotOfStock(stock)
+    const lotLeft = lot ? lotLeftFor(stock.id, lot, key) : 0
+    const lotFields =
+      lot && lotLeft > LOT_EPSILON && lotLeft < lot.weights[lot.measure] - LOT_EPSILON
+        ? lotLinePatch(
+            {
+              stoneRate: fields.stoneRate ?? 0,
+              stoneChargeTouched: false,
+              caratWeight: fields.caratWeight ?? 0,
+            },
+            lot,
+            lotLeft,
+          )
+        : {}
     updateItem(key, {
       inventoryStockId: stockId,
-      ...linkedStockFields(stock),
+      ...fields,
+      ...lotFields,
       // Re-linking to a different stock item resets quantity to a sane
       // default for it (1, or 0 if it's already fully claimed by other
       // lines) rather than carrying over a quantity that made sense for
@@ -985,7 +1080,11 @@ export function InvoiceForm({
       })
 
       if (rejected) {
-        toast.error(`Only ${stock.quantity} of ${stock.productName} in stock — all of it is already on this bill.`)
+        toast.error(
+          stock.sellsByWeight
+            ? `${stock.productName} is sold by weight and already on this bill — change the weight on its line.`
+            : `Only ${stock.quantity} of ${stock.productName} in stock — all of it is already on this bill.`,
+        )
         return
       }
 
@@ -1622,6 +1721,10 @@ export function InvoiceForm({
 
   const incompleteNewItem = items.find((item) => missingProductFields(item).length > 0)
 
+  // A sold-by-weight line must take more than 0 and, with the other lines
+  // on the same lot, no more than is left (the server checks it again).
+  const invalidLotItem = items.find((item) => lotProblem(item) !== null)
+
   // Only meaningful for a fresh invoice — see paymentRows' own comment
   // above. Zero-amount rows (a split row the user opened but never filled
   // in) are dropped here rather than sent through, matching parseOptionalPayments'
@@ -1676,6 +1779,10 @@ export function InvoiceForm({
         }
         if (hasInvalidRate) {
           toast.error("Enter a selling price (Rate / g) for every line item before creating the invoice.")
+          return
+        }
+        if (invalidLotItem) {
+          toast.error(lotProblem(invalidLotItem) ?? "")
           return
         }
         formAction(new FormData(event.currentTarget))
@@ -1941,6 +2048,18 @@ export function InvoiceForm({
             // to the day's metal rate independent of what the stock was
             // priced at when it was entered.
             const isLinked = Boolean(item.inventoryStockId)
+            // A sold-by-weight lot: its measure field (net g / carats / gross)
+            // stays editable on the linked line; quantity is always 1.
+            const lot = lotFor(item)
+            const lotError = lot ? lotProblem(item) : null
+            const lotHintText = lot ? (
+              <>
+                <p className="text-[10px] leading-tight text-muted-foreground" data-testid="sale-line-lot-hint">
+                  {lotHint(item, lot)}
+                </p>
+                {lotError && <p className="text-[10px] leading-tight text-destructive">{lotError}</p>}
+              </>
+            ) : null
             const isExpanded = expandedKeys.has(item.key)
             // Compact-row GST summary: the two intra-state components
             // combined into one figure, or the single inter-state one — the
@@ -2261,7 +2380,11 @@ export function InvoiceForm({
                     // digit. Same "show empty, not a forced minimum" as
                     // every other numeric field on this line (Rate, etc.).
                     value={item.quantity === 0 ? "" : item.quantity}
+                    readOnly={Boolean(lot)}
+                    className={lot ? "bg-muted" : undefined}
+                    aria-label="Quantity"
                     onChange={(e) => {
+                      if (lot) return
                       const requested = e.target.value === "" ? 0 : Number(e.target.value) || 0
                       const quantity = item.inventoryStockId
                         ? Math.min(requested, Math.max(availableForStock(item.inventoryStockId, item.key), 1))
@@ -2277,7 +2400,7 @@ export function InvoiceForm({
                       if (!item.quantity) updateItem(item.key, { quantity: 1 })
                     }}
                   />
-                  {item.inventoryStockId && (
+                  {item.inventoryStockId && !lot && (
                     <p className="text-[10px] leading-tight text-muted-foreground">
                       {availableForStock(item.inventoryStockId, item.key)} in stock
                     </p>
@@ -2289,11 +2412,12 @@ export function InvoiceForm({
                     {wf.g(pieceOf(item).metalGross + pieceOf(item).stoneGrams || pieceOf(item).metalNet)} g
                   </div>
                 ) : (
+                <div className="space-y-1">
                 <div className="flex gap-1">
                   <Input
                     type="number"
                     step="any"
-                    className={isLinked ? "flex-1 bg-muted" : "flex-1"}
+                    className={isLinked && lot?.measure !== "grossWeight" ? "flex-1 bg-muted" : "flex-1"}
                     value={
                       item.grossWeight === 0
                         ? ""
@@ -2304,9 +2428,22 @@ export function InvoiceForm({
                             resolveGramsPerCarat(item.purity, caratConversionRates),
                           )
                     }
-                    readOnly={isLinked}
+                    readOnly={isLinked && lot?.measure !== "grossWeight"}
                     aria-label="Gross weight"
-                    onChange={(e) => handleGrossWeightChange(item, e.target.value)}
+                    aria-invalid={lot?.measure === "grossWeight" && lotError ? true : undefined}
+                    onChange={(e) =>
+                      lot?.measure === "grossWeight"
+                        ? handleLotAmountChange(
+                            item,
+                            toPrimaryUnit(
+                              Number(e.target.value) || 0,
+                              item.grossWeightUnit,
+                              "GRAM",
+                              resolveGramsPerCarat(item.purity, caratConversionRates),
+                            ),
+                          )
+                        : handleGrossWeightChange(item, e.target.value)
+                    }
                   />
                   <Select
                     value={item.grossWeightUnit}
@@ -2321,6 +2458,8 @@ export function InvoiceForm({
                       <SelectItem value="CARAT">ct</SelectItem>
                     </SelectContent>
                   </Select>
+                </div>
+                {lot?.measure === "grossWeight" && lotHintText}
                 </div>
                 )}
 
@@ -2337,7 +2476,7 @@ export function InvoiceForm({
                     <Input
                       type="number"
                       step="any"
-                      className={isLinked ? "flex-1 bg-muted" : "flex-1"}
+                      className={isLinked && lot?.measure !== "netWeight" ? "flex-1 bg-muted" : "flex-1"}
                       value={
                         item.netWeight === 0
                           ? ""
@@ -2348,8 +2487,22 @@ export function InvoiceForm({
                               resolveGramsPerCarat(item.purity, caratConversionRates),
                             )
                       }
-                      readOnly={isLinked}
-                      onChange={(e) => handleNetWeightChange(item, e.target.value)}
+                      readOnly={isLinked && lot?.measure !== "netWeight"}
+                      aria-label="Net weight"
+                      aria-invalid={lot?.measure === "netWeight" && lotError ? true : undefined}
+                      onChange={(e) =>
+                        lot?.measure === "netWeight"
+                          ? handleLotAmountChange(
+                              item,
+                              toPrimaryUnit(
+                                Number(e.target.value) || 0,
+                                item.netWeightUnit,
+                                "GRAM",
+                                resolveGramsPerCarat(item.purity, caratConversionRates),
+                              ),
+                            )
+                          : handleNetWeightChange(item, e.target.value)
+                      }
                     />
                     <Select
                       value={item.netWeightUnit}
@@ -2368,6 +2521,7 @@ export function InvoiceForm({
                   {!item.netTouched && (
                     <p className="text-[10px] leading-tight text-muted-foreground">{netWeightHint(weightSettings)}</p>
                   )}
+                  {lot?.measure === "netWeight" && lotHintText}
                 </div>
                 )}
 
@@ -2595,22 +2749,32 @@ export function InvoiceForm({
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                     {!showNewProductDetails && !linkedStock && metalPurityFields}
 
-                    {isCaratLine(item) && (
+                    {(isCaratLine(item) || lot?.measure === "caratWeight") && (
                       <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
                         <Label className="text-xs">Carat Weight (ct)</Label>
                         <Input
                           type="number"
                           step="any"
                           value={item.caratWeight === 0 ? "" : item.caratWeight}
-                          readOnly={isLinked}
-                          className={isLinked ? "bg-muted" : undefined}
-                          onChange={(e) => handleCaratWeightChange(item, e.target.value)}
+                          readOnly={isLinked && lot?.measure !== "caratWeight"}
+                          className={isLinked && lot?.measure !== "caratWeight" ? "bg-muted" : undefined}
+                          aria-label="Carat weight"
+                          aria-invalid={lot?.measure === "caratWeight" && lotError ? true : undefined}
+                          onChange={(e) =>
+                            lot?.measure === "caratWeight"
+                              ? handleLotAmountChange(item, Number(e.target.value) || 0)
+                              : handleCaratWeightChange(item, e.target.value)
+                          }
                         />
-                        <p className="text-xs text-muted-foreground">
-                          {item.purity === "DIAMOND"
-                            ? "Priced per carat, not per gram"
-                            : "1 ct = 0.2 g — converts with Net Weight"}
-                        </p>
+                        {lot?.measure === "caratWeight" ? (
+                          lotHintText
+                        ) : (
+                          <p className="text-xs text-muted-foreground">
+                            {item.purity === "DIAMOND"
+                              ? "Priced per carat, not per gram"
+                              : "1 ct = 0.2 g — converts with Net Weight"}
+                          </p>
+                        )}
                       </div>
                     )}
 

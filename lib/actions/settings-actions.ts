@@ -66,9 +66,9 @@ export type BusinessSettings = {
   // comment. Only gates starting a *new* send; existing artisans/jobs/
   // ledger/reports stay visible regardless of this flag.
   sendToArtisanEnabled: boolean;
-  // Whether the Supplier module's own UI shows up — see
-  // prisma/schema.prisma's BusinessSettings.supplierModuleEnabled doc
-  // comment. Off by default (new, opt-in module).
+  // Retired 2026-10-13 (only Parties, one ledger each): the column stays,
+  // but Settings no longer shows or saves it. Still returned for any
+  // caller not yet moved off it.
   supplierModuleEnabled: boolean;
   // Whether the E-way Bill section/button/card/print-block shows up on an
   // invoice at all — see prisma/schema.prisma's BusinessSettings.
@@ -347,7 +347,6 @@ export async function updateBusinessSettings(
         ),
         returnWindowEnabled: formData.get("returnWindowEnabled") === "on",
         sendToArtisanEnabled: formData.get("sendToArtisanEnabled") === "on",
-        supplierModuleEnabled: formData.get("supplierModuleEnabled") === "on",
         ewayBillEnabled: formData.get("ewayBillEnabled") === "on",
         eInvoiceEnabled: formData.get("eInvoiceEnabled") === "on",
         showDueDate: formData.get("showDueDate") === "on",
@@ -392,7 +391,6 @@ export async function updateBusinessSettings(
         ),
         returnWindowEnabled: formData.get("returnWindowEnabled") === "on",
         sendToArtisanEnabled: formData.get("sendToArtisanEnabled") === "on",
-        supplierModuleEnabled: formData.get("supplierModuleEnabled") === "on",
         ewayBillEnabled: formData.get("ewayBillEnabled") === "on",
         eInvoiceEnabled: formData.get("eInvoiceEnabled") === "on",
         showDueDate: formData.get("showDueDate") === "on",

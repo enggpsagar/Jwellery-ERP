@@ -99,6 +99,12 @@ export const PRODUCT_SHEET_COLUMNS: ProductSheetColumn[] = [
     help: "Unfinished or Finished / Hallmarked. New stock made from the product starts with this Finish.",
     example: "Unfinished",
   },
+  {
+    header: "Sold By Weight",
+    required: "No (default No)",
+    help: "Yes for bulk stock sold by weight (loose stones, bars, bullion, coins, raw metal): each stock entry is one lot and a sale takes part of it by weight.",
+    example: "No",
+  },
   // Additional Information
   { header: "Description", required: "No", help: "Shown on the product.", example: "Gold + silver ladies ring with diamonds and a ruby"},
   { header: "Notes", required: "No", help: "Internal notes.", example: "" },
@@ -116,6 +122,17 @@ export const PRODUCT_SHEET_COLUMNS: ProductSheetColumn[] = [
     help: "Where that opening stock is kept. Must match a location under Settings › Locations. Blank = your default location.",
     example: "",
   },
+]
+
+/** Written by the export after the shared columns, for reference only — the
+ *  import ignores them. What's available right now: IN_STOCK rows only, each
+ *  row's weight × its quantity (a sold-by-weight lot = what's left of it). */
+export const PRODUCT_SHEET_EXPORT_ONLY_HEADERS = [
+  "In Stock Qty",
+  "In Stock Gross Weight",
+  "In Stock Net Weight",
+  "In Stock Fine Weight",
+  "In Stock Carats",
 ]
 
 /** Every header, every feature on (the demo store's layout). */
@@ -144,12 +161,21 @@ export const PRODUCT_SHEET_FOLLOW_ON_EXAMPLE: Record<string, string | number> = 
   "Stone Pcs": 2,
 }
 
-/** The Instructions sheet's rows. */
-export function productSheetInstructions(features: SheetFeatures = ALL_SHEET_FEATURES) {
-  return productSheetColumns(features).map((column, index) => ({
-    "#": index + 1,
-    Column: column.header,
-    Required: column.required,
-    "What to enter": column.help,
-  }))
+/** The Instructions sheet's rows (an export also lists its read-only columns). */
+export function productSheetInstructions(features: SheetFeatures = ALL_SHEET_FEATURES, { exportOnly = false } = {}) {
+  const columns = productSheetColumns(features)
+  return [
+    ...columns.map((column, index) => ({
+      "#": index + 1,
+      Column: column.header,
+      Required: column.required,
+      "What to enter": column.help,
+    })),
+    ...(exportOnly ? PRODUCT_SHEET_EXPORT_ONLY_HEADERS : []).map((header, index) => ({
+      "#": columns.length + index + 1,
+      Column: header,
+      Required: "Export only",
+      "What to enter": "Live stock (in stock now), filled in by the export for reference; ignored on import.",
+    })),
+  ]
 }

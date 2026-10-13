@@ -8,7 +8,6 @@ import { toTitleCase } from "@/lib/utils"
 import { CustomerRowActions } from "@/components/customers/customer-row-actions"
 import { CustomerDetailContent } from "@/components/customers/customer-detail-content"
 import { CustomerLedgerCardClient } from "@/components/customers/ledger/customer-ledger-card-client"
-import { SupplierLedgerCardClient } from "@/components/customers/ledger/supplier-ledger-card-client"
 import { Skeleton } from "@/components/ui/skeleton"
 
 type StateItem = {
@@ -19,9 +18,6 @@ type StateItem = {
 type CustomerDetailPanelProps = {
   customerId: string | null
   states: StateItem[]
-  /** BusinessSettings.supplierModuleEnabled — see CustomerDetailContent's
-   * own doc comment. Defaults false, same as that component. */
-  supplierModuleEnabled?: boolean
 }
 
 /**
@@ -33,7 +29,7 @@ type CustomerDetailPanelProps = {
  * standalone page, which re-renders the list — the selection itself is
  * cleared by the parent's own effect watching the customers prop.
  */
-export function CustomerDetailPanel({ customerId, states, supplierModuleEnabled = false }: CustomerDetailPanelProps) {
+export function CustomerDetailPanel({ customerId, states }: CustomerDetailPanelProps) {
   const [customer, setCustomer] = useState<Customer | null>(null)
   const [loading, setLoading] = useState(false)
 
@@ -87,14 +83,12 @@ export function CustomerDetailPanel({ customerId, states, supplierModuleEnabled 
       <CustomerDetailContent
         customer={customer}
         states={states}
-        supplierModuleEnabled={supplierModuleEnabled}
         ledger={
           <CustomerLedgerCardClient
             customerId={customer.id}
             hasEmail={Boolean(customer.email)}
           />
         }
-        supplierLedger={<SupplierLedgerCardClient customerId={customer.id} />}
       />
     </div>
   )

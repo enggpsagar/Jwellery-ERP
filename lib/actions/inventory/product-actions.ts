@@ -1,9 +1,9 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { ChargeType, InventoryFinish, PurityType, Prisma } from "@prisma/client";
+import { ChargeType, InventoryFinish, InventoryStockStatus, PurityType, Prisma } from "@prisma/client";
 import { finishLabel, parseFinishLabel } from "@/lib/inventory/finish";
-import { PRODUCT_SHEET_COLUMNS, PRODUCT_SHEET_FOLLOW_ON_EXAMPLE, productSheetColumns, productSheetHeaders, productSheetInstructions } from "@/lib/inventory/product-sheet";
+import { PRODUCT_SHEET_COLUMNS, PRODUCT_SHEET_EXPORT_ONLY_HEADERS, PRODUCT_SHEET_FOLLOW_ON_EXAMPLE, productSheetColumns, productSheetHeaders, productSheetInstructions } from "@/lib/inventory/product-sheet";
 import { dropdownsFor, hiddenSheetHeaders, pickSheetRow, stripHiddenSheetColumns } from "@/lib/sheet-features";
 import { getSheetFeatures } from "@/lib/sheet-features.server";
 
@@ -16,6 +16,7 @@ import { getLocationScope, resolveWritableLocationId } from "@/lib/location-scop
 import { UNASSIGNED_METAL_TYPE } from "@/lib/business-units";
 import type { ProductFormState } from "@/lib/inventory/product-types";
 import { buildSkuPrefix } from "@/lib/inventory/product-sku";
+import { stockSellsByWeight } from "@/lib/inventory/weight-lot";
 import { PURITY_LABELS, matchLegacyPurityType } from "@/lib/purity";
 import { classifyPurityFamily } from "@/lib/business-units";
 import {
@@ -58,6 +59,12 @@ function parseNullableDecimal(
 
 function parseBoolean(value: FormDataEntryValue | null) {
   return String(value || "") === "true";
+}
+
+/** The Add/Edit Product "Sold by weight" switch — "on" (or "true") when set. */
+function parseSoldByWeight(value: FormDataEntryValue | null) {
+  const parsed = String(value ?? "").trim().toLowerCase();
+  return parsed === "on" || parsed === "true";
 }
 
 function toChargeTypeInput(value: unknown): ChargeType {
@@ -250,6 +257,7 @@ function serializeProduct(product: {
   defaultStoneWeight: { toString(): string } | null;
   defaultCaratWeight: { toString(): string } | null;
   hasStoneComponent: boolean;
+  soldByWeight: boolean;
   defaultStoneRate: { toString(): string } | null;
   defaultStoneMetalTypeName: string | null;
   defaultStoneTypeNames: string | null;
@@ -316,6 +324,7 @@ function serializeProduct(product: {
     defaultStoneWeight: product.defaultStoneWeight?.toString() ?? null,
     defaultCaratWeight: product.defaultCaratWeight?.toString() ?? null,
     hasStoneComponent: product.hasStoneComponent,
+    soldByWeight: product.soldByWeight,
     defaultStoneRate: product.defaultStoneRate?.toString() ?? null,
     defaultStoneMetalTypeName: product.defaultStoneMetalTypeName,
     defaultStoneTypeNames: product.defaultStoneTypeNames,
@@ -531,6 +540,7 @@ function mapProductRow(row: {
   defaultStoneWeight: { toString(): string } | null;
   defaultCaratWeight: { toString(): string } | null;
   hasStoneComponent: boolean;
+  soldByWeight: boolean;
   defaultStoneRate: { toString(): string } | null;
   defaultStoneMetalTypeName: string | null;
   defaultStoneTypeNames: string | null;
@@ -568,6 +578,7 @@ function mapProductRow(row: {
     defaultCaratWeight:
       row.defaultCaratWeight != null ? Number(row.defaultCaratWeight) : null,
     hasStoneComponent: row.hasStoneComponent,
+    soldByWeight: row.soldByWeight,
     defaultStoneRate:
       row.defaultStoneRate != null ? Number(row.defaultStoneRate) : null,
     defaultStoneMetalTypeName: row.defaultStoneMetalTypeName,
@@ -603,7 +614,7 @@ export async function getProducts(params: GetProductsParams = {}) {
       include: { ...PRODUCT_RELATIONS, storeMetalPurity: { select: { label: true } } },
     }),
     prisma.inventoryStock.aggregate({
-      where: { storeId, product: where },
+      where: { storeId, status: InventoryStockStatus.IN_STOCK, product: where },
       _sum: { quantity: true },
     }),
     // Products store no fine weight of their own — net × the purity's
@@ -626,11 +637,12 @@ export async function getProducts(params: GetProductsParams = {}) {
       grossWeight: row.defaultGrossWeight,
     }).fineWeight;
 
-  // How many pieces of this product design are currently in stock, summed
-  // across every InventoryStock lot it has (a design can have several —
-  // different purchases, different pieces) — quantity is already the live
-  // remaining count (it only reaches 0, flipping status to SOLD, as pieces
-  // sell), so a plain sum needs no status filter of its own.
+  // How many pieces of this product design are available, summed across
+  // every IN_STOCK InventoryStock row it has (a design can have several —
+  // different purchases, different pieces). Only IN_STOCK counts: a
+  // RESERVED / DAMAGED / artisan row still carries its quantity but isn't
+  // available to sell. A sold-by-weight lot counts as 1 while any of it is
+  // left (its weights are what's left of the lot).
   const stockQtyByProductId = new Map<string, number>();
 
   // Weight actually in stock: every lot's per-piece weight × its remaining
@@ -642,7 +654,7 @@ export async function getProducts(params: GetProductsParams = {}) {
   // _sum; the lots are fetched once for all matching products (the footer
   // spans every page) and bucketed per product.
   const stockLots = await prisma.inventoryStock.findMany({
-    where: { storeId, product: where, quantity: { gt: 0 } },
+    where: { storeId, status: InventoryStockStatus.IN_STOCK, product: where, quantity: { gt: 0 } },
     select: { productId: true, quantity: true, grossWeight: true, netWeight: true, fineWeight: true, caratWeight: true },
   });
   // carat: a loose stone's stock carries its weight in caratWeight with
@@ -670,7 +682,7 @@ export async function getProducts(params: GetProductsParams = {}) {
   if (rows.length > 0) {
     const stockTotals = await prisma.inventoryStock.groupBy({
       by: ["productId"],
-      where: { storeId, productId: { in: rows.map((row) => row.id) } },
+      where: { storeId, status: InventoryStockStatus.IN_STOCK, productId: { in: rows.map((row) => row.id) } },
       _sum: { quantity: true },
     });
     for (const total of stockTotals) {
@@ -770,11 +782,36 @@ async function getAllProductsForExport(params: ExportProductsParams = {}) {
     },
   });
 
+  // Live stock per product (IN_STOCK rows, weight × remaining quantity —
+  // same basis as the Products list), for the export-only columns.
+  const liveRows = rows.length
+    ? await prisma.inventoryStock.findMany({
+        where: {
+          storeId,
+          status: InventoryStockStatus.IN_STOCK,
+          quantity: { gt: 0 },
+          productId: { in: rows.map((row) => row.id) },
+        },
+        select: { productId: true, quantity: true, grossWeight: true, netWeight: true, fineWeight: true, caratWeight: true },
+      })
+    : [];
+  const liveByProduct = new Map<string, { qty: number; gross: number; net: number; fine: number; carat: number }>();
+  for (const stock of liveRows) {
+    const bucket = liveByProduct.get(stock.productId) ?? { qty: 0, gross: 0, net: 0, fine: 0, carat: 0 };
+    bucket.qty += stock.quantity;
+    bucket.gross += Number(stock.grossWeight ?? 0) * stock.quantity;
+    bucket.net += Number(stock.netWeight ?? 0) * stock.quantity;
+    bucket.fine += Number(stock.fineWeight ?? stock.netWeight ?? 0) * stock.quantity;
+    bucket.carat += Number(stock.caratWeight ?? 0) * stock.quantity;
+    liveByProduct.set(stock.productId, bucket);
+  }
+
   return rows.map((row) => ({
     ...mapProductRow(row),
     purityLabel: row.storeMetalPurity?.label ?? null,
     metals: row.metalComponents,
     stones: row.stoneComponents,
+    liveStock: liveByProduct.get(row.id) ?? { qty: 0, gross: 0, net: 0, fine: 0, carat: 0 },
   }));
 }
 
@@ -838,7 +875,11 @@ export async function exportProductsToExcel(
     const storeId = await requireStoreScope();
     const features = await getSheetFeatures(storeId);
     const headers = productSheetHeaders(features);
-    const toRow = (values: Record<string, unknown>) => pickSheetRow(values, headers);
+    // The import template's columns, then the read-only live-stock ones.
+    const exportHeaders = [...headers, ...PRODUCT_SHEET_EXPORT_ONLY_HEADERS];
+    const toRow = (values: Record<string, unknown>) => pickSheetRow(values, exportHeaders);
+    // Float noise off, stored precision kept (grams 5 dp, carats 3 dp).
+    const exact = (value: number, decimals: number) => Number(value.toFixed(decimals));
 
     const rows = products.flatMap((product) => {
       const [firstMetal, ...moreMetals] = product.metals;
@@ -875,8 +916,14 @@ export async function exportProductsToExcel(
         "HSN Code": blank(product.hsnCode),
         Active: product.isActive ? "Yes" : "No",
         Finish: finishLabel(product.defaultFinish),
+        "Sold By Weight": product.soldByWeight ? "Yes" : "No",
         Description: blank(product.description),
         Notes: blank(product.notes),
+        "In Stock Qty": product.liveStock.qty,
+        "In Stock Gross Weight": exact(product.liveStock.gross, 5),
+        "In Stock Net Weight": exact(product.liveStock.net, 5),
+        "In Stock Fine Weight": exact(product.liveStock.fine, 5),
+        "In Stock Carats": exact(product.liveStock.carat, 3),
       });
       const extraCount = Math.max(moreMetals.length, moreStones.length);
       const extras = Array.from({ length: extraCount }, (_, index) =>
@@ -900,9 +947,11 @@ export async function exportProductsToExcel(
         Metal: product.metalType || "-",
         Purity: product.defaultPurity || "-",
         HSN: product.hsnCode || "-",
-        "Gross Wt (g)": product.defaultGrossWeight != null ? wf.g(product.defaultGrossWeight) : "-",
-        "Net Wt (g)": product.defaultNetWeight != null ? wf.g(product.defaultNetWeight) : "-",
-        "Stone Wt (g)": product.defaultStoneWeight != null ? wf.g(product.defaultStoneWeight) : "-",
+        // Live stock (IN_STOCK rows), not the product's template weights.
+        "In Stock": product.liveStock.qty,
+        "Stock Gross Wt (g)": product.liveStock.qty > 0 ? wf.g(product.liveStock.gross) : "-",
+        "Stock Net Wt (g)": product.liveStock.qty > 0 ? wf.g(product.liveStock.net) : "-",
+        "Stock Carats": product.liveStock.carat > 0 ? wf.ct(product.liveStock.carat) : "-",
         "Making Charge":
           product.defaultMakingCharge != null
             ? product.defaultMakingChargeType === "PERCENTAGE"
@@ -923,9 +972,9 @@ export async function exportProductsToExcel(
           : buildImportTemplateWithDropdowns({
               sheetName: "Products",
               rows,
-              columns: headers,
+              columns: exportHeaders,
               dropdowns: dropdownsFor(await loadProductSheetDropdowns(storeId), headers),
-              instructions: { notes: PRODUCT_SHEET_NOTES, rows: productSheetInstructions(features) },
+              instructions: { notes: PRODUCT_SHEET_NOTES, rows: productSheetInstructions(features, { exportOnly: true }) },
               filePrefix: "products",
             });
 
@@ -966,7 +1015,126 @@ export async function getProductById(id: string) {
   });
 
   if (!product) return null;
-  return serializeProduct(product);
+
+  const [identityLocked, liveStock] = await Promise.all([
+    productHasStockOrBills(storeId, product.id),
+    getProductLiveStock(storeId, product.id, {
+      soldByWeight: product.soldByWeight,
+      metalComponents: product.metalComponents.length,
+      stoneComponents: product.stoneComponents.length,
+    }),
+  ]);
+
+  return {
+    ...serializeProduct(product),
+    /** Name / metal / purity / stone / category can't change — see updateProduct. */
+    identityLocked,
+    liveStock,
+  };
+}
+
+export type ProductLiveStock = {
+  /** Σ quantity of IN_STOCK rows — a sold-by-weight lot counts as 1. */
+  pieces: number;
+  /** Σ per-row weight × quantity (a lot's weights are what's left of it). */
+  grossWeight: number;
+  netWeight: number;
+  fineWeight: number;
+  caratWeight: number;
+  /** IN_STOCK rows. */
+  rowCount: number;
+  /** IN_STOCK rows that sell by weight (sold-by-weight lots). */
+  lotCount: number;
+};
+
+/**
+ * What's actually available of a product right now: IN_STOCK rows only
+ * (reserved, damaged, at an artisan and sold rows are left out), each row's
+ * per-piece weight × its remaining quantity — for a sold-by-weight lot the
+ * quantity is 1 and the weights are the whole remaining lot. Unlike the
+ * product's default* weights, which are only the template a new stock
+ * entry starts from.
+ */
+async function getProductLiveStock(
+  storeId: string,
+  productId: string,
+  product: { soldByWeight: boolean; metalComponents: number; stoneComponents: number },
+): Promise<ProductLiveStock> {
+  const rows = await prisma.inventoryStock.findMany({
+    where: { storeId, productId, status: InventoryStockStatus.IN_STOCK, quantity: { gt: 0 } },
+    select: {
+      quantity: true,
+      grossWeight: true,
+      netWeight: true,
+      fineWeight: true,
+      caratWeight: true,
+      _count: { select: { components: true } },
+    },
+  });
+  const live: ProductLiveStock = {
+    pieces: 0,
+    grossWeight: 0,
+    netWeight: 0,
+    fineWeight: 0,
+    caratWeight: 0,
+    rowCount: rows.length,
+    lotCount: 0,
+  };
+  for (const row of rows) {
+    const qty = row.quantity;
+    live.pieces += qty;
+    live.grossWeight += Number(row.grossWeight ?? 0) * qty;
+    live.netWeight += Number(row.netWeight ?? 0) * qty;
+    live.fineWeight += Number(row.fineWeight ?? row.netWeight ?? 0) * qty;
+    live.caratWeight += Number(row.caratWeight ?? 0) * qty;
+    if (stockSellsByWeight({ quantity: qty, components: row._count.components, product })) live.lotCount += 1;
+  }
+  return live;
+}
+
+/**
+ * Whether a product is already in use: any stock row (any status) or any
+ * purchase line. Invoice / Estimate / Quotation lines only reach a product
+ * through a stock row (inventoryStockId → stock.productId), so the stock
+ * check covers them too. Once in use, the product's identity (name, metal,
+ * purity, stone, category) is fixed — see updateProduct.
+ */
+async function productHasStockOrBills(storeId: string, productId: string): Promise<boolean> {
+  const [stock, purchaseLine] = await Promise.all([
+    prisma.inventoryStock.findFirst({ where: { storeId, productId }, select: { id: true } }),
+    prisma.purchaseItem.findFirst({ where: { productId, purchase: { storeId } }, select: { id: true } }),
+  ]);
+  return Boolean(stock || purchaseLine);
+}
+
+const PRODUCT_IDENTITY_LOCKED_MESSAGE =
+  "This product already has stock or bills, so its name, metal, purity, stone and category can't change — create a new product instead.";
+
+/** Name compared the way a person reads it: trimmed, single-spaced, any case. */
+function identityName(value: string | null | undefined) {
+  return String(value ?? "").normalize("NFKC").trim().replace(/\s+/g, " ").toLowerCase();
+}
+
+/** Blank / whitespace / null all mean "not set". */
+function identityId(value: string | null | undefined) {
+  const trimmed = String(value ?? "").trim();
+  return trimmed || null;
+}
+
+/** "Natural, Lab-Grown" → "lab-grown,natural" (order and spacing don't matter). */
+function identityTypeNames(value: string | null | undefined) {
+  return String(value ?? "")
+    .split(",")
+    .map((name) => identityName(name))
+    .filter(Boolean)
+    .sort()
+    .join(",");
+}
+
+function sameList(a: string[], b: string[]) {
+  const left = [...a].sort();
+  const right = [...b].sort();
+  return left.length === right.length && left.every((value, index) => value === right[index]);
 }
 
 /**
@@ -1173,6 +1341,7 @@ export async function createProduct(
     const notes = parseNullableString(formData.get("notes"));
     const imageUrls = parseProductImageUrls(formData.get("imageUrlsJson"));
     const isActive = parseBoolean(formData.get("isActive"));
+    const soldByWeight = parseSoldByWeight(formData.get("soldByWeight"));
 
     const errors: Record<string, string[]> = {};
 
@@ -1329,6 +1498,7 @@ export async function createProduct(
             defaultStoneWeight,
             defaultCaratWeight,
             hasStoneComponent,
+            soldByWeight,
             defaultStoneRate,
             defaultStoneMetalTypeName,
             defaultStoneTypeNames,
@@ -1614,6 +1784,7 @@ export async function updateProduct(
     const notes = parseNullableString(formData.get("notes"));
     const imageUrls = parseProductImageUrls(formData.get("imageUrlsJson"));
     const isActive = parseBoolean(formData.get("isActive"));
+    const soldByWeight = parseSoldByWeight(formData.get("soldByWeight"));
 
     const errors: Record<string, string[]> = {};
 
@@ -1675,6 +1846,105 @@ export async function updateProduct(
       };
     }
 
+    const existing = await prisma.product.findFirst({
+      where: { id, storeId },
+      select: {
+        name: true,
+        categoryId: true,
+        metalTypeId: true,
+        storeMetalPurityId: true,
+        defaultPurity: true,
+        stoneOriginOptionId: true,
+        hasStoneComponent: true,
+        defaultStoneMetalTypeName: true,
+        defaultStoneTypeNames: true,
+        metalType: { select: { name: true, isGemstone: true } },
+        stoneOriginOption: { select: { name: true } },
+        metalComponents: { orderBy: { sortOrder: "asc" }, select: { metalTypeId: true, storeMetalPurityId: true } },
+        stoneComponents: { orderBy: { sortOrder: "asc" }, select: { stoneMetalTypeName: true, stoneTypeNames: true } },
+      },
+    });
+    if (!existing) {
+      return { success: false, message: "Product not found", errors: {} };
+    }
+
+    // The form never posts stoneOriginOptionId (a stone's type lives on its
+    // stone row), so an absent field keeps the stored one instead of wiping
+    // it on every save — unless the metal itself changed.
+    const submittedOriginOptionId = formData.has("stoneOriginOptionId")
+      ? stoneOriginOptionId
+      : identityId(metalTypeId) === identityId(existing.metalTypeId)
+        ? existing.stoneOriginOptionId
+        : null;
+
+    // Identity guard: once a product has stock or bills, those rows describe
+    // it by name / metal / purity / stone / category — changing any of them
+    // would silently rewrite what was bought and sold. Compared by meaning,
+    // not shape, so re-saving the form unchanged always passes (blank = null,
+    // name case/spacing ignored, metal and stone rows as sets, and a legacy
+    // product with no component rows compared via its scalar fields — the
+    // same fallback the form seeds its rows from).
+    const identityLocked = await productHasStockOrBills(storeId, id);
+    if (identityLocked) {
+      const metalKey = (metal: string | null | undefined, purity: string | null | undefined) =>
+        `${identityId(metal) ?? ""}|${identityId(purity) ?? ""}`;
+      const storedMetalKeys = existing.metalComponents.length
+        ? existing.metalComponents.map((row) => metalKey(row.metalTypeId, row.storeMetalPurityId))
+        : existing.metalTypeId
+          ? [metalKey(existing.metalTypeId, existing.storeMetalPurityId)]
+          : [];
+      const submittedMetalKeys = metalComponents.length
+        ? metalComponents.map((row) => metalKey(row.metalTypeId, row.storeMetalPurityId))
+        : identityId(metalTypeId)
+          ? [metalKey(metalTypeId, storeMetalPurityId)]
+          : [];
+
+      const storedStones = existing.stoneComponents.length
+        ? existing.stoneComponents.map((row) => ({ name: row.stoneMetalTypeName, types: row.stoneTypeNames }))
+        : existing.hasStoneComponent && existing.defaultStoneMetalTypeName
+          ? [{ name: existing.defaultStoneMetalTypeName, types: existing.defaultStoneTypeNames }]
+          : existing.metalType?.isGemstone
+            ? [{ name: existing.metalType.name, types: existing.stoneOriginOption?.name ?? null }]
+            : [];
+      const submittedStones = stoneComponents.map((row) => ({
+        name: row.stoneMetalTypeName ?? "",
+        types: row.stoneTypeNames ?? null,
+      }));
+      // A stored stone with no Stone Type yet may have one filled in (the
+      // form requires one) — a missing value, not a different stone.
+      const untypedStones = new Set(
+        storedStones.filter((stone) => !identityTypeNames(stone.types)).map((stone) => identityName(stone.name)),
+      );
+      const stoneKey = (stone: { name: string; types: string | null }) =>
+        untypedStones.has(identityName(stone.name))
+          ? identityName(stone.name)
+          : `${identityName(stone.name)}|${identityTypeNames(stone.types)}`;
+      const stonesUnchanged = sameList(storedStones.map(stoneKey), submittedStones.map(stoneKey));
+      const stoneSummaryUnchanged =
+        existing.stoneComponents.length === 0 ||
+        !existing.hasStoneComponent ||
+        (identityName(existing.defaultStoneMetalTypeName) === identityName(defaultStoneMetalTypeName) &&
+          (!identityTypeNames(existing.defaultStoneTypeNames) ||
+            identityTypeNames(existing.defaultStoneTypeNames) === identityTypeNames(defaultStoneTypeNames)));
+
+      const identityChanged =
+        identityName(name) !== identityName(existing.name) ||
+        identityId(categoryId) !== identityId(existing.categoryId) ||
+        identityId(metalTypeId) !== identityId(existing.metalTypeId) ||
+        identityId(storeMetalPurityId) !== identityId(existing.storeMetalPurityId) ||
+        // The legacy purity enum only stands on its own when no real purity
+        // row is picked; otherwise it's derived from that row.
+        (!identityId(storeMetalPurityId) && defaultPurity !== null && defaultPurity !== existing.defaultPurity) ||
+        identityId(submittedOriginOptionId) !== identityId(existing.stoneOriginOptionId) ||
+        !sameList(storedMetalKeys, submittedMetalKeys) ||
+        !stonesUnchanged ||
+        !stoneSummaryUnchanged;
+
+      if (identityChanged) {
+        return { success: false, message: PRODUCT_IDENTITY_LOCKED_MESSAGE, errors: {} };
+      }
+    }
+
     const [metalRow, storeMetalPurityRow] = await Promise.all([
       metalTypeId
         ? prisma.storeMetal.findFirst({ where: { id: metalTypeId, storeId }, select: { name: true, isGemstone: true } })
@@ -1691,6 +1961,30 @@ export async function updateProduct(
       ? (matchLegacyPurityType(metalRow ? classifyPurityFamily(metalRow) : null, storeMetalPurityRow.label) ?? defaultPurity)
       : defaultPurity;
 
+    // Locked identity is written back exactly as stored (it was just shown to
+    // be unchanged) so a re-derived summary — the legacy purity enum, the
+    // primary stone's name — can never drift on a product in use.
+    const identity = identityLocked
+      ? {
+          categoryId: existing.categoryId,
+          metalTypeId: existing.metalTypeId,
+          stoneOriginOptionId: existing.stoneOriginOptionId,
+          defaultPurity: existing.defaultPurity,
+          storeMetalPurityId: existing.storeMetalPurityId,
+          defaultStoneMetalTypeName: existing.defaultStoneMetalTypeName,
+          defaultStoneTypeNames: existing.defaultStoneTypeNames,
+        }
+      : {
+          // Blank → null, see createProduct.
+          categoryId: categoryId || null,
+          metalTypeId,
+          stoneOriginOptionId: submittedOriginOptionId,
+          defaultPurity: resolvedDefaultPurity,
+          storeMetalPurityId,
+          defaultStoneMetalTypeName,
+          defaultStoneTypeNames,
+        };
+
    // Same replace-on-update pattern as PurchaseItem (lib/actions/
    // purchase-actions.ts) — drop every old component row and recreate from
    // the submitted arrays, inside the same transaction as the Product row
@@ -1701,14 +1995,9 @@ export async function updateProduct(
       where: { id, storeId },
       data: {
         name,
-        // Blank → null, see createProduct.
-        categoryId: categoryId || null,
+        ...identity,
         categoryTypeId,
-        metalTypeId,
         targetStyleId,
-        stoneOriginOptionId,
-        defaultPurity: resolvedDefaultPurity,
-        storeMetalPurityId,
         defaultMakingCharge,
         defaultMakingChargeType,
         defaultStoneCharge,
@@ -1719,9 +2008,8 @@ export async function updateProduct(
         defaultStoneWeight,
         defaultCaratWeight,
         hasStoneComponent,
+        soldByWeight,
         defaultStoneRate,
-        defaultStoneMetalTypeName,
-        defaultStoneTypeNames,
         designCode,
         hsnCode,
         description,
@@ -2038,6 +2326,7 @@ const PRODUCT_SHEET_NOTES = [
   "• Dropdowns list your store's own names (from Settings). The Options sheet shows every list.",
   "• Nothing is imported if any row has an error — the import lists each problem with its row number.",
   "• A Products export has these same columns, so an exported file can be edited and imported as new products.",
+  "• An export also adds read-only In Stock columns at the end (quantity and weights in stock now) — the import ignores them.",
 ]
 
 /** The template/export dropdown lists, from this store's own masters. */
@@ -2074,6 +2363,7 @@ async function loadProductSheetDropdowns(storeId: string): Promise<Record<string
     "Making Charge Type": chargeTypes,
     Active: yesNo,
     Finish: ["Unfinished", "Finished / Hallmarked"],
+    "Sold By Weight": yesNo,
     Location: names(locations),
   };
 }
@@ -2515,6 +2805,7 @@ export async function importProductsFromExcel(
       const resolvedStyle = style;
       const hasStoneComponent = productImportYesNo(row, "Has Stone Component", false);
       const isActive = productImportYesNo(row, "Active", true);
+      const soldByWeight = productImportYesNo(row, "Sold By Weight", false);
 
       const skuPrefix = buildSkuPrefix({
         metalName: resolvedMetal.name,
@@ -2583,6 +2874,7 @@ export async function importProductsFromExcel(
           description: productImportCell(row, "Description") || null,
           notes: productImportCell(row, "Notes") || null,
           isActive,
+          soldByWeight,
         },
       });
     }

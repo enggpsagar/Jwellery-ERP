@@ -10,6 +10,7 @@ import { fineOrNet, pieceMetalsSelect } from "@/lib/fine-weight-read";
 import { metalBreakdown } from "@/lib/piece-components";
 import { ROLE_LABELS } from "@/lib/roles";
 import { financialYearStartOf } from "@/lib/date-range";
+import { getPartyNetBalances } from "@/lib/core/customer";
 
 export type DateRange = { from?: string; to?: string };
 
@@ -363,8 +364,10 @@ export async function getKarigarOutstandingReport() {
 }
 
 /**
- * Customers with an outstanding balance across their invoices, highest
- * dues first.
+ * Parties with unpaid invoices / estimates (location-scoped), highest dues
+ * first. Each row also carries the party's ONE net balance
+ * (lib/party-balance.ts, store-wide — purchases and payments out included),
+ * so a party you also owe for purchases shows that beside its unpaid bills.
  */
 export async function getCustomerDuesReport() {
   const storeId = await requireStoreScope();
@@ -391,6 +394,8 @@ export async function getCustomerDuesReport() {
     },
   });
 
+  const nets = await getPartyNetBalances(storeId, customers.map((customer) => customer.id));
+
   const withDues = customers
     .map((customer) => {
       const invoiceDue = customer.invoices.reduce((sum, inv) => sum + Number(inv.balanceAmount), 0);
@@ -402,6 +407,7 @@ export async function getCustomerDuesReport() {
         phone: customer.phone,
         totalDue: invoiceDue + kachaDue,
         invoiceCount: customer.invoices.length + customer.kachaInvoices.length,
+        netBalance: nets.get(customer.id) ?? 0,
       };
     })
     .filter((customer) => customer.totalDue > 0)

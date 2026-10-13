@@ -15,6 +15,8 @@ export const stockOptionProductDetailsSelect = {
   targetStyle: { select: { id: true, name: true } },
   storeMetalPurity: { select: { label: true, sellingPrice: true, finenessPercent: true } },
   hasStoneComponent: true,
+  // Bulk stock sold by weight (lib/inventory/weight-lot.ts).
+  soldByWeight: true,
   hsnCode: true,
   defaultMakingCharge: true,
   defaultMakingChargeType: true,
@@ -72,6 +74,9 @@ export type StockOptionProductDetails = {
   defaultMakingChargeType: "FIXED" | "PERCENTAGE";
   /** The Product's HSN code — searchable in the stock picker. */
   productHsnCode: string | null;
+  /** Product.soldByWeight — whether the row is a lot is decided per row
+   * (isWeightLotRow: also quantity ≤ 1 and not multi-part). */
+  productSoldByWeight: boolean;
 };
 
 export function toStockOptionProductDetails(product: ProductDetails): StockOptionProductDetails {
@@ -93,5 +98,6 @@ export function toStockOptionProductDetails(product: ProductDetails): StockOptio
     defaultMakingCharge: product.defaultMakingCharge != null ? Number(product.defaultMakingCharge) : null,
     defaultMakingChargeType: product.defaultMakingChargeType,
     productHsnCode: product.hsnCode ?? null,
+    productSoldByWeight: product.soldByWeight,
   };
 }

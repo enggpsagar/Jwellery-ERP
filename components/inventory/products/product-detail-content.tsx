@@ -77,6 +77,8 @@ export function ProductDetailContent({
   const hasAdditionalInfo = Boolean(product.description) || Boolean(product.notes)
 
   const imageUrls = product.imageUrls ?? []
+  const live = product.liveStock
+  const liveHasGrams = live.grossWeight > 0 || live.netWeight > 0
 
   return (
     <div className="space-y-6">
@@ -103,8 +105,32 @@ export function ProductDetailContent({
         </div>
       )}
 
+      {/* What's actually available now (IN_STOCK rows: weight × remaining
+          qty, a sold-by-weight lot = what's left of it) — the weights further
+          down are only the template a new stock entry starts from. */}
+      <Section title="In Stock Now">
+        <Field label="Pieces in stock" value={String(live.pieces)} />
+        {product.soldByWeight && live.lotCount > 0 ? (
+          <Field label="Lots in stock" value={String(live.lotCount)} />
+        ) : null}
+        {live.pieces > 0 && liveHasGrams ? (
+          <>
+            <Field label="Gross weight in stock" value={<WeightText value={live.grossWeight} />} />
+            <Field label="Net weight in stock" value={<WeightText value={live.netWeight} />} />
+            <Field label="Fine weight in stock" value={<WeightText value={live.fineWeight} />} />
+          </>
+        ) : null}
+        {live.pieces > 0 && live.caratWeight > 0 ? (
+          <Field label="Carats in stock" value={<WeightText value={live.caratWeight} unit="CARAT" />} />
+        ) : null}
+      </Section>
+
       <Section title="Basic Information">
         <Field label="Product Code" value={product.productCode} />
+        <Field
+          label="Selling"
+          value={product.soldByWeight ? <Badge variant="secondary">Sold by weight</Badge> : "By the piece"}
+        />
         <Field label="Category" value={product.category?.name} />
         <Field label="Item Type" value={product.categoryType?.name} />
         <Field label="Finish" value={<FinishBadge finish={product.defaultFinish} />} />
@@ -149,9 +175,9 @@ export function ProductDetailContent({
               />
             </>
           )}
-          <Field label="Gross Weight" value={grossWeight} />
-          <Field label="Stone Weight" value={stoneWeight} />
-          <Field label="Net Weight" value={netWeight} />
+          <Field label="Default Gross Weight (template)" value={grossWeight} />
+          <Field label="Default Stone Weight (template)" value={stoneWeight} />
+          <Field label="Default Net Weight (template)" value={netWeight} />
         </Section>
       ) : null}
 

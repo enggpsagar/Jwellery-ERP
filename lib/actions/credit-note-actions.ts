@@ -28,6 +28,8 @@ import {
 } from "@/lib/excel-export";
 import { omitHiddenKeys } from "@/lib/sheet-features";
 import { getSheetFeatures } from "@/lib/sheet-features.server";
+import { parseLotDraw } from "@/lib/inventory/weight-lot";
+import { restoreToLot } from "@/lib/inventory/weight-lot.server";
 
 export type CreditNoteFormState = {
   success: boolean;
@@ -536,7 +538,19 @@ export async function createCreditNote(
           },
         });
 
-        if (item.inventoryStockId) {
+        // A line sold by weight off a lot (quantity is always 1, so a
+        // return is the whole line) gives back exactly the weight it drew.
+        const lotDraw = parseLotDraw(item.lotDraw);
+        if (item.inventoryStockId && lotDraw) {
+          await restoreToLot(tx, {
+            storeId,
+            stockId: item.inventoryStockId,
+            draw: lotDraw,
+            referenceType: "CreditNote",
+            referenceId: creditNote.id,
+            notes: `Returned via credit note ${creditNoteNumber}`,
+          });
+        } else if (item.inventoryStockId) {
           await tx.inventoryStock.updateMany({
             where: { id: item.inventoryStockId, storeId },
             data: { quantity: { increment: quantity } },

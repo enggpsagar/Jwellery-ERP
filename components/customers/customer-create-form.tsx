@@ -2,15 +2,12 @@
 
 import { useActionState, useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
-import { User, Phone, Mail, MapPin, Hash, IndianRupee } from "lucide-react"
+import { User, Phone, Mail, MapPin, Hash } from "lucide-react"
 
-import {
-  addCustomer,
-  toggleCustomerSupplierStatus,
-  type CustomerFormState,
-} from "@/lib/actions/customer-actions"
+import { addCustomer, type CustomerFormState } from "@/lib/actions/customer-actions"
 import { getCitiesByStateId } from "@/lib/actions/location-actions"
 import { Button } from "@/components/ui/button"
+import { OpeningBalanceField } from "@/components/customers/opening-balance-field"
 import { Card, CardContent } from "@/components/ui/card"
 import { useToast } from "@/components/providers/toast-provider"
 import { RequiredMark } from "@/components/shared/required-mark"
@@ -34,14 +31,6 @@ type CustomerCreateFormProps = {
    * screen can select it on arrival.
    */
   returnTo?: string
-  /** Set only when arriving from the Suppliers page's own "Add Supplier"
-   * link — a follow-up toggleCustomerSupplierStatus call after this same
-   * addCustomer save succeeds, rather than a field on this form itself,
-   * since there's no user-facing "is this a supplier?" choice at creation
-   * time (see Customer.isSupplier's doc comment in schema.prisma) — this
-   * exists purely so a party created from the Suppliers list doesn't
-   * immediately vanish from the filtered list it was created from. */
-  markAsSupplier?: boolean
   /** Sets this customer's own initial GST type — see defaultPartyGstType's
    *  doc comment in lib/gst.ts. Freely editable per customer afterward, not
    *  a store-wide restriction. */
@@ -69,7 +58,6 @@ function FieldError({ errors }: { errors?: string[] }) {
 export function CustomerCreateForm({
   states,
   returnTo,
-  markAsSupplier,
   gstScheme,
   defaultState,
   defaultCity,
@@ -101,14 +89,6 @@ export function CustomerCreateForm({
       toast.success(state.message || "Party added successfully")
 
       async function finish() {
-        if (markAsSupplier && state.customer) {
-          // Best-effort — the party itself already saved either way; a
-          // failure here just means they land on Suppliers without it
-          // showing up yet, same as any other best-effort follow-up call
-          // in this app (e.g. the old alsoCreateVendor checkbox).
-          await toggleCustomerSupplierStatus(state.customer.id, true)
-        }
-
         // Hand the new id back to whoever sent us here so it can be selected
         // straight away, rather than making the user hunt for it in the list.
         if (returnTo && state.customer) {
@@ -333,19 +313,7 @@ export function CustomerCreateForm({
             <input name="registrationId" className={FIELD} placeholder="Optional" />
           </div>
 
-          <div className="space-y-1 rounded-lg transition-colors focus-within:bg-accent/40">
-            <label className="flex items-center gap-2 text-sm font-medium">
-              <IndianRupee className="h-4 w-4 text-muted-foreground" />
-              Opening Balance
-            </label>
-            <input
-              name="openingBalance"
-              type="number"
-              step="0.01"
-              className={FIELD}
-              placeholder="0.00"
-            />
-          </div>
+          <OpeningBalanceField />
 
           <div className="flex justify-end gap-3 pt-2 md:col-span-2">
             <Button type="submit" disabled={pending} size="lg">

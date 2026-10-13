@@ -34,7 +34,8 @@ No real secrets are used, and nothing talks to the shared Neon database —
 | `stock-autofill.spec.ts` | Picking an 18K + diamond piece with no selling price fills Purity, the stone and Rate / g (today's 24K × fineness); QR/Barcode tags print every metal and stone and follow Settings → QR & Barcode Tags; Stock list shows Product Code over `STOCK-CODE (qty)` and Fine Weight |
 | `product-images.spec.ts` | Product Images: add / make cover / remove / save order; square tiles for any photo shape; non-Blob URLs rejected |
 | `header-rates.spec.ts` | Top bar "Today's Rates": the Store Owner changes Gold 22K's selling rate and it lands on the purity's own selling price and in Metal Rates → Your Selling Rates |
-| `party-sheet.spec.ts` | Parties template = export columns, bad rows reject the whole file, an exported party re-imports equal, Suppliers export is suppliers only |
+| `party-sheet.spec.ts` | Parties template = export columns, bad rows reject the whole file, an exported party re-imports equal, Opening Balance Type Payable is stored negative |
+| `party-net-balance.spec.ts` | One party, one ledger: Payable opening balance from the form, a sale then a purchase net into one Receivable/Payable figure on the list, party page, running ledger and payment picker; dashboard Total Receivable/Payable; `/suppliers` redirects to Parties |
 | `karigar-sheet.spec.ts` | Artisan export → import round trip (opening cash, inactive, GST, metals, location), duplicate mobiles refused, ledger export columns |
 | `kacha-sheet.spec.ts` | Estimate import posts the party ledger, export → re-import is equal, backup → restore keeps slip number and DMO weight |
 | `taxonomy-io.spec.ts` | Metals/Purities and Stones/Stone Types export → import round trip, metal/stone name clash rejects the file, price changes logged |

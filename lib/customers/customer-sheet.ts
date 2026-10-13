@@ -54,8 +54,14 @@ export const PARTY_SHEET_COLUMNS: PartySheetColumn[] = [
   {
     header: "Opening Balance",
     required: "No (default 0)",
-    help: "A plain number in ₹ (no currency sign or commas). Positive = the party owes you.",
+    help: "A plain amount in ₹ (no currency sign or commas). Pick Receivable or Payable in the next column.",
     example: 0,
+  },
+  {
+    header: "Opening Balance Type",
+    required: "No (default Receivable)",
+    help: "Receivable = the party owes you; Payable = you owe the party (see the dropdown). Blank = Receivable, or Payable when Opening Balance is a negative number.",
+    example: "Receivable",
   },
 ]
 
@@ -64,11 +70,10 @@ export const PARTY_SHEET_HEADERS = PARTY_SHEET_COLUMNS.map((column) => column.he
 /** Written by the export after the shared columns, for reference only — the
  *  import ignores them (they're computed from the party's history). */
 export const PARTY_SHEET_EXPORT_ONLY_HEADERS = [
-  "Current Balance",
+  "Net Balance",
   "Balance Type",
   "Total Orders",
   "Total Purchase Value",
-  "Pending Amount",
   "Last Purchase Date",
   "Last Payment Date",
   "Created At",
@@ -78,9 +83,10 @@ export const PARTY_SHEET_NOTES = [
   "How to fill in the Parties sheet",
   "• One row per party. Replace or delete the example row before importing.",
   "• Columns can be in any order — they are matched by header name, so don't rename the headers.",
-  "• An exported Parties file has the same columns plus read-only ones at the end (Current Balance, Total Orders, …) — the import ignores those.",
+  "• An exported Parties file has the same columns plus read-only ones at the end (Net Balance, Balance Type, Total Orders, …) — the import ignores those.",
   "• Every row adds a new party; a Phone that already belongs to a party is an error.",
-  "• Dropdowns list the GST types and states. The Options sheet shows every list.",
+  "• Dropdowns list the GST types, Opening Balance Types and states. The Options sheet shows every list.",
+  "• Net Balance is the party's one running balance (opening balance + every sale, purchase and payment); Balance Type says whether it's Receivable, Payable or Settled.",
   "• Nothing is imported if any row has an error — the import lists each problem with its row number.",
 ]
 

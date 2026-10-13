@@ -5,18 +5,8 @@ import * as React from "react"
 import type { Customer } from "@/lib/actions/customer-actions"
 import { CustomersPagination } from "@/components/customers/customers-pagination"
 import { cn, toTitleCase } from "@/lib/utils"
-
-/** Money as it reads on a jewellery ledger. */
-function inr(value: number | string | null | undefined) {
-  if (value === null || value === undefined || value === "") return null
-  const amount = Number(value)
-  if (!Number.isFinite(amount)) return null
-  return new Intl.NumberFormat("en-IN", {
-    style: "currency",
-    currency: "INR",
-    maximumFractionDigits: 0,
-  }).format(amount)
-}
+import { PartyBalance } from "@/components/customers/party-balance"
+import { formatPartyBalanceText } from "@/lib/party-balance"
 
 type CustomersTableProps = {
   customers: Customer[]
@@ -33,19 +23,6 @@ type CustomersTableProps = {
   /** Which row's detail is showing in the panel alongside this table — distinct from selectedCustomerIds, which is the bulk-action checkbox selection. */
   activeCustomerId?: string | null
   onActivate?: (id: string) => void
-}
-
-/** Supplier-side balance: red when the store owes the party, blue when the
- *  party holds an advance from the store, "-" for a party never bought from. */
-function PayableAmount({ customer }: { customer: Customer }) {
-  const balance = customer.supplierBalance ?? 0
-  if (!customer.isSupplier && balance === 0) return <span className="text-muted-foreground">-</span>
-  if (balance < 0) return <span className="font-medium text-blue-600">{inr(Math.abs(balance))} Advance</span>
-  return (
-    <span className={cn("font-medium", balance > 0 ? "text-red-600" : "text-foreground")}>
-      {inr(balance) || "₹0"}
-    </span>
-  )
 }
 
 export function CustomersTable({
@@ -120,34 +97,19 @@ export function CustomersTable({
               <th className="px-4 py-3 font-medium">Party Name</th>
               <th className="px-4 py-3 font-medium">Phone</th>
               {/* City/State hidden below sm — on a narrow phone this table
-                  sits inside overflow-x-auto with no scroll affordance
-                  shown, so these two (the least useful at a glance) got
-                  silently scrolled out of view with nothing telling the
-                  user more columns existed. Outstanding — the one figure
+                  sits inside overflow-x-auto with no scroll affordance, so
+                  the least useful columns go first. Balance — the one figure
                   someone actually needs on this list — stays visible at
-                  every width instead of being hidden behind that same
-                  invisible scroll. */}
+                  every width. */}
               <th className="hidden px-4 py-3 font-medium sm:table-cell">City</th>
               <th className="hidden px-4 py-3 font-medium sm:table-cell">State</th>
-              {/* Outstanding shows currentBalance (ledger-derived: opening
-                  + every DEBIT sale - every CREDIT payment/refund), not
-                  pendingAmount — pendingAmount only sums unpaid
-                  Invoice/KachaInvoice balances, so a customer whose every
-                  document is fully paid but who has also made a standalone
-                  advance payment (no invoice yet to apply it against)
-                  showed a flatly wrong "₹0" here despite the ledger clearly
-                  showing money paid beyond what was ever billed. Plain
-                  <th>, not SortableTableHead: this is computed after the
-                  page's own rows are fetched (see getCustomers()), not a
-                  real column the database can ORDER BY. */}
-              <th className="px-4 py-3 font-medium">Outstanding</th>
-              {/* What the store owes this party for purchases (supplier-side
-                  ledger, mapCustomer's supplierBalance). Its own column, not
-                  netted into Outstanding — the two balances are kept apart
-                  on purpose. Shown whether or not the Supplier module is on:
-                  it's the same data either way, and without it a party you
-                  bought from read "₹0" here. */}
-              <th className="px-4 py-3 font-medium">Payable</th>
+              {/* The party's ONE net balance (lib/party-balance.ts): opening
+                  + every sale/payment-out DEBIT − every purchase/payment-in/
+                  return CREDIT, across both sides of its ledger. Replaces the
+                  old separate Outstanding and Payable columns. Plain <th>,
+                  not sortable: computed after the page's rows are fetched,
+                  not a column the database can ORDER BY. */}
+              <th className="px-4 py-3 font-medium">Balance</th>
             </tr>
           </thead>
 
@@ -205,24 +167,14 @@ export function CustomersTable({
                           },
                           {
                             fields: [
-                              { label: "Opening balance", value: inr(customer.openingBalance) },
                               {
-                                // currentBalance (ledger-derived), not
-                                // pendingAmount — see the main "Outstanding"
-                                // column's own comment below for why.
-                                label: "Outstanding",
-                                value:
-                                  customer.balanceType === "Advance" ? (
-                                    <span className="text-blue-600">
-                                      {inr(Math.abs(customer.currentBalance ?? 0))} Advance
-                                    </span>
-                                  ) : (customer.currentBalance ?? 0) > 0 ? (
-                                    <span className="text-red-600">{inr(customer.currentBalance)}</span>
-                                  ) : (
-                                    inr(customer.currentBalance ?? 0)
-                                  ),
+                                label: "Opening balance",
+                                value: customer.openingBalance ? formatPartyBalanceText(customer.openingBalance) : null,
                               },
-                              { label: "Payable", value: <PayableAmount customer={customer} /> },
+                              {
+                                label: "Balance",
+                                value: <PartyBalance net={customer.netBalance} fractionDigits={0} />,
+                              },
                               { label: "Orders", value: customer.totalOrders },
                               { label: "Last purchase", value: customer.lastPurchaseDate },
                             ],
@@ -244,25 +196,8 @@ export function CustomersTable({
                     {customer.state || "-"}
                   </td>
 
-                  <td className="px-4 py-3">
-                    <span
-                      className={cn(
-                        "font-medium",
-                        customer.balanceType === "Advance"
-                          ? "text-blue-600"
-                          : (customer.currentBalance ?? 0) > 0
-                            ? "text-red-600"
-                            : "text-foreground",
-                      )}
-                    >
-                      {customer.balanceType === "Advance"
-                        ? `${inr(Math.abs(customer.currentBalance ?? 0))} Advance`
-                        : inr(customer.currentBalance ?? 0) || "₹0"}
-                    </span>
-                  </td>
-
-                  <td className="px-4 py-3">
-                    <PayableAmount customer={customer} />
+                  <td className="px-4 py-3" data-testid="party-balance">
+                    <PartyBalance net={customer.netBalance} fractionDigits={0} />
                   </td>
                 </tr>
               )

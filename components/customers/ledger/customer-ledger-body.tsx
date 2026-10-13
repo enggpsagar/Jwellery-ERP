@@ -4,228 +4,153 @@
 import { useWeightFormat } from "@/components/providers/weight-settings-provider"
 import { useState } from "react"
 import Link from "next/link"
-import { ChevronDown, ChevronUp, Receipt } from "lucide-react"
+import { ChevronDown, ChevronUp, PackagePlus, Receipt } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
-
-import type { CustomerLedgerEntryItem, CustomerLedgerSummary } from "@/lib/actions/customer-ledger-actions"
-import { cn } from "@/lib/utils"
+import { ExportMenu } from "@/components/shared/export-menu"
+import type { PartyLedger } from "@/lib/actions/customer-ledger-actions"
+import { formatPartyAmount } from "@/lib/party-balance"
 import { EmailLedgerStatementButton } from "@/components/customers/ledger/email-ledger-statement-button"
 import { CustomerLedgerHistoryTable } from "@/components/customers/ledger/customer-ledger-history-table"
 import { CustomerReturnActions } from "@/components/customers/ledger/customer-return-actions"
-
-function formatAmount(value: number) {
-  return `₹ ${Number(value || 0).toLocaleString("en-IN", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })}`
-}
-
-/** Grams / carats with the store's Settings > Weights decimals. */
-function formatWeight(value: number, decimals: number) {
-  return `${Number(value || 0).toLocaleString("en-IN", {
-    minimumFractionDigits: decimals,
-    maximumFractionDigits: decimals,
-  })} g`
-}
-
-function formatCarat(value: number, decimals: number) {
-  return `${Number(value || 0).toLocaleString("en-IN", {
-    minimumFractionDigits: decimals,
-    maximumFractionDigits: decimals,
-  })} ct`
-}
+import { PartyBalance } from "@/components/customers/party-balance"
 
 type CustomerLedgerBodyProps = {
   customerId: string
   hasEmail: boolean
-  entries: CustomerLedgerEntryItem[]
-  summary: CustomerLedgerSummary | null
+  ledger: PartyLedger | null
+  /** Start with the history open (e.g. the Purchases page's party panel,
+   *  where the entries are the point). */
+  defaultShowDetails?: boolean
+}
+
+function SummaryCard({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div className="rounded-lg border bg-card p-4">
+      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{title}</p>
+      <div className="mt-1 text-sm font-semibold">{children}</div>
+    </div>
+  )
 }
 
 /**
- * The customer ledger's presentation — no data fetching of its own, so it
- * has no server-only imports and can be rendered from either the
- * server-fetched CustomerLedgerCard or the client-fetched
- * CustomerLedgerCardClient.
+ * The Party Ledger — ONE ledger per party (user decision 2026-10-13):
+ * sales, purchases, payments in and out, returns and exchanges together,
+ * with one running net balance (lib/party-balance.ts). No data fetching of
+ * its own, so it renders from either the server-fetched CustomerLedgerCard
+ * or the client-fetched CustomerLedgerCardClient.
  */
 export function CustomerLedgerBody({
   customerId,
   hasEmail,
-  entries,
-  summary,
+  ledger,
+  defaultShowDetails = false,
 }: CustomerLedgerBodyProps) {
   const wf = useWeightFormat()
-  // Collapsed by default — the summary cards above already answer "where do
-  // things stand," so the full transaction-by-transaction history (which
-  // can run long) stays out of the way until someone actually asks for it.
-  const [showDetails, setShowDetails] = useState(false)
+  const [showDetails, setShowDetails] = useState(defaultShowDetails)
+  const rows = ledger?.rows ?? []
+  const summary = ledger?.summary ?? null
+  const from = encodeURIComponent(`/customers/${customerId}`)
 
   return (
     <section className="space-y-4">
-      {/* Explicit "Party Ledger" label — this is the customer/receivable
-          side of this Party's activity, tracked independently from any
-          Supplier Ledger section that may also show further down the same
-          page (see customer-detail-content.tsx). Without this heading a
-          reader had no way to tell which ledger they were looking at from
-          the section itself, only from page position — same reasoning the
-          Supplier Ledger's own DetailSection title already gets. */}
       <h2 className="text-base font-semibold text-foreground">Party Ledger</h2>
 
-      {/* Just the actions, no bordered header card around them — a "Ledger"
-          heading and a description restating what the buttons already say
-          isn't information, and this bar is the first thing on the page,
-          so it's already positioned for easy access. Email Ledger only
-          appears when there's actually an address to send it to. Sale
-          jumps straight to a real invoice with this customer already
-          selected — no more separate lightweight "just note a sale
-          happened" entry unlinked to any actual invoice. Payment In
-          mirrors Vendor's own "Pay Now" shortcut (same variant="success",
-          same ?customerId= pre-fill convention into /payments/in — see
-          payment-in-dialog.tsx's own doc comment) — this used to have no
-          equivalent at all, so recording money received meant leaving this
-          page and re-picking the customer from a dropdown on /payments/in.
-          Refund/Replace route into the existing invoice-level Return Items
-          / Return & Exchange mechanisms (see CustomerReturnActions), and
-          hide themselves entirely when this customer has no prior sale to
-          act against. */}
+      {/* Everything you can do with a party, from its own page: sell to it,
+          buy from it, take or make a payment. Each pre-selects this party on
+          the form it opens. Refund/Replace hide themselves when there is no
+          past sale to act against. */}
       <div className="flex flex-wrap gap-3">
         {hasEmail ? <EmailLedgerStatementButton customerId={customerId} /> : null}
         <Button asChild className="gap-2">
-          <Link
-            href={`/billing/new?customerId=${customerId}&from=${encodeURIComponent(`/customers/${customerId}`)}`}
-          >
+          <Link href={`/billing/new?customerId=${customerId}&from=${from}`}>
             <Receipt className="h-4 w-4" />
             Sale
           </Link>
         </Button>
-        <Button variant="success" asChild>
-          <Link href={`/payments/in?customerId=${customerId}`}>
-            Payment In
+        <Button asChild variant="outline" className="gap-2">
+          <Link href={`/purchases/new?vendorId=${customerId}`}>
+            <PackagePlus className="h-4 w-4" />
+            Purchase
           </Link>
+        </Button>
+        <Button variant="success" asChild>
+          <Link href={`/payments/in?customerId=${customerId}`}>Payment In</Link>
+        </Button>
+        <Button variant="warning" asChild>
+          <Link href={`/payments/out?vendorId=${customerId}`}>Payment Out</Link>
         </Button>
         <CustomerReturnActions customerId={customerId} />
-        {/* This same Customer record can also be a Supplier (the merged
-            Vendor/Party model) — Payment Out here is the money-leaving
-            counterpart to Payment In above, reusing the exact same
-            ?vendorId= pre-fill convention PaymentOutDialog already supports
-            (see supplier-ledger-body.tsx's own "Pay Out" button). */}
-        <Button variant="warning" asChild>
-          <Link href={`/payments/out?vendorId=${customerId}`}>
-            Payment Out
-          </Link>
-        </Button>
+        {rows.length > 0 ? (
+          <ExportMenu href={`/customers/${customerId}/ledger-export`} label="Export Ledger" />
+        ) : null}
       </div>
 
       {summary && (
         <div className="space-y-4">
-          {/* Hidden when the customer has no actual activity — an opening
-              balance and a running ₹0.00 debit/credit/balance on every card
-              is clutter, not information, for a customer nothing has ever
-              been recorded against. */}
-          {summary.moneyActive &&
-            (summary.openingBalance !== 0 ||
-              summary.ledgerDebitTotal !== 0 ||
-              summary.ledgerCreditTotal !== 0) && (
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+          {/* Hidden when nothing was ever recorded — ₹0 cards for a party
+              with no history are clutter, not information. auto-fit so the
+              cards also fit the narrow Parties side panel. */}
+          {summary.moneyActive && (summary.openingBalance !== 0 || rows.length > 0) && (
+            <div className="grid grid-cols-[repeat(auto-fit,minmax(150px,1fr))] gap-3">
               {summary.openingBalance !== 0 && (
-                <div className="rounded-lg border bg-card p-4">
-                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                    Opening Balance
-                  </p>
-                  <p className="mt-1 text-sm font-semibold text-foreground">
-                    {formatAmount(summary.openingBalance)}
-                  </p>
-                </div>
+                <SummaryCard title="Opening Balance">
+                  <PartyBalance net={summary.openingBalance} />
+                </SummaryCard>
               )}
-
-              <div className="rounded-lg border bg-card p-4">
-                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                  Total Sales (Debit)
-                </p>
-                <p className="mt-1 text-sm font-semibold text-red-600">
-                  {formatAmount(summary.ledgerDebitTotal)}
-                </p>
-              </div>
-
-              <div className="rounded-lg border bg-card p-4">
-                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                  Total Refund / Received (Credit)
-                </p>
-                <p className="mt-1 text-sm font-semibold text-green-600">
-                  {formatAmount(summary.ledgerCreditTotal)}
-                </p>
-              </div>
-
-              <div className="rounded-lg border bg-card p-4">
-                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                  Current Ledger Balance
-                </p>
-                <p
-                  className={cn(
-                    "mt-1 text-sm font-semibold",
-                    summary.currentBalance > 0
-                      ? "text-red-600"
-                      : summary.currentBalance < 0
-                        ? "text-blue-600"
-                        : "text-foreground",
-                  )}
-                >
-                  {formatAmount(summary.currentBalance)}
-                </p>
-              </div>
+              <SummaryCard title="Total Debit">
+                <span className="text-red-600">{formatPartyAmount(summary.debitTotal)}</span>
+                <span className="block text-[11px] font-normal text-muted-foreground">sales, payments out</span>
+              </SummaryCard>
+              <SummaryCard title="Total Credit">
+                <span className="text-green-600">{formatPartyAmount(summary.creditTotal)}</span>
+                <span className="block text-[11px] font-normal text-muted-foreground">
+                  purchases, payments in, returns
+                </span>
+              </SummaryCard>
+              <SummaryCard title="Net Balance">
+                <span data-testid="party-ledger-net">
+                  <PartyBalance net={summary.netBalance} />
+                </span>
+              </SummaryCard>
+              {summary.metalsPurchased.length > 0 && (
+                <SummaryCard title="Metal Bought">
+                  {summary.metalsPurchased.map((metal) => (
+                    <p key={`${metal.label}|${metal.unit}`} className="text-foreground">
+                      {metal.label}: {metal.unit === "ct" ? wf.ct(metal.weight) : wf.g(metal.weight)} {metal.unit}
+                    </p>
+                  ))}
+                </SummaryCard>
+              )}
             </div>
           )}
 
           {summary.unitSummaries.map((unit) => {
             const format = (value: number) =>
-              unit.isGemstone ? formatCarat(value, wf.caratDecimals) : formatWeight(value, wf.gramDecimals)
-
+              unit.isGemstone ? `${wf.ct(value)} ct` : `${wf.g(value)} g`
             return (
-              <div key={unit.unit} className="grid grid-cols-1 gap-4 md:grid-cols-3">
-                <div className="rounded-lg border bg-card p-4">
-                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                    {unit.label} Debit
-                  </p>
-                  <p className="mt-1 text-sm font-semibold text-red-600">
-                    {format(unit.debitTotal)}
-                  </p>
-                </div>
-
-                <div className="rounded-lg border bg-card p-4">
-                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                    {unit.label} Credit
-                  </p>
-                  <p className="mt-1 text-sm font-semibold text-green-600">
-                    {format(unit.creditTotal)}
-                  </p>
-                </div>
-
-                <div className="rounded-lg border bg-card p-4">
-                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                    {unit.label} Balance
-                  </p>
-                  <p className="mt-1 text-sm font-semibold text-foreground">
-                    {format(unit.currentBalance)}
-                  </p>
-                </div>
+              <div key={unit.unit} className="grid grid-cols-[repeat(auto-fit,minmax(150px,1fr))] gap-3">
+                <SummaryCard title={`${unit.label} Debit`}>
+                  <span className="text-red-600">{format(unit.debitTotal)}</span>
+                </SummaryCard>
+                <SummaryCard title={`${unit.label} Credit`}>
+                  <span className="text-green-600">{format(unit.creditTotal)}</span>
+                </SummaryCard>
+                <SummaryCard title={`${unit.label} Balance`}>{format(unit.currentBalance)}</SummaryCard>
               </div>
             )
           })}
         </div>
       )}
 
-      {/* No entries at all means nothing for "Ledger History" to summarize
-          or expand into — the heading plus a permanently-disabled toggle
-          isn't information either. */}
-      {entries.length > 0 && (
+      {rows.length > 0 && summary && (
         <>
           <div className="rounded-xl border bg-card shadow-sm">
             <div className="flex w-full items-center justify-between gap-2 px-4 py-4">
               <div>
                 <h3 className="text-sm font-semibold text-foreground">Ledger History</h3>
                 <p className="text-xs text-muted-foreground">
-                  {entries.length} entr{entries.length === 1 ? "y" : "ies"}
+                  {rows.length} entr{rows.length === 1 ? "y" : "ies"}
                   {!showDetails ? " — click to view details" : ""}
                 </p>
               </div>
@@ -251,7 +176,7 @@ export function CustomerLedgerBody({
             </div>
           </div>
 
-          {showDetails && <CustomerLedgerHistoryTable entries={entries} />}
+          {showDetails && <CustomerLedgerHistoryTable rows={rows} summary={summary} />}
         </>
       )}
     </section>

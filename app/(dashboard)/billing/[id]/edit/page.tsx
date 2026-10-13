@@ -169,7 +169,6 @@ export default async function EditInvoicePage({ params }: Props) {
         customers={customers}
         stockItems={stockItems}
         suppliers={suppliers}
-        supplierModuleEnabled={businessSettings.supplierModuleEnabled}
         existingExchange={existingExchange}
         alreadyPaid={Number(invoice.paidAmount)}
         enumFineness={enumFineness}

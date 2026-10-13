@@ -1,5 +1,6 @@
 "use client"
 
+import { PartyBalance } from "@/components/customers/party-balance"
 import { useWeightFormat } from "@/components/providers/weight-settings-provider"
 import Link from "next/link"
 import { useSearchParams } from "next/navigation"
@@ -63,7 +64,7 @@ type KarigarOutstanding = {
 type CustomerDues = {
   customerCount: number
   totalDue: number
-  customers: { id: string; name: string; phone: string | null; totalDue: number; invoiceCount: number }[]
+  customers: { id: string; name: string; phone: string | null; totalDue: number; invoiceCount: number; netBalance: number }[]
 }
 
 type GoldFlow = {
@@ -406,6 +407,7 @@ export function ReportsTabs({
         case "phone": return row.phone
         case "invoices": return row.invoiceCount
         case "totalDue": return row.totalDue
+        case "netBalance": return row.netBalance
         default: return null
       }
     },
@@ -1143,7 +1145,7 @@ export function ReportsTabs({
         <div className="space-y-6">
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <StatCard title="Parties with Dues" value={customerDues.customerCount} />
-            <StatCard title="Total Outstanding" value={`₹${customerDues.totalDue.toFixed(2)}`} tone="outstanding" />
+            <StatCard title="Unpaid Bills" value={`₹${customerDues.totalDue.toFixed(2)}`} tone="outstanding" />
           </div>
 
           <ReportSearchBar
@@ -1160,14 +1162,15 @@ export function ReportsTabs({
                   <SortableTh label="Party" sortKey="name" activeSortKey={duesTable.sortKey} sortDir={duesTable.sortDir} onSort={duesTable.toggleSort} />
                   <SortableTh label="Phone" sortKey="phone" activeSortKey={duesTable.sortKey} sortDir={duesTable.sortDir} onSort={duesTable.toggleSort} />
                   <SortableTh label="Invoices" sortKey="invoices" activeSortKey={duesTable.sortKey} sortDir={duesTable.sortDir} onSort={duesTable.toggleSort} />
-                  <SortableTh label="Total Due" sortKey="totalDue" activeSortKey={duesTable.sortKey} sortDir={duesTable.sortDir} onSort={duesTable.toggleSort} />
+                  <SortableTh label="Unpaid Bills" sortKey="totalDue" activeSortKey={duesTable.sortKey} sortDir={duesTable.sortDir} onSort={duesTable.toggleSort} />
+                  <SortableTh label="Net Balance" sortKey="netBalance" activeSortKey={duesTable.sortKey} sortDir={duesTable.sortDir} onSort={duesTable.toggleSort} />
                 </tr>
               </thead>
               <tbody>
                 {duesTable.pageRows.length === 0 ? (
                   <tr>
-                    <td colSpan={4} className="px-4 py-6 text-center text-muted-foreground">
-                      No outstanding party dues match this search.
+                    <td colSpan={5} className="px-4 py-6 text-center text-muted-foreground">
+                      No party dues match this search.
                     </td>
                   </tr>
                 ) : (
@@ -1190,7 +1193,8 @@ export function ReportsTabs({
                             },
                             {
                               fields: [
-                                { label: "Total due", value: <span className="text-red-600">{reportInr(customer.totalDue)}</span> },
+                                { label: "Unpaid bills", value: <span className="text-red-600">{reportInr(customer.totalDue)}</span> },
+                                { label: "Net balance", value: <PartyBalance net={customer.netBalance} /> },
                                 {
                                   label: "Average per invoice",
                                   value:
@@ -1207,6 +1211,9 @@ export function ReportsTabs({
                       <td className="px-4 py-3">{customer.invoiceCount}</td>
                       <td className="px-4 py-3 text-red-600 font-medium">
                         ₹{customer.totalDue.toFixed(2)}
+                      </td>
+                      <td className="px-4 py-3">
+                        <PartyBalance net={customer.netBalance} />
                       </td>
                     </tr>
                   ))

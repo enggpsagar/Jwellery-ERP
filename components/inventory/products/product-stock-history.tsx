@@ -32,6 +32,20 @@ export function ProductStockHistory({ productId, refreshToken }: { productId: st
     }
   }, [productId, refreshToken])
 
+  // Grams and/or carats, whichever this product actually moves — a loose
+  // stone has only carats (it used to read "0 g" everywhere).
+  const showCarats = rows?.some((row) => row.caratWeight > 0) ?? false
+  const showGrams = !showCarats || (rows?.some((row) => row.netWeight > 0) ?? false)
+  const sign = (row: ProductStockHistoryRow) => (row.direction === "OUT" ? "−" : "+")
+  const balance = (row: ProductStockHistoryRow) =>
+    [
+      String(row.balanceQty),
+      showGrams ? `${wf.g(row.balanceNetWeight)} g` : null,
+      showCarats ? `${wf.ct(row.balanceCaratWeight)} ct` : null,
+    ]
+      .filter(Boolean)
+      .join(" · ")
+
   return (
     <section className="space-y-3 rounded-xl border bg-card p-5">
       <h3 className="text-lg font-semibold">Stock History</h3>
@@ -48,7 +62,8 @@ export function ProductStockHistory({ productId, refreshToken }: { productId: st
                 <th className="py-2 pr-3 font-medium">Entry</th>
                 <th className="py-2 pr-3 font-medium">Stock</th>
                 <th className="py-2 pr-3 text-right font-medium">Qty</th>
-                <th className="py-2 pr-3 text-right font-medium">Net Wt</th>
+                {showGrams && <th className="py-2 pr-3 text-right font-medium">Net Wt</th>}
+                {showCarats && <th className="py-2 pr-3 text-right font-medium">Carats</th>}
                 <th className="py-2 text-right font-medium">In Stock</th>
               </tr>
             </thead>
@@ -79,6 +94,7 @@ export function ProductStockHistory({ productId, refreshToken }: { productId: st
                         )}
                       </span>
                     ) : null}
+                    {row.byWeight ? <div className="text-xs text-muted-foreground">By weight (part of the lot)</div> : null}
                     {row.party ? <div className="text-xs text-muted-foreground">{row.party}</div> : null}
                   </td>
                   <td className="py-2 pr-3 whitespace-nowrap">
@@ -87,14 +103,20 @@ export function ProductStockHistory({ productId, refreshToken }: { productId: st
                     </Link>
                   </td>
                   <td className="py-2 pr-3 text-right tabular-nums">
-                    {row.direction === "NOTE" ? "—" : `${row.direction === "OUT" ? "−" : "+"}${row.quantity}`}
+                    {/* Part of a lot moved without emptying / refilling it: no piece count change. */}
+                    {row.direction === "NOTE" || (row.byWeight && row.quantity === 0) ? "—" : `${sign(row)}${row.quantity}`}
                   </td>
-                  <td className="py-2 pr-3 text-right tabular-nums whitespace-nowrap">
-                    {row.direction === "NOTE" ? "—" : `${row.direction === "OUT" ? "−" : "+"}${wf.g(row.netWeight)} g`}
-                  </td>
-                  <td className="py-2 text-right tabular-nums whitespace-nowrap">
-                    {row.balanceQty} · {wf.g(row.balanceNetWeight)} g
-                  </td>
+                  {showGrams && (
+                    <td className="py-2 pr-3 text-right tabular-nums whitespace-nowrap">
+                      {row.direction === "NOTE" ? "—" : `${sign(row)}${wf.g(row.netWeight)} g`}
+                    </td>
+                  )}
+                  {showCarats && (
+                    <td className="py-2 pr-3 text-right tabular-nums whitespace-nowrap">
+                      {row.direction === "NOTE" ? "—" : `${sign(row)}${wf.ct(row.caratWeight)} ct`}
+                    </td>
+                  )}
+                  <td className="py-2 text-right tabular-nums whitespace-nowrap">{balance(row)}</td>
                 </tr>
               ))}
             </tbody>

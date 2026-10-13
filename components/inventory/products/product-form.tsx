@@ -3,7 +3,8 @@
 import { deriveNetWeight as calcNetWeight } from "@/lib/weight-calc";
 import { useWeightFormat, useWeightSettings } from "@/components/providers/weight-settings-provider";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Plus, Trash2 } from "lucide-react";
+import Link from "next/link";
+import { Lock, Plus, Trash2 } from "lucide-react";
 
 import { PurityType } from "@prisma/client";
 
@@ -31,7 +32,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input"
 import { SelectSearchInput } from "@/components/ui/select-search-input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 import {
   Select,
@@ -120,6 +123,11 @@ type Product = {
   description: string | null;
   notes: string | null;
   isActive: boolean;
+  /** Bulk stock sold by weight — see Product.soldByWeight. */
+  soldByWeight?: boolean;
+  /** Edit only: the product already has stock or bills, so its name, metal,
+   * purity, stone and category can't change (updateProduct refuses). */
+  identityLocked?: boolean;
   /** Present only when this product already has real component rows (see
    * getProductById's own include) — a legacy product saved before this
    * feature existed has neither array, and the form seeds one metal row
@@ -186,6 +194,31 @@ type ProductFormProps = {
    * that hasn't been updated still shows it, matching today's behavior. */
   styleFieldEnabled?: boolean;
 };
+
+export const IDENTITY_LOCK_TIP =
+  "Locked — this product already has stock or bills. Create a new product instead.";
+
+/** Category / type names that are bulk stock, sold by weight by default. */
+const BULK_STOCK_NAME = /\b(bars?|bullion|biscuits?|coins?|raw)\b/i;
+
+/**
+ * Wraps a locked identity field so hovering / focusing it explains why it
+ * can't change. A disabled control gets no pointer events of its own, so the
+ * tooltip hangs off a focusable wrapper instead.
+ */
+function LockedField({ locked, children }: { locked: boolean; children: React.ReactNode }) {
+  if (!locked) return <>{children}</>;
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <div tabIndex={0} className="w-full rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring/50">
+          {children}
+        </div>
+      </TooltipTrigger>
+      <TooltipContent>{IDENTITY_LOCK_TIP}</TooltipContent>
+    </Tooltip>
+  );
+}
 
 function ErrorText({ error }: { error?: string[] }) {
   if (!error?.length) return null;
@@ -288,6 +321,11 @@ export function ProductForm({
   gstRates = [],
 }: ProductFormProps) {
   const showLocationField = useShowLocationField(locations.length);
+  // Name / metal / purity / stone / category are fixed once the product has
+  // stock or bills (updateProduct refuses a change). Locked fields stay in
+  // the form and still submit their values — hidden inputs / readOnly, never
+  // a bare disabled input — so an unchanged save passes the server check.
+  const identityLocked = mode === "edit" && Boolean(product?.identityLocked);
   const [categoryId, setCategoryId] = useState(product?.categoryId ?? "");
 
   const [categoryTypeId, setCategoryTypeId] = useState(
@@ -685,6 +723,22 @@ export function ProductForm({
     setDefaultFinish(metalFamily === "GOLD" && /ornament/i.test(selectedCategoryName) ? "PAKKA" : "KACHA");
   }, [finishTouched, metalFamily, selectedCategoryName]);
 
+  // Bulk stock (loose stones, bars, bullion, coins, raw metal) sells part of
+  // a lot by weight. A new product starts ON for a gemstone or a bulk-sounding
+  // category / type, until the user flips the switch themselves; an existing
+  // (or copied) product keeps its stored value.
+  const [soldByWeight, setSoldByWeight] = useState(Boolean(product?.soldByWeight));
+  const [soldByWeightTouched, setSoldByWeightTouched] = useState(Boolean(product));
+  const selectedTypeName = types.find((item) => item.id === categoryTypeId)?.name ?? "";
+  const suggestsSoldByWeight =
+    Boolean(selectedMetal?.isGemstone) ||
+    BULK_STOCK_NAME.test(selectedCategoryName) ||
+    BULK_STOCK_NAME.test(selectedTypeName);
+  useEffect(() => {
+    if (soldByWeightTouched) return;
+    setSoldByWeight(suggestsSoldByWeight);
+  }, [soldByWeightTouched, suggestsSoldByWeight]);
+
   // Create-only: offer to open the stock entry in the same step, so a new
   // product doesn't need a second trip to Inventory to become stockable.
   const [createStock, setCreateStock] = useState(false);
@@ -989,6 +1043,23 @@ export function ProductForm({
 
   return (
     <div className="space-y-8">
+      {identityLocked && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
+          <p className="flex items-start gap-2">
+            <Lock className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
+            <span>
+              This product already has stock or bills, so its name, metal, purity, stone and category are locked.
+              Weights, charges, HSN, GST, images and notes can still be edited.
+            </span>
+          </p>
+          {product?.id && (
+            <Button asChild variant="outline" size="sm">
+              <Link href={`/inventory/products/new?fromProductId=${product.id}`}>Create new product</Link>
+            </Button>
+          )}
+        </div>
+      )}
+
       <div className="rounded-xl border p-6">
         <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
           <h3 className="text-lg font-semibold">Basic Information</h3>
@@ -998,12 +1069,18 @@ export function ProductForm({
           <div className="lg:col-span-2">
             <Label htmlFor="name">Product Name <RequiredMark /></Label>
 
-            <Input
-              id="name"
-              name="name"
-              defaultValue={product?.name ?? ""}
-              placeholder="Ladies Ring"
-            />
+            <LockedField locked={identityLocked}>
+              <Input
+                id="name"
+                name="name"
+                defaultValue={product?.name ?? ""}
+                placeholder="Ladies Ring"
+                // readOnly, not disabled — a disabled input doesn't post.
+                readOnly={identityLocked}
+                aria-readonly={identityLocked || undefined}
+                className={identityLocked ? "bg-muted" : undefined}
+              />
+            </LockedField>
 
             <ErrorText error={state.errors.name} />
           </div>
@@ -1014,9 +1091,12 @@ export function ProductForm({
                 through Default Purity below — the SKU itself. */}
             <Label>Metal / Stone <RequiredMark /></Label>
 
+            <LockedField locked={identityLocked}>
             <Select
               value={productKind}
+              disabled={identityLocked}
               onValueChange={(value) => {
+                if (identityLocked || !value) return;
                 const kind = value as "METAL" | "STONE";
                 setProductKind(kind);
                 // A metal and a gemstone are never both valid for the
@@ -1046,6 +1126,7 @@ export function ProductForm({
                 <SelectItem value="STONE">Stone</SelectItem>
               </SelectContent>
             </Select>
+            </LockedField>
           </div>
 
           {productKind === "STONE" && (
@@ -1073,9 +1154,19 @@ export function ProductForm({
           <div>
             <Label>Category <RequiredMark /></Label>
 
-            {categories.length > 0 ? (
+            {categories.length > 0 || identityLocked ? (
+              <LockedField locked={identityLocked}>
               <div className="flex gap-1.5">
-                <Select value={categoryId} onValueChange={setCategoryId}>
+                <Select
+                  value={categoryId}
+                  disabled={identityLocked}
+                  // Ignore Radix's "" (fired when the value lands before its
+                  // option renders — categories reload per metal).
+                  onValueChange={(value) => {
+                    if (identityLocked || !value) return;
+                    setCategoryId(value);
+                  }}
+                >
                   <SelectTrigger className="h-11 w-full">
                     <SelectValue placeholder="Select category" />
                   </SelectTrigger>
@@ -1108,11 +1199,13 @@ export function ProductForm({
                   size="icon"
                   className="h-11 w-9 shrink-0 px-0"
                   aria-label="Add Category"
+                  disabled={identityLocked}
                   onClick={() => setAddCategoryOpen(true)}
                 >
                   <Plus className="h-4 w-4" />
                 </Button>
               </div>
+              </LockedField>
             ) : (
               // Nothing to pick from — this store has no category that's
               // either universal or tagged to the current Metal/Stone yet
@@ -1130,8 +1223,6 @@ export function ProductForm({
                 <Plus className="h-4 w-4 mr-1.5" /> Add a category to get started
               </Button>
             )}
-
-            <input type="hidden" name="categoryId" value={categoryId} />
 
             <ErrorText error={state.errors.categoryId} />
           </div>
@@ -1205,6 +1296,10 @@ export function ProductForm({
           </>
           )}
 
+          {/* Outside the Metal-only block: a Stone product saved with a
+              category (e.g. imported) keeps it rather than posting blank —
+              switching Metal/Stone clears it anyway. */}
+          <input type="hidden" name="categoryId" value={categoryId} />
           <input
             type="hidden"
             name="categoryTypeId"
@@ -1235,6 +1330,26 @@ export function ProductForm({
               <ErrorText error={state.errors.targetStyleId} />
             </div>
           )}
+
+          <div className="flex items-start gap-3 rounded-lg border p-3 lg:col-span-3">
+            <Switch
+              id="soldByWeight"
+              className="mt-0.5"
+              checked={soldByWeight}
+              aria-describedby="soldByWeight-help"
+              onCheckedChange={(checked) => {
+                setSoldByWeightTouched(true);
+                setSoldByWeight(checked);
+              }}
+            />
+            <div className="space-y-0.5">
+              <Label htmlFor="soldByWeight">Sold by weight</Label>
+              <p id="soldByWeight-help" className="text-xs text-muted-foreground">
+                Bulk stock (loose stones, bars, bullion): sell part of a lot by weight
+              </p>
+            </div>
+            <input type="hidden" name="soldByWeight" value={soldByWeight ? "on" : ""} />
+          </div>
         </div>
       </div>
 
@@ -1259,6 +1374,7 @@ export function ProductForm({
               type="button"
               variant="secondary"
               size="sm"
+              disabled={identityLocked}
               onClick={() => setMetalComponents((prev) => [...prev, emptyMetalComponent(undefined, resolveDefaultGstRateId(gstRates))])}
             >
               <Plus className="h-4 w-4 mr-1" /> Add Metal
@@ -1279,10 +1395,13 @@ export function ProductForm({
                         Metal Type <RequiredMark />
                         {index === 0 && <span className="ml-1 font-normal text-muted-foreground">(primary)</span>}
                       </Label>
+                      <LockedField locked={identityLocked}>
                       <div className="flex gap-1.5">
                         <Select
                           value={row.metalTypeId}
+                          disabled={identityLocked}
                           onValueChange={(value) => {
+                            if (identityLocked || !value) return;
                             ensureMetalPurities(value);
                             updateMetalComponent(row.key, { metalTypeId: value, storeMetalPurityId: "" });
                           }}
@@ -1304,22 +1423,28 @@ export function ProductForm({
                           size="icon"
                           className="w-9 shrink-0 px-0"
                           aria-label="Add Metal Type"
+                          disabled={identityLocked}
                           onClick={() => setAddMetalForKey(row.key)}
                         >
                           <Plus className="h-4 w-4" />
                         </Button>
                       </div>
+                      </LockedField>
                     </div>
 
                     <div className="space-y-1">
                       <Label className="text-xs">Purity</Label>
+                      <LockedField locked={identityLocked}>
                       <div className="flex gap-1.5">
                         <Select
                           value={row.storeMetalPurityId || "__none__"}
-                          onValueChange={(value) =>
-                            updateMetalComponent(row.key, { storeMetalPurityId: value === "__none__" ? "" : value })
-                          }
-                          disabled={!rowMetal || !rowMetal.hasPurity}
+                          onValueChange={(value) => {
+                            // "" is Radix firing before the async purities
+                            // render, not a pick — an explicit None is "__none__".
+                            if (identityLocked || !value) return;
+                            updateMetalComponent(row.key, { storeMetalPurityId: value === "__none__" ? "" : value });
+                          }}
+                          disabled={identityLocked || !rowMetal || !rowMetal.hasPurity}
                         >
                           <SelectTrigger className="w-full">
                             <SelectValue placeholder={rowMetal && !rowMetal.hasPurity ? "N/A" : "Select"} />
@@ -1339,12 +1464,13 @@ export function ProductForm({
                           size="icon"
                           className="w-9 shrink-0 px-0"
                           aria-label="Add Purity"
-                          disabled={!rowMetal || !rowMetal.hasPurity}
+                          disabled={identityLocked || !rowMetal || !rowMetal.hasPurity}
                           onClick={() => setAddPurityForKey(row.key)}
                         >
                           <Plus className="h-4 w-4" />
                         </Button>
                       </div>
+                      </LockedField>
                     </div>
 
                     <div className="space-y-1">
@@ -1399,7 +1525,7 @@ export function ProductForm({
                     </div>
                   </div>
 
-                  {metalComponents.length > 1 && (
+                  {metalComponents.length > 1 && !identityLocked && (
                     <div className="mt-3 flex justify-end">
                       <Button
                         type="button"
@@ -1519,6 +1645,7 @@ export function ProductForm({
               type="button"
               variant="secondary"
               size="sm"
+              disabled={identityLocked}
               onClick={() => setStoneComponents((prev) => [...prev, emptyStoneComponent(undefined, resolveDefaultGstRateId(gstRates))])}
             >
               <Plus className="h-4 w-4 mr-1" /> Add Stone
@@ -1533,8 +1660,23 @@ export function ProductForm({
             <div className="space-y-4">
               {stoneComponents.map((row) => (
                 <div key={row.key} className="rounded-lg border border-emerald-200 bg-white p-4">
+                  {identityLocked && (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <p tabIndex={0} className="mb-2 inline-flex items-center gap-1 text-xs text-muted-foreground">
+                          <Lock className="h-3 w-3" aria-hidden /> Stone and Stone Type locked
+                        </p>
+                      </TooltipTrigger>
+                      <TooltipContent>{IDENTITY_LOCK_TIP}</TooltipContent>
+                    </Tooltip>
+                  )}
                   <StoneComponentFields
                     compact
+                    // Locked: which stone it is stays fixed; carats, rate and
+                    // weight stay editable. A stored stone with no Stone Type
+                    // yet stays open so one can be picked (the form needs it).
+                    lockPhysicalFields={identityLocked && row.stoneTypeNames.length > 0}
+                    allowWeightEdit
                     metals={metals}
                     origins={origins}
                     onMetalsChange={setMetals}
@@ -1707,7 +1849,7 @@ export function ProductForm({
                       row — that's the whole product, not an optional
                       extra — so Remove hides on the last one instead of
                       letting the box empty out. */}
-                  {(productKind !== "STONE" || stoneComponents.length > 1) && (
+                  {(productKind !== "STONE" || stoneComponents.length > 1) && !identityLocked && (
                     <div className="mt-3 flex justify-end">
                       <Button
                         type="button"

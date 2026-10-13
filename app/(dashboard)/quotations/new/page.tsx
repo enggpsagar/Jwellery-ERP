@@ -54,7 +54,6 @@ export default async function NewQuotationPage() {
           customers={customers}
           stockItems={stockItems}
           suppliers={suppliers}
-          supplierModuleEnabled={businessSettings.supplierModuleEnabled}
           locations={locations}
           defaultLocationId={defaultLocationId}
           metals={metals}

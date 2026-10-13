@@ -886,32 +886,45 @@ export function kachaSlipEmail(params: {
   };
 }
 
+/** "₹1,200 Receivable" / "₹300 Payable" / "Settled" — the party's one net
+ *  balance in words (lib/party-balance.ts sign convention). */
+function partyBalanceWords(net: number) {
+  if (Math.abs(net) < 0.005) return "Settled";
+  return `${formatCurrency(Math.abs(net))} ${net > 0 ? "Receivable" : "Payable"}`;
+}
+
+/**
+ * A party's statement: the same unified rows the Party Ledger shows (every
+ * sale, purchase, payment in/out, return, exchange), oldest first, with
+ * Debit / Credit columns and the running net balance.
+ */
 export function ledgerStatementEmail(params: {
   storeName: string;
   customerName: string;
   openingBalance: number;
-  ledgerDebitTotal: number;
-  ledgerCreditTotal: number;
-  currentBalance: number;
-  entries: {
+  debitTotal: number;
+  creditTotal: number;
+  netBalance: number;
+  rows: {
     entryDate: string;
-    sourceType: string;
+    label: string;
     description: string;
-    type: "DEBIT" | "CREDIT";
-    amount: number;
-    invoiceNumber?: string | null;
+    debit: number;
+    credit: number;
+    balance: number;
   }[];
 }) {
-  const rows = params.entries
+  const cell = "padding: 8px; border-bottom: 1px solid #e5e7eb;";
+  const rows = params.rows
     .map(
-      (entry) => `
+      (row) => `
       <tr>
-        <td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">${entry.entryDate}</td>
-        <td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">${entry.sourceType}${entry.invoiceNumber ? ` (${entry.invoiceNumber})` : ""}</td>
-        <td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">${entry.description || "-"}</td>
-        <td style="padding: 8px; border-bottom: 1px solid #e5e7eb; text-align: right; color: ${entry.type === "DEBIT" ? "#dc2626" : "#059669"};">
-          ${entry.type === "DEBIT" ? "-" : "+"}${formatCurrency(entry.amount)}
-        </td>
+        <td style="${cell}">${row.entryDate}</td>
+        <td style="${cell}">${escapeHtml(row.label)}</td>
+        <td style="${cell}">${row.description ? escapeHtml(row.description) : "-"}</td>
+        <td style="${cell} text-align: right; color: #dc2626;">${row.debit ? formatCurrency(row.debit) : ""}</td>
+        <td style="${cell} text-align: right; color: #059669;">${row.credit ? formatCurrency(row.credit) : ""}</td>
+        <td style="${cell} text-align: right; white-space: nowrap;">${partyBalanceWords(row.balance)}</td>
       </tr>`,
     )
     .join("");
@@ -919,22 +932,35 @@ export function ledgerStatementEmail(params: {
   const body = `
     <p>Hi ${params.customerName},</p>
     <p>Here is your account statement with <strong>${params.storeName}</strong>.</p>
-    <table style="width: 100%; max-width: 300px; font-size: 13px; border-collapse: collapse;">
-      ${summaryRow("Opening Balance", formatCurrency(params.openingBalance))}
-      ${summaryRow("Total Sales (Debit)", formatCurrency(params.ledgerDebitTotal))}
-      ${summaryRow("Total Received (Credit)", formatCurrency(params.ledgerCreditTotal))}
-      ${summaryRow("Current Balance", formatCurrency(params.currentBalance), true)}
+    <table style="width: 100%; max-width: 320px; font-size: 13px; border-collapse: collapse;">
+      ${summaryRow("Opening Balance", partyBalanceWords(params.openingBalance))}
+      ${summaryRow("Total Debit", formatCurrency(params.debitTotal))}
+      ${summaryRow("Total Credit", formatCurrency(params.creditTotal))}
+      ${summaryRow("Net Balance", partyBalanceWords(params.netBalance), true)}
     </table>
+    <p style="font-size: 12px; color: #6b7280;">Receivable = you owe ${params.storeName}; Payable = ${params.storeName} owes you.</p>
     <table style="width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 13px;">
       <thead>
         <tr style="background: #f9fafb;">
           <th style="padding: 8px; text-align: left;">Date</th>
-          <th style="padding: 8px; text-align: left;">Type</th>
+          <th style="padding: 8px; text-align: left;">Entry</th>
           <th style="padding: 8px; text-align: left;">Description</th>
-          <th style="padding: 8px; text-align: right;">Amount</th>
+          <th style="padding: 8px; text-align: right;">Debit</th>
+          <th style="padding: 8px; text-align: right;">Credit</th>
+          <th style="padding: 8px; text-align: right;">Balance</th>
         </tr>
       </thead>
-      <tbody>${rows || `<tr><td colspan="4" style="padding: 8px; text-align: center; color: #9ca3af;">No entries yet</td></tr>`}</tbody>
+      <tbody>
+        <tr>
+          <td style="${cell}"></td>
+          <td style="${cell}">Opening balance</td>
+          <td style="${cell}"></td>
+          <td style="${cell}"></td>
+          <td style="${cell}"></td>
+          <td style="${cell} text-align: right; white-space: nowrap;">${partyBalanceWords(params.openingBalance)}</td>
+        </tr>
+        ${rows || `<tr><td colspan="6" style="padding: 8px; text-align: center; color: #9ca3af;">No entries yet</td></tr>`}
+      </tbody>
     </table>
   `;
 

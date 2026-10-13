@@ -14,6 +14,7 @@ import { CustomerSelect } from "@/components/customers/customer-select"
 import { useToast } from "@/components/providers/toast-provider"
 
 import { Button } from "@/components/ui/button"
+import { PartyBalance } from "@/components/customers/party-balance"
 import {
   Dialog,
   DialogContent,
@@ -227,21 +228,8 @@ export function PaymentInDialog({ customers }: PaymentInDialogProps) {
               onBeforeAddNew={() => saveDraft()}
             />
             {selectedCustomer && (
-              <p className="text-sm text-muted-foreground">
-                Outstanding:{" "}
-                <span
-                  className={
-                    selectedCustomer.balanceType === "Advance"
-                      ? "font-medium text-blue-600"
-                      : selectedCustomer.currentBalance > 0
-                        ? "font-medium text-red-600"
-                        : "font-medium text-muted-foreground"
-                  }
-                >
-                  {selectedCustomer.balanceType === "Advance"
-                    ? `₹${Math.abs(selectedCustomer.currentBalance).toLocaleString("en-IN")} Advance`
-                    : `₹${selectedCustomer.currentBalance.toLocaleString("en-IN")}`}
-                </span>
+              <p className="flex items-center gap-2 text-sm text-muted-foreground" data-testid="party-picker-balance">
+                Balance: <PartyBalance net={selectedCustomer.netBalance} />
               </p>
             )}
           </div>

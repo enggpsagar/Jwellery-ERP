@@ -18,7 +18,7 @@ import {
 import { prisma } from "@/lib/prisma";
 import { METALS_AND_STONES_COLUMN, describePieceComponentsText } from "@/lib/piece-components-text";
 import { getWeightFormat } from "@/lib/weight-settings.server";
-import { getFineWeightResolver, storedLineWeights } from "@/lib/fine-weight";
+import { getFineWeightResolver, storedLineWeights, type FineWeightResolver } from "@/lib/fine-weight";
 import { requirePermission } from "@/lib/auth/auth";
 import { PERMISSIONS } from "@/lib/permissions";
 import { requireStoreScope, getStoreIdForRead, assertPlanActiveForExport } from "@/lib/store-context";
@@ -259,6 +259,82 @@ function lineTotalWithTax(item: PreparedLineItem) {
   );
 }
 
+function roundToDecimals(value: number, decimals: number) {
+  const factor = 10 ** decimals;
+  return Math.round(value * factor) / factor;
+}
+
+/** Per-piece weight × pieces, rounded to the column's precision (null stays null). */
+function lotTotal(perPiece: number | null | undefined, pieces: number, decimals: number) {
+  if (perPiece === null || perPiece === undefined) return undefined;
+  const value = Number(perPiece);
+  if (!Number.isFinite(value)) return undefined;
+  return new Prisma.Decimal(roundToDecimals(value * pieces, decimals));
+}
+
+/**
+ * Whether a purchase line comes in as ONE sold-by-weight lot
+ * (Product.soldByWeight): a single-part line (no PieceComponent rows — a
+ * multi-component product is already multi-part by lockLinkedProductFields)
+ * that isn't reusing a "Convert to purchase" stock row.
+ */
+function isWeightLotLine(item: PreparedLineItem, soldByWeight: boolean) {
+  return soldByWeight && !item.piece && !item.existingStockId;
+}
+
+/**
+ * Quantity + weights for a purchase line's new InventoryStock row and its
+ * PURCHASE InventoryTransaction.
+ *
+ * A sold-by-weight product (loose stones, bars, bullion, coins, raw metal) is
+ * bought as "N pieces of W each" on the supplier's bill, but physically it's
+ * one parcel / bar lot that is later sold by weight, part at a time
+ * (lib/inventory/weight-lot.ts — a lot is a stock row with quantity ≤ 1). So
+ * qty N comes in as ONE lot: quantity 1 holding every weight × N, rounded to
+ * the column's precision (grams 5 decimals, carats 3). The PurchaseItem keeps
+ * the line as entered (qty N, per-piece weights), so the bill and its totals
+ * are unchanged. Any other line keeps the per-piece stock row as before.
+ */
+function purchaseStockWeights(item: PreparedLineItem, fineOf: FineWeightResolver, lot: boolean) {
+  const { fineWeight, wastagePercent } = storedLineWeights(item, fineOf);
+  if (!lot) {
+    return {
+      stock: {
+        quantity: item.quantity || 1,
+        grossWeight: toDecimal(item.grossWeight),
+        netWeight: toDecimal(item.netWeight),
+        fineWeight,
+        wastagePercent,
+        dmoWeight: toDecimal(item.dmoWeight),
+        stoneWeight: toDecimal(item.stoneWeight),
+        caratWeight: toDecimal(item.caratWeight),
+      },
+      transaction: {
+        quantity: item.quantity || 1,
+        grossWeight: toDecimal(item.grossWeight),
+        netWeight: toDecimal(item.netWeight),
+      },
+    };
+  }
+  const pieces = item.quantity || 1;
+  const grossWeight = lotTotal(item.grossWeight, pieces, 5);
+  const netWeight = lotTotal(item.netWeight, pieces, 5);
+  const caratWeight = lotTotal(item.caratWeight, pieces, 3);
+  return {
+    stock: {
+      quantity: 1,
+      grossWeight,
+      netWeight,
+      fineWeight: lotTotal(fineWeight, pieces, 5),
+      wastagePercent,
+      dmoWeight: lotTotal(item.dmoWeight, pieces, 5),
+      stoneWeight: lotTotal(item.stoneWeight, pieces, 5),
+      caratWeight,
+    },
+    transaction: { quantity: 1, grossWeight, netWeight, caratWeight },
+  };
+}
+
 /**
  * Resolves each line's own gstRateId into a verified snapshot — GST is
  * picked per line now, not once for the whole purchase (see
@@ -337,7 +413,7 @@ async function createProductFromManualEntry(
   const [businessSettings, metalRow] = await Promise.all([
     prisma.businessSettings.findUnique({ where: { storeId }, select: { skuFormat: true } }),
     item.metalTypeId
-      ? prisma.storeMetal.findFirst({ where: { id: item.metalTypeId, storeId }, select: { name: true } })
+      ? prisma.storeMetal.findFirst({ where: { id: item.metalTypeId, storeId }, select: { name: true, isGemstone: true } })
       : Promise.resolve(null),
   ]);
 
@@ -366,6 +442,14 @@ async function createProductFromManualEntry(
   const hasStoneComponent = piece
     ? pieceStones.length > 0
     : Boolean(item.stoneMetalTypeName || item.stoneTypeNames || toNumber(item.stoneCharge) > 0);
+
+  // A loose stone (the line's metal is a gemstone, or there's no metal and
+  // the line carries a stone) is bought and sold by weight — a parcel whose
+  // carats are sold part at a time (lib/inventory/weight-lot.ts). Single-part
+  // lines only: a multi-part piece always sells whole.
+  const lineHasStone = Boolean(item.stoneMetalTypeName) || toNumber(item.caratWeight) > 0;
+  const soldByWeight =
+    !piece && (Boolean(metalRow?.isGemstone) || (!item.metalTypeId && lineHasStone));
 
   const pieceDefaults = piece
     ? {
@@ -431,6 +515,7 @@ async function createProductFromManualEntry(
           defaultStoneTypeNames: item.stoneTypeNames ?? undefined,
           hsnCode: item.hsnCode ?? undefined,
           isActive: true,
+          soldByWeight,
           ...pieceDefaults,
         },
       });
@@ -1303,9 +1388,13 @@ export async function getPurchaseFormProducts() {
       name: true,
       category: { select: { name: true } },
       categoryType: { select: { name: true } },
-      metalType: { select: { id: true, name: true } },
+      // isGemstone + the stone/purity fields below also feed the form's
+      // "already exists — add to it?" match on a "+ New product" line.
+      metalType: { select: { id: true, name: true, isGemstone: true } },
       defaultPurity: true,
       storeMetalPurity: { select: { id: true, label: true } },
+      // Bulk stock sold by weight — qty N comes in as one lot (purchaseStockWeights).
+      soldByWeight: true,
       defaultMakingCharge: true,
       defaultMakingChargeType: true,
       defaultStoneCharge: true,
@@ -1450,13 +1539,19 @@ export async function createPurchase(
     }
 
     const productIds = [...new Set(items.map((item) => item.productId))];
+    // soldByWeight read here, in the same one query, so the transaction below
+    // knows which lines come in as one weight lot (purchaseStockWeights).
     const products = await prisma.product.findMany({
       where: { id: { in: productIds }, storeId },
-      select: { id: true },
+      select: { id: true, soldByWeight: true },
     });
     if (products.length !== productIds.length) {
       return { success: false, message: "One or more selected products are invalid" };
     }
+    const soldByWeightIds = new Set(products.filter((p) => p.soldByWeight).map((p) => p.id));
+    const stockWeights = items.map((item) =>
+      purchaseStockWeights(item, fineOf, isWeightLotLine(item, soldByWeightIds.has(item.productId))),
+    );
 
     // lockLinkedProductFields already ran above (before minting) — it must
     // happen before every total below is computed from `items`: a
@@ -1647,18 +1742,12 @@ export async function createPurchase(
             metalTypeId: item.metalTypeId ?? undefined,
             purity: item.purity ?? undefined,
             purityLabel: item.purityLabel ?? undefined,
-            quantity: item.quantity || 1,
             status: InventoryStockStatus.IN_STOCK,
             finish: InventoryFinish.PAKKA,
-            grossWeight: toDecimal(item.grossWeight),
-            netWeight: toDecimal(item.netWeight),
-            ...storedLineWeights(item, fineOf),
-            dmoWeight: toDecimal(item.dmoWeight),
-            stoneWeight: toDecimal(item.stoneWeight),
-            // Previously dropped here even though it's saved onto the
-            // sibling PurchaseItem below — a purchased composite/Diamond
-            // item's stock row had nowhere to keep its own carat weight.
-            caratWeight: toDecimal(item.caratWeight),
+            // quantity + every weight (one lot for a sold-by-weight product).
+            ...stockWeights[i].stock,
+            // caratWeight is in stockWeights (it used to be dropped here even
+            // though the sibling PurchaseItem saves it).
             purchaseRate: toDecimal(item.rate),
             purchaseAmount: toDecimal(lineTotal(item)),
             makingCharge: toDecimal(item.makingCharge),
@@ -1761,14 +1850,12 @@ export async function createPurchase(
       // 3. Log an inventory transaction per new stock row now that we have
       //    the purchase id to reference.
       for (let i = 0; i < items.length; i++) {
-        const item = items[i];
         await tx.inventoryTransaction.create({
           data: {
             inventoryStockId: stockIds[i],
             transactionType: InventoryTransactionType.PURCHASE,
-            quantity: item.quantity || 1,
-            grossWeight: toDecimal(item.grossWeight),
-            netWeight: toDecimal(item.netWeight),
+            // A weight lot logs quantity 1 and the lot's total weights.
+            ...stockWeights[i].transaction,
             referenceType: "Purchase",
             referenceId: created.id,
           },
@@ -2103,13 +2190,19 @@ export async function updatePurchase(
     }
 
     const productIds = [...new Set(items.map((item) => item.productId))];
+    // soldByWeight read here, in the same one query, so the transaction below
+    // knows which lines come in as one weight lot (purchaseStockWeights).
     const products = await prisma.product.findMany({
       where: { id: { in: productIds }, storeId },
-      select: { id: true },
+      select: { id: true, soldByWeight: true },
     });
     if (products.length !== productIds.length) {
       return { success: false, message: "One or more selected products are invalid" };
     }
+    const soldByWeightIds = new Set(products.filter((p) => p.soldByWeight).map((p) => p.id));
+    const stockWeights = items.map((item) =>
+      purchaseStockWeights(item, fineOf, isWeightLotLine(item, soldByWeightIds.has(item.productId))),
+    );
 
     const discount = toNumber(formData.get("discount"));
     const sgstAmount = items.reduce((sum, item) => sum + toNumber(item.sgstAmount), 0);
@@ -2193,15 +2286,10 @@ export async function updatePurchase(
             metalTypeId: item.metalTypeId ?? undefined,
             purity: item.purity ?? undefined,
             purityLabel: item.purityLabel ?? undefined,
-            quantity: item.quantity || 1,
             status: InventoryStockStatus.IN_STOCK,
             finish: InventoryFinish.PAKKA,
-            grossWeight: toDecimal(item.grossWeight),
-            netWeight: toDecimal(item.netWeight),
-            ...storedLineWeights(item, fineOf),
-            dmoWeight: toDecimal(item.dmoWeight),
-            stoneWeight: toDecimal(item.stoneWeight),
-            caratWeight: toDecimal(item.caratWeight),
+            // quantity + every weight (one lot for a sold-by-weight product).
+            ...stockWeights[i].stock,
             purchaseRate: toDecimal(item.rate),
             purchaseAmount: toDecimal(lineTotal(item)),
             makingCharge: toDecimal(item.makingCharge),
@@ -2292,14 +2380,12 @@ export async function updatePurchase(
 
       // 4. One inventory transaction per new stock row.
       for (let i = 0; i < items.length; i++) {
-        const item = items[i];
         await tx.inventoryTransaction.create({
           data: {
             inventoryStockId: newStockIds[i],
             transactionType: InventoryTransactionType.PURCHASE,
-            quantity: item.quantity || 1,
-            grossWeight: toDecimal(item.grossWeight),
-            netWeight: toDecimal(item.netWeight),
+            // A weight lot logs quantity 1 and the lot's total weights.
+            ...stockWeights[i].transaction,
             referenceType: "Purchase",
             referenceId: id,
           },

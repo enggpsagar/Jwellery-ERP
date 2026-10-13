@@ -11,6 +11,8 @@ import { formatShortDateTime } from "@/lib/utils";
 import { parseDateRangeBoundary } from "@/lib/date-range";
 import { fineOrNet, pieceMetalsSelect } from "@/lib/fine-weight-read";
 import { metalBreakdown, stoneBreakdown } from "@/lib/piece-components";
+import { getPartyNetBalances } from "@/lib/core/customer";
+import { partyBalanceDirection, partyBalanceTotals } from "@/lib/party-balance";
 
 /**
  * What counts as metal still on hand.
@@ -140,34 +142,19 @@ export async function getDashboardStats(): Promise<DashboardStat[]> {
   const tomorrowStart = new Date(todayStart.getTime() + 86_400_000);
 
   const [
-    outstandingAgg,
-    outstandingKachaAgg,
+    partyNets,
     todayPurchasesAgg,
     totalPurchasesAgg,
     metalStockAggs,
     pendingJobs,
     overdueJobs,
   ] = await Promise.all([
-    prisma.invoice.aggregate({
-      where: {
-        storeId,
-        balanceAmount: { gt: 0 },
-        status: { not: InvoiceStatus.CANCELLED },
-        ...locationWhere(scope),
-      },
-      _sum: { balanceAmount: true },
-      _count: true,
-    }),
-    // A customer's Kacha slip balance is owed exactly the same as an
-    // invoice's — it just hasn't been converted to a Pakka invoice yet.
-    // Without this, "Outstanding Receivables" under-reports real dues and
-    // disagrees with the Ledger, which already counts both (each creates
-    // its own balance-due LedgerEntry).
-    prisma.kachaInvoice.aggregate({
-      where: { storeId, balanceAmount: { gt: 0 }, ...locationWhere(scope) },
-      _sum: { balanceAmount: true },
-      _count: true,
-    }),
+    // Every party's ONE net balance (lib/party-balance.ts): opening +
+    // sales/payments-out − purchases/payments-in/returns, from the ledger.
+    // Store-wide, not location-filtered: a party's balance (and its opening
+    // balance) belongs to the party, not to one counter — same figure the
+    // Parties list shows, so the two always agree.
+    getPartyNetBalances(storeId),
     // Bounded above unlike the sales queries this mirrors — a future-dated
     // purchase must not inflate "today" indefinitely.
     prisma.purchase.aggregate({
@@ -238,10 +225,10 @@ export async function getDashboardStats(): Promise<DashboardStat[]> {
     }),
   ]);
 
-  const outstanding =
-    Number(outstandingAgg._sum.balanceAmount ?? 0) +
-    Number(outstandingKachaAgg._sum.balanceAmount ?? 0);
-  const outstandingAccounts = outstandingAgg._count + outstandingKachaAgg._count;
+  const partyTotals = partyBalanceTotals(partyNets.values());
+  const netDirection = partyBalanceDirection(partyTotals.net);
+  const inr = (value: number) => `₹${value.toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
+  const parties = (count: number) => `${count} part${count === 1 ? "y" : "ies"}`;
   const todayPurchases = Number(todayPurchasesAgg._sum.totalAmount ?? 0);
   const totalPurchases = Number(totalPurchasesAgg._sum.totalAmount ?? 0);
   const totalPurchaseCount = totalPurchasesAgg._count;
@@ -265,13 +252,40 @@ export async function getDashboardStats(): Promise<DashboardStat[]> {
 
   return [
     {
-      label: "Outstanding Receivables",
-      value: `₹${outstanding.toLocaleString("en-IN")}`,
+      label: "Total Receivable",
+      value: inr(partyTotals.receivable),
       change: "",
-      trend: outstanding > 0 ? "down" : "up",
-      sub: `across ${outstandingAccounts} account${outstandingAccounts === 1 ? "" : "s"}`,
+      trend: partyTotals.receivable > 0 ? "down" : "up",
+      sub: `${parties(partyTotals.receivableCount)} owe you`,
       icon: "wallet",
       tone: "outstanding",
+    },
+    {
+      label: "Total Payable",
+      value: inr(partyTotals.payable),
+      change: "",
+      trend: partyTotals.payable > 0 ? "down" : "up",
+      sub: `you owe ${parties(partyTotals.payableCount)}`,
+      icon: "rupee",
+      tone: "deposited",
+    },
+    {
+      label: "Net Party Balance",
+      value: netDirection === "Settled" ? "₹0" : inr(Math.abs(partyTotals.net)),
+      change: "",
+      trend: partyTotals.net >= 0 ? "up" : "down",
+      sub:
+        netDirection === "Receivable"
+          ? "net receivable (receivable − payable)"
+          : netDirection === "Payable"
+            ? "net payable (payable − receivable)"
+            : "receivable and payable cancel out",
+      icon: "trending",
+      ...(netDirection === "Receivable"
+        ? { tone: "outstanding" as const }
+        : netDirection === "Payable"
+          ? { tone: "deposited" as const }
+          : {}),
     },
     {
       label: "Total Purchases",

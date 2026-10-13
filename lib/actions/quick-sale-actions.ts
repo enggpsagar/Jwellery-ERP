@@ -272,6 +272,9 @@ export async function completeQuickSale(
         purity: true,
         netWeight: true,
         grossWeight: true,
+        // A sold-by-weight stone parcel is measured in carats — a counter
+        // sale takes the whole lot, so its carats go on the line too.
+        caratWeight: true,
         // Identity only, not pricing — the operator types one flat price for
         // the whole piece, so what stone it contains still needs to survive
         // onto the invoice line for the print/detail view even though its
@@ -310,6 +313,7 @@ export async function completeQuickSale(
       quantity,
       grossWeight: stock?.grossWeight ? Number(stock.grossWeight) : null,
       netWeight: netWeight || null,
+      caratWeight: stock?.caratWeight ? Number(stock.caratWeight) : null,
       rate: netWeight > 0 ? rate : null,
       makingCharge: netWeight > 0 ? sellingPrice - metalValue : sellingPrice,
       makingChargeType: "FIXED",

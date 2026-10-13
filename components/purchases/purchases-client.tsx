@@ -85,7 +85,7 @@ export function PurchasesClient({ purchases, groups, view, locations, pagination
           <h1 className="text-2xl font-semibold">Purchases</h1>
           <p className="text-sm text-muted-foreground">
             {view === "supplier"
-              ? `${pagination.totalCount} supplier${pagination.totalCount === 1 ? "" : "s"} · ${purchases.length} bills`
+              ? `${pagination.totalCount} part${pagination.totalCount === 1 ? "y" : "ies"} · ${purchases.length} bills`
               : `Showing ${purchases.length} of ${pagination.totalCount} purchases`}
           </p>
           <div className="mt-2 inline-flex rounded-md border p-0.5 text-sm" role="tablist" aria-label="Purchases view">
@@ -100,7 +100,7 @@ export function PurchasesClient({ purchases, groups, view, locations, pagination
                   view === option ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground",
                 )}
               >
-                {option === "supplier" ? "By supplier" : "All bills"}
+                {option === "supplier" ? "By party" : "All bills"}
               </Link>
             ))}
           </div>
@@ -141,7 +141,7 @@ export function PurchasesClient({ purchases, groups, view, locations, pagination
             totalPages={pagination.totalPages}
             totalCount={pagination.totalCount}
             pageSize={pagination.pageSize}
-            itemLabel={view === "supplier" ? "suppliers" : "purchases"}
+            itemLabel={view === "supplier" ? "parties" : "purchases"}
             showPageSizeSelector
           />
         </div>

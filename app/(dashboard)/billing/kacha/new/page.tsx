@@ -55,7 +55,6 @@ export default async function NewKachaInvoicePage() {
           customers={customers}
           stockItems={stockItems}
           suppliers={suppliers}
-          supplierModuleEnabled={businessSettings.supplierModuleEnabled}
           locations={locations}
           metals={metals}
           origins={origins}

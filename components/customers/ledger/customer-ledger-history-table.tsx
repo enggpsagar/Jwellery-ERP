@@ -1,24 +1,24 @@
 "use client"
 
 import { useWeightFormat } from "@/components/providers/weight-settings-provider"
-import { useEffect, useMemo, useState } from "react"
+import { useMemo, useState } from "react"
 import Link from "next/link"
-import { ArrowDown, ArrowUp, ArrowUpDown, Receipt, Search } from "lucide-react"
+import { Search } from "lucide-react"
 
-import type { CustomerLedgerEntryItem } from "@/lib/actions/customer-ledger-actions"
-import { classifyMetalName } from "@/lib/business-units"
-import type { WeightFormat } from "@/lib/weight-calc"
+import type { PartyLedgerMetal, PartyLedgerRow, PartyLedgerSummary } from "@/lib/actions/customer-ledger-actions"
 import {
   Table,
   TableBody,
   TableCell,
+  TableFooter,
   TableHead,
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
-import { cn } from "@/lib/utils"
+import { formatPartyAmount } from "@/lib/party-balance"
+import { PartyBalance } from "@/components/customers/party-balance"
 
 const PAGE_SIZE = 10
 
@@ -31,28 +31,6 @@ const PAYMENT_METHOD_LABELS: Record<string, string> = {
   OTHER: "Other",
 }
 
-function formatAmount(value: number) {
-  return `₹ ${Number(value || 0).toLocaleString("en-IN", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })}`
-}
-
-/** Grams / carats with the store's Settings > Weights decimals. */
-function formatWeight(value: number, decimals: number) {
-  return `${Number(value || 0).toLocaleString("en-IN", {
-    minimumFractionDigits: decimals,
-    maximumFractionDigits: decimals,
-  })} g`
-}
-
-function formatCarat(value: number, decimals: number) {
-  return `${Number(value || 0).toLocaleString("en-IN", {
-    minimumFractionDigits: decimals,
-    maximumFractionDigits: decimals,
-  })} ct`
-}
-
 /** dd-MM-yy, used consistently across every date shown in this table. */
 function formatShortDate(iso: string) {
   const date = new Date(iso)
@@ -63,119 +41,59 @@ function formatShortDate(iso: string) {
   return `${dd}-${mm}-${yy}`
 }
 
-function formatEntryAmount(entry: CustomerLedgerEntryItem, wf: WeightFormat) {
-  const family = classifyMetalName(entry.metalType)
-
-  if ((family === "GOLD" || family === "SILVER") && entry.metalWeight != null) {
-    return formatWeight(entry.metalWeight, wf.gramDecimals)
-  }
-
-  if (family === "DIAMOND" && entry.caratWeight != null) {
-    return formatCarat(entry.caratWeight, wf.caratDecimals)
-  }
-
-  return formatAmount(entry.amount)
-}
-
-type SortKey = "date" | "type" | "unit" | "amount"
-type SortDir = "asc" | "desc"
-
-function matchesSearch(entry: CustomerLedgerEntryItem, query: string) {
+function matchesSearch(row: PartyLedgerRow, query: string) {
   if (!query) return true
-  const haystack = `${entry.description} ${entry.sourceType} ${entry.metalType ?? "Money"} ${
-    entry.invoiceNumber ?? ""
-  } ${entry.creditNoteNumber ?? ""} ${entry.entryDate}`.toLowerCase()
+  const haystack = [
+    row.label,
+    row.documentNumber ?? "",
+    row.description,
+    row.metalType ?? "",
+    ...row.metals.map((metal) => metal.label),
+    row.entryDate,
+    formatShortDate(row.entryDateISO),
+  ]
+    .join(" ")
+    .toLowerCase()
   return haystack.includes(query)
 }
 
-function compareEntries(a: CustomerLedgerEntryItem, b: CustomerLedgerEntryItem, sortKey: SortKey) {
-  switch (sortKey) {
-    case "type":
-      return a.type.localeCompare(b.type)
-    case "unit":
-      return (a.metalType ?? "Money").localeCompare(b.metalType ?? "Money")
-    case "amount":
-      return Math.abs(a.amount) - Math.abs(b.amount)
-    case "date":
-    default:
-      return new Date(a.entryDateISO).getTime() - new Date(b.entryDateISO).getTime()
-  }
-}
-
-function SortableHead({
-  label,
-  sortKey,
-  activeSortKey,
-  sortDir,
-  onSort,
-  align = "left",
-  className,
+/**
+ * Every entry of the party's one ledger, oldest first, with Debit / Credit
+ * money columns and the running net balance after each row (starting from
+ * the opening balance row). Kept chronological — re-sorting would make the
+ * Balance column meaningless — and opens on the latest page. Columns wrap
+ * so it fits the narrow Parties side panel.
+ */
+export function CustomerLedgerHistoryTable({
+  rows,
+  summary,
 }: {
-  label: string
-  sortKey: SortKey
-  activeSortKey: SortKey
-  sortDir: SortDir
-  onSort: (key: SortKey) => void
-  align?: "left" | "right"
-  className?: string
+  rows: PartyLedgerRow[]
+  summary: PartyLedgerSummary
 }) {
-  const isActive = activeSortKey === sortKey
-  const Icon = isActive ? (sortDir === "asc" ? ArrowUp : ArrowDown) : ArrowUpDown
-
-  return (
-    <TableHead className={cn(align === "right" ? "text-right" : undefined, className)}>
-      <button
-        type="button"
-        onClick={() => onSort(sortKey)}
-        className={cn(
-          "inline-flex items-center gap-1 hover:text-foreground",
-          isActive ? "text-foreground" : "text-muted-foreground",
-          align === "right" ? "flex-row-reverse" : undefined,
-        )}
-      >
-        {label}
-        <Icon className="h-3.5 w-3.5" />
-      </button>
-    </TableHead>
-  )
-}
-
-export function CustomerLedgerHistoryTable({ entries }: { entries: CustomerLedgerEntryItem[] }) {
   const wf = useWeightFormat()
   const [search, setSearch] = useState("")
-  const [sortKey, setSortKey] = useState<SortKey>("date")
-  const [sortDir, setSortDir] = useState<SortDir>("desc")
-  const [page, setPage] = useState(1)
+  const query = search.trim().toLowerCase()
 
-  const filteredAndSorted = useMemo(() => {
-    const query = search.trim().toLowerCase()
-    const filtered = entries.filter((entry) => matchesSearch(entry, query))
-    return [...filtered].sort((a, b) => {
-      const cmp = compareEntries(a, b, sortKey)
-      return sortDir === "asc" ? cmp : -cmp
-    })
-  }, [entries, search, sortKey, sortDir])
+  const filtered = useMemo(() => rows.filter((row) => matchesSearch(row, query)), [rows, query])
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
+  // null = "the last page" (latest entries), until the user pages.
+  const [page, setPage] = useState<number | null>(null)
+  const currentPage = Math.min(page ?? totalPages, totalPages)
+  const pageRows = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
+  const showOpening = !query && currentPage === 1
 
-  useEffect(() => {
-    setPage(1)
-  }, [search, sortKey, sortDir])
-
-  const totalPages = Math.max(1, Math.ceil(filteredAndSorted.length / PAGE_SIZE))
-  const currentPage = Math.min(page, totalPages)
-  const paginated = filteredAndSorted.slice(
-    (currentPage - 1) * PAGE_SIZE,
-    currentPage * PAGE_SIZE,
+  const totals = useMemo(
+    () =>
+      filtered.reduce(
+        (acc, row) => ({ debit: acc.debit + row.debit, credit: acc.credit + row.credit }),
+        { debit: 0, credit: 0 },
+      ),
+    [filtered],
   )
-  const rangeStart = filteredAndSorted.length === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1
-  const rangeEnd = Math.min(currentPage * PAGE_SIZE, filteredAndSorted.length)
 
-  const handleSort = (key: SortKey) => {
-    if (key === sortKey) {
-      setSortDir((dir) => (dir === "asc" ? "desc" : "asc"))
-    } else {
-      setSortKey(key)
-    }
-  }
+  const weightText = (metal: PartyLedgerMetal) =>
+    `${metal.unit === "ct" ? wf.ct(metal.weight) : wf.g(metal.weight)} ${metal.unit}`
 
   return (
     <div className="overflow-hidden rounded-xl border bg-card shadow-sm">
@@ -184,131 +102,150 @@ export function CustomerLedgerHistoryTable({ entries }: { entries: CustomerLedge
           <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             placeholder="Search ledger history..."
+            aria-label="Search ledger history"
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => {
+              setSearch(e.target.value)
+              setPage(null)
+            }}
             className="h-9 pl-9"
           />
         </div>
       </div>
 
       <div className="overflow-x-auto">
-        <Table>
+        <Table className="min-w-[520px]" data-testid="party-ledger-table">
           <TableHeader>
             <TableRow>
-              <SortableHead label="Date" sortKey="date" activeSortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
-              <SortableHead label="Entry Type" sortKey="type" activeSortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
-              <SortableHead label="Unit" sortKey="unit" activeSortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
-              <TableHead>Source</TableHead>
-              <TableHead>Invoice</TableHead>
-              <SortableHead
-                label="Amount"
-                sortKey="amount"
-                activeSortKey={sortKey}
-                sortDir={sortDir}
-                onSort={handleSort}
-                align="right"
-              />
+              <TableHead className="w-[84px]">Date</TableHead>
+              <TableHead>Entry</TableHead>
+              <TableHead className="text-right">Debit</TableHead>
+              <TableHead className="text-right">Credit</TableHead>
+              <TableHead className="text-right">Balance</TableHead>
             </TableRow>
           </TableHeader>
 
           <TableBody>
-            {paginated.length === 0 ? (
+            {showOpening && (
+              <TableRow className="bg-muted/30">
+                <TableCell />
+                <TableCell className="font-medium">Opening balance</TableCell>
+                <TableCell />
+                <TableCell />
+                <TableCell className="text-right">
+                  <PartyBalance net={summary.openingBalance} className="justify-end" />
+                </TableCell>
+              </TableRow>
+            )}
+            {pageRows.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="py-10 text-center text-muted-foreground">
-                  {entries.length === 0
-                    ? "No ledger entries found for this party."
-                    : "No entries match your search."}
+                <TableCell colSpan={5} className="py-10 text-center text-muted-foreground">
+                  No entries match your search.
                 </TableCell>
               </TableRow>
             ) : (
-              paginated.map((entry) => (
-                <TableRow key={entry.id}>
-                  <TableCell className="whitespace-nowrap text-foreground">
-                    {formatShortDate(entry.entryDateISO)}
-                  </TableCell>
-                  <TableCell>
-                    <span
-                      className={cn(
-                        "inline-flex rounded-full px-2.5 py-1 text-xs font-medium",
-                        entry.type === "DEBIT"
-                          ? "bg-red-50 text-red-700"
-                          : "bg-green-50 text-green-700",
-                      )}
-                    >
-                      {entry.type}
-                    </span>
-                  </TableCell>
-                  <TableCell className="text-foreground">{entry.metalType ?? "Money"}</TableCell>
-                  <TableCell className="text-foreground">
-                    {entry.sourceType}
-                    {entry.paymentMethod ? (
-                      <span className="block text-xs text-muted-foreground">
-                        {PAYMENT_METHOD_LABELS[entry.paymentMethod] ?? entry.paymentMethod}
-                      </span>
-                    ) : null}
-                  </TableCell>
-                  <TableCell>
-                    {entry.creditNoteId && entry.creditNoteNumber ? (
-                      <Link
-                        href={`/billing/credit-notes/${entry.creditNoteId}`}
-                        className="inline-flex items-center gap-1 text-xs font-medium text-blue-600 hover:underline"
-                      >
-                        <Receipt className="h-3.5 w-3.5" />
-                        {entry.creditNoteNumber}
-                      </Link>
-                    ) : entry.invoiceId && entry.invoiceNumber ? (
-                      <Link
-                        href={`/billing/${entry.invoiceId}`}
-                        className="inline-flex items-center gap-1 text-xs font-medium text-blue-600 hover:underline"
-                      >
-                        <Receipt className="h-3.5 w-3.5" />
-                        {entry.invoiceNumber}
-                      </Link>
-                    ) : (
-                      <span className="text-xs text-muted-foreground">-</span>
-                    )}
-                  </TableCell>
-                  <TableCell
-                    className={cn(
-                      "text-right font-medium",
-                      entry.type === "DEBIT" ? "text-red-600" : "text-green-600",
-                    )}
-                  >
-                    {formatEntryAmount(entry, wf)}
-                  </TableCell>
-                </TableRow>
-              ))
+              pageRows.map((row) => {
+                const metalOnly = row.debit === 0 && row.credit === 0
+                return (
+                  <TableRow key={row.id} className="align-top" data-testid="party-ledger-row">
+                    <TableCell className="whitespace-nowrap text-foreground">
+                      {formatShortDate(row.entryDateISO)}
+                    </TableCell>
+                    <TableCell className="whitespace-normal">
+                      <div className="font-medium text-foreground">
+                        {row.label}
+                        {row.documentNumber ? (
+                          row.href ? (
+                            <>
+                              {" "}
+                              <Link href={row.href} className="text-primary underline-offset-4 hover:underline">
+                                #{row.documentNumber}
+                              </Link>
+                            </>
+                          ) : (
+                            ` #${row.documentNumber}`
+                          )
+                        ) : null}
+                      </div>
+                      {row.description ? (
+                        <div className="text-xs text-muted-foreground">{row.description}</div>
+                      ) : null}
+                      {row.paymentMethod ? (
+                        <div className="text-xs text-muted-foreground">
+                          {PAYMENT_METHOD_LABELS[row.paymentMethod] ?? row.paymentMethod}
+                        </div>
+                      ) : null}
+                      {row.metals.length > 0 ? (
+                        <div className="mt-0.5 text-xs text-foreground">
+                          {row.metals.map((metal) => (
+                            <span key={`${metal.label}|${metal.unit}`} className="mr-2 inline-block whitespace-nowrap">
+                              {metal.label}: <span className="tabular-nums">{weightText(metal)}</span>
+                            </span>
+                          ))}
+                        </div>
+                      ) : metalOnly && (row.metalWeight != null || row.caratWeight != null) ? (
+                        <div className="mt-0.5 text-xs text-foreground">
+                          {row.metalType ?? "Metal"}:{" "}
+                          {row.caratWeight != null ? `${wf.ct(row.caratWeight)} ct` : `${wf.g(row.metalWeight)} g`}
+                        </div>
+                      ) : null}
+                      {row.stockValue ? (
+                        <div className="text-[11px] text-muted-foreground">
+                          Stock value {formatPartyAmount(row.stockValue)} · not owed
+                        </div>
+                      ) : null}
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap text-right font-medium text-red-600">
+                      {row.debit ? formatPartyAmount(row.debit) : ""}
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap text-right font-medium text-green-600">
+                      {row.credit ? formatPartyAmount(row.credit) : ""}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <PartyBalance net={row.balance} className="justify-end" />
+                    </TableCell>
+                  </TableRow>
+                )
+              })
             )}
           </TableBody>
+          {/* Totals over every row matching the search (all pages); the
+              closing balance is the party's net balance. */}
+          <TableFooter>
+            <TableRow className="font-semibold">
+              <TableCell />
+              <TableCell>{query ? "Total (matching)" : "Total"}</TableCell>
+              <TableCell className="whitespace-nowrap text-right text-red-600">{formatPartyAmount(totals.debit)}</TableCell>
+              <TableCell className="whitespace-nowrap text-right text-green-600">{formatPartyAmount(totals.credit)}</TableCell>
+              <TableCell className="text-right">
+                <PartyBalance net={summary.netBalance} className="justify-end" />
+              </TableCell>
+            </TableRow>
+          </TableFooter>
         </Table>
       </div>
 
-      {filteredAndSorted.length > 0 && (
+      {filtered.length > PAGE_SIZE && (
         <div className="flex flex-col gap-3 border-t px-4 py-3 text-sm md:flex-row md:items-center md:justify-between">
           <p className="text-muted-foreground">
-            Showing <span className="font-medium text-foreground">{rangeStart}</span> to{" "}
-            <span className="font-medium text-foreground">{rangeEnd}</span> of{" "}
-            <span className="font-medium text-foreground">{filteredAndSorted.length}</span> entries
+            Page {currentPage} of {totalPages} · {filtered.length} entries
           </p>
           <div className="flex items-center gap-2">
             <Button
               variant="outline"
               size="sm"
               disabled={currentPage <= 1}
-              onClick={() => setPage((p) => p - 1)}
+              onClick={() => setPage(currentPage - 1)}
             >
-              Previous
+              Older
             </Button>
-            <span className="px-2 text-muted-foreground">
-              Page {currentPage} of {totalPages}
-            </span>
             <Button
               variant="outline"
               size="sm"
               disabled={currentPage >= totalPages}
-              onClick={() => setPage((p) => p + 1)}
+              onClick={() => setPage(currentPage + 1)}
             >
-              Next
+              Newer
             </Button>
           </div>
         </div>

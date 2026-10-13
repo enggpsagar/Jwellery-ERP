@@ -53,6 +53,17 @@ import { markSourcePartiesAsSuppliers, resolveLineSourceParties } from "@/lib/in
 import { parseDateRangeBoundary } from "@/lib/date-range";
 import { stockOptionProductDetailsSelect, toStockOptionProductDetails } from "@/lib/inventory/stock-option-details";
 import { lockedStockPieceRows, stockPieceOption } from "@/lib/inventory/stock-piece-rows";
+import {
+  lotDrawJson,
+  lotMeasure,
+  planLotDraw,
+  stockSellsByWeight,
+  subtractLotWeights,
+  type LotDraw,
+  type LotWeights,
+} from "@/lib/inventory/weight-lot";
+import { OversellError } from "@/lib/inventory/oversell-error";
+import { drawFromLot, loadWeightLots, planLineLotDraws } from "@/lib/inventory/weight-lot.server";
 import { recordOldGoldExchange, resolveOldGoldLines, type OldGoldLineInput } from "@/lib/old-gold/exchange";
 import { splitOldGoldValue } from "@/lib/old-gold/value";
 
@@ -137,6 +148,10 @@ export type QuotationLineItemInput = {
   components?: PieceComponentPayload[] | null;
   // Server-only: the resolved rows (resolvePieceLines), never from the client.
   piece?: ResolvedPiece;
+  // Server-only: set when the line quotes part of a sold-by-weight lot
+  // (planLineLotDraws) — a quotation reserves nothing, so it isn't stored;
+  // the weight is drawn when the quotation is converted.
+  lotDraw?: LotDraw | null;
 };
 
 export type QuotationFormState = {
@@ -353,10 +368,15 @@ async function lockLinkedStockFields(
       metalTypeId: stock.metalTypeId,
       purity: stock.purity,
       purityLabel: stock.purityLabel,
-      grossWeight: stock.grossWeight ? Number(stock.grossWeight) : null,
-      netWeight: stock.netWeight ? Number(stock.netWeight) : null,
-      caratWeight: stock.caratWeight ? Number(stock.caratWeight) : null,
-      stoneWeight: stock.stoneWeight ? Number(stock.stoneWeight) : null,
+      // A sold-by-weight lot line keeps the part it quotes (planLineLotDraws).
+      ...(item.lotDraw
+        ? {}
+        : {
+            grossWeight: stock.grossWeight ? Number(stock.grossWeight) : null,
+            netWeight: stock.netWeight ? Number(stock.netWeight) : null,
+            caratWeight: stock.caratWeight ? Number(stock.caratWeight) : null,
+            stoneWeight: stock.stoneWeight ? Number(stock.stoneWeight) : null,
+          }),
       stoneMetalTypeName: stock.stoneMetalTypeName,
       stoneTypeNames: stock.stoneTypeNames,
     };
@@ -762,6 +782,10 @@ export async function getQuotationFormStockItems() {
     // Product's (lib/inventory/stock-piece-rows.ts) — plus a single stone's
     // pieces / clarity / certificate / catalog rate.
     ...stockPieceOption(stock),
+    // A sold-by-weight lot: the line's weight is editable, up to what's left
+    // (lib/inventory/weight-lot.ts).
+    sellsByWeight: stockSellsByWeight(stock),
+    stoneWeight: stock.stoneWeight ? Number(stock.stoneWeight) : null,
   }));
 }
 
@@ -820,6 +844,12 @@ export async function createQuotation(
       items.map((item) => item.inventoryStockId).filter((id): id is string => !!id),
     );
 
+    // A line on a sold-by-weight lot quotes the weight typed on it, checked
+    // against what's left today (other weights in proportion); the lock
+    // below leaves those weights alone.
+    const lotPlan = await planLineLotDraws(storeId, items);
+    if ("error" in lotPlan) return { success: false, message: lotPlan.error };
+    items = lotPlan.items;
     items = await lockLinkedStockFields(storeId, items, explicitStockIds);
     const pieceLines = await resolvePieceLines(storeId, items);
     if ("error" in pieceLines) return { success: false, message: pieceLines.error };
@@ -1294,6 +1324,36 @@ export async function convertQuotationToInvoice(
 
     const invoiceNumber = await generateInvoiceNumber(storeId);
 
+    // Lines on a sold-by-weight lot draw the quoted weight now — clamped to
+    // what's left, the same "a quotation reserves nothing" rule the piece
+    // path below follows. Each draw is stored on its invoice line (lotDraw)
+    // so cancelling/deleting the invoice gives back exactly that; a lot with
+    // nothing left gets a zero draw, never a piece-count restore.
+    const quoteLots = await loadWeightLots(
+      storeId,
+      quotation.items
+        .filter((item) => item.inventoryStockId && item.components.length === 0)
+        .map((item) => item.inventoryStockId as string),
+    );
+    const lotDrawByItem = new Map<string, LotDraw>();
+    const lotLeft = new Map<string, LotWeights>();
+    for (const item of quotation.items) {
+      const lot = item.inventoryStockId && item.components.length === 0 ? quoteLots.get(item.inventoryStockId) : undefined;
+      if (!lot) continue;
+      const left =
+        lotLeft.get(lot.id) ??
+        (lot.status === InventoryStockStatus.IN_STOCK ? lot.weights : subtractLotWeights(lot.weights, lot.weights));
+      const measure = lotMeasure(left);
+      const quoted = measure ? Number(item[measure] ?? 0) : 0;
+      const plan = measure && quoted > 0 ? planLotDraw(left, Math.min(quoted, left[measure]), lot.label) : null;
+      const draw: LotDraw =
+        plan && plan.ok
+          ? plan.draw
+          : { ...subtractLotWeights(left, left), measure: measure ?? "netWeight" };
+      lotDrawByItem.set(item.id, draw);
+      lotLeft.set(lot.id, subtractLotWeights(left, draw));
+    }
+
     // Default interactive-transaction timeout is 5s — the per-item stock
     // lookup+decrement loop below can exceed that on a multi-line quotation
     // over a real (non-local) DB connection and throw P2028 ("Transaction
@@ -1352,6 +1412,7 @@ export async function convertQuotationToInvoice(
               hmCharge: item.hmCharge,
               lineTotal: item.lineTotal,
               inventoryStockId: item.inventoryStockId ?? undefined,
+              lotDraw: lotDrawJson(lotDrawByItem.get(item.id)),
               // The piece's metal/stone rows travel with it onto the invoice.
               components: item.components.length
                 ? {
@@ -1401,6 +1462,23 @@ export async function convertQuotationToInvoice(
 
       for (const item of quotation.items) {
         if (!item.inventoryStockId) continue;
+
+        // A sold-by-weight lot gives up the weight planned above (nothing
+        // when it had none left).
+        const lotDraw = lotDrawByItem.get(item.id);
+        if (lotDraw) {
+          if (lotDraw[lotDraw.measure] > 0) {
+            await drawFromLot(tx, {
+              storeId,
+              stockId: item.inventoryStockId,
+              draw: lotDraw,
+              label: item.itemName,
+              referenceType: "Invoice",
+              referenceId: created.id,
+            });
+          }
+          continue;
+        }
 
         // Decrement rather than flipping the whole row to SOLD: a row of
         // 100 pieces that sells 2 still has 98 on hand.
@@ -1521,6 +1599,7 @@ export async function convertQuotationToInvoice(
       invoiceId: invoice.id,
     };
   } catch (error) {
+    if (error instanceof OversellError) return { success: false, message: error.message };
     logger.error("convertQuotationToInvoice error", error);
     return { success: false, message: actionErrorMessage(error, "Failed to convert quotation to invoice") };
   }

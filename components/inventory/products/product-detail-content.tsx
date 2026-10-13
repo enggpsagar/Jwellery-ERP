@@ -63,7 +63,15 @@ export function ProductDetailContent({
   const hasMetalDetails =
     hasMetalComponents || Boolean(product.metalType?.name) || Boolean(product.defaultPurity)
   const hasCharges = Boolean(makingCharge) || Boolean(stoneCharge)
-  const hasWeights = Boolean(grossWeight) || Boolean(stoneWeight) || Boolean(netWeight)
+  const live = product.liveStock
+  const liveHasGrams = live.grossWeight > 0 || live.netWeight > 0
+  // With stock on hand "In Stock Now" carries the live weights, which move
+  // with every purchase and sale. The default* weights are only the template a
+  // new purchase line starts from — shown alongside real stock they read as
+  // a stale stock figure, so they appear only while nothing is in stock.
+  const showTemplateWeights = !(live.pieces > 0 && (liveHasGrams || live.caratWeight > 0))
+  const hasWeights =
+    showTemplateWeights && (Boolean(grossWeight) || Boolean(stoneWeight) || Boolean(netWeight))
   // A piece carries stone info either as a stand-alone gemstone product
   // (stoneOriginOptionId, only meaningful when the metal itself is a
   // gemstone) or as a composite metal+stone piece (hasStoneComponent) — the
@@ -77,8 +85,6 @@ export function ProductDetailContent({
   const hasAdditionalInfo = Boolean(product.description) || Boolean(product.notes)
 
   const imageUrls = product.imageUrls ?? []
-  const live = product.liveStock
-  const liveHasGrams = live.grossWeight > 0 || live.netWeight > 0
 
   return (
     <div className="space-y-6">
@@ -106,8 +112,9 @@ export function ProductDetailContent({
       )}
 
       {/* What's actually available now (IN_STOCK rows: weight × remaining
-          qty, a sold-by-weight lot = what's left of it) — the weights further
-          down are only the template a new stock entry starts from. */}
+          qty, a sold-by-weight lot = what's left of it) — moves with every
+          purchase and sale. The template weights further down only show
+          while nothing is in stock. */}
       <Section title="In Stock Now">
         <Field label="Pieces in stock" value={String(live.pieces)} />
         {product.soldByWeight && live.lotCount > 0 ? (
@@ -161,7 +168,13 @@ export function ProductDetailContent({
                   <span>
                     {component.metalTypeName}
                     {component.storeMetalPurityLabel ? ` (${component.storeMetalPurityLabel})` : ""}
-                    {component.netWeight ? <> — {formatWeight(component.netWeight)} net</> : ""}
+                    {/* A component's weight is the template's — only shown
+                        while nothing is in stock (see showTemplateWeights). */}
+                    {showTemplateWeights && component.netWeight ? (
+                      <> — {formatWeight(component.netWeight)} net (template)</>
+                    ) : (
+                      ""
+                    )}
                   </span>
                 }
               />
@@ -175,9 +188,13 @@ export function ProductDetailContent({
               />
             </>
           )}
-          <Field label="Default Gross Weight (template)" value={grossWeight} />
-          <Field label="Default Stone Weight (template)" value={stoneWeight} />
-          <Field label="Default Net Weight (template)" value={netWeight} />
+          {showTemplateWeights ? (
+            <>
+              <Field label="Default Gross Weight (pre-fills new purchases)" value={grossWeight} />
+              <Field label="Default Stone Weight (pre-fills new purchases)" value={stoneWeight} />
+              <Field label="Default Net Weight (pre-fills new purchases)" value={netWeight} />
+            </>
+          ) : null}
         </Section>
       ) : null}
 

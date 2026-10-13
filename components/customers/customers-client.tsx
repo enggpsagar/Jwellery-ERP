@@ -9,6 +9,8 @@ import { CustomersToolbar } from "@/components/customers/customers-toolbar"
 import { CustomerImportDialog } from "@/components/customers/customer-import-dialog"
 import { BulkDeleteButton } from "@/components/shared/bulk-delete-button"
 import { CustomerDetailPanel } from "@/components/customers/customer-detail-panel"
+import { PartyDetailDialog } from "@/components/customers/party-detail-dialog"
+import { Maximize2 } from "lucide-react"
 import { bulkDeleteCustomers, type Customer } from "@/lib/actions/customer-actions"
 
 type StateItem = {
@@ -45,8 +47,15 @@ export function CustomersClient({
     customers[0]?.id ?? null,
   )
 
+  // The party in the full pop-up (name click / panel's expand icon); null = closed.
+  const [dialogCustomerId, setDialogCustomerId] = React.useState<string | null>(null)
+
   React.useEffect(() => {
     setSelectedCustomerIds([])
+    // Archived / deleted from inside the pop-up → it left the list; close.
+    setDialogCustomerId((current) =>
+      current && customers.some((customer) => customer.id === current) ? current : null,
+    )
     setActiveCustomerId((current) => {
       if (current && customers.some((customer) => customer.id === current)) return current
       return customers[0]?.id ?? null
@@ -107,14 +116,35 @@ export function CustomersClient({
             onSelectionChange={setSelectedCustomerIds}
             activeCustomerId={activeCustomerId}
             onActivate={setActiveCustomerId}
+            onOpen={setDialogCustomerId}
           />
         </div>
 
         <CustomerDetailPanel
           customerId={activeCustomerId}
           states={states}
+          headerActions={
+            activeCustomerId ? (
+              <Button
+                variant="outline"
+                size="icon"
+                aria-label="Open in pop-up with full ledger"
+                onClick={() => setDialogCustomerId(activeCustomerId)}
+              >
+                <Maximize2 className="h-4 w-4" />
+              </Button>
+            ) : null
+          }
         />
       </div>
+
+      <PartyDetailDialog
+        customerId={dialogCustomerId}
+        states={states}
+        onOpenChange={(open) => {
+          if (!open) setDialogCustomerId(null)
+        }}
+      />
     </main>
   )
 }

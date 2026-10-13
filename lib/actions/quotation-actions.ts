@@ -2,6 +2,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { revalidateStockViews } from "@/lib/inventory/revalidate-stock-views";
 import {
   InvoiceStatus,
   InventoryStockStatus,
@@ -1591,6 +1592,7 @@ export async function convertQuotationToInvoice(
     revalidatePath("/quotations");
     revalidatePath(`/quotations/${quotationId}`);
     revalidatePath("/billing");
+    revalidateStockViews();
     revalidatePath(`/billing/${invoice.id}`);
 
     return {

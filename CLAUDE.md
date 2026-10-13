@@ -569,6 +569,12 @@ customer, optional expiry). Admin: Billing → Offers & Vouchers
 - New Invoice only (Edit Invoice keeps the discount already on the lines;
   not on Kacha/Quotation yet).
 
+### Added 2026-10-13: party pop-up; live weights replace template weights
+
+- **Party pop-up** (`components/customers/party-detail-dialog.tsx`): clicking a party's **name** on the Parties list (or the side panel's expand icon) opens a wide dialog with details, net balance, ledger summary and the full ledger history already open. It renders the same `CustomerDetailPanel` (`bare`, `defaultShowLedgerDetails`, `headerActions` props) so it can't drift from the side panel. Clicking elsewhere on the row still only selects the side panel's party.
+- **Template weights hide once stocked.** A product's `default*` weights (and a metal component's net weight) are only what a new purchase line pre-fills. Product detail/panel ("Metal & Weights" → "Metal Details") and the list hover card show them only while nothing is IN_STOCK; otherwise "In Stock Now" (live) is the only weight shown. Shown beside live stock they read as a stock figure that never moved after a purchase.
+- **`revalidateStockViews()`** (`lib/inventory/revalidate-stock-views.ts`) revalidates `/inventory` + `/customers` (layout) and `/dashboard`. It's called after purchase create/update/delete, invoice create/update/line edits/cancel/delete, Estimate create/convert/delete/import, Quotation → Invoice and payments (`{ stock: false }`). A new stock- or balance-moving action should call it too.
+
 ### Regression tests (added 2026-09-29)
 
 Playwright suite in `e2e/`, run by `.github/workflows/regression.yml` on every push to `main` and every PR: throwaway Postgres in the runner → migrate → `pnpm seed` + `pnpm db:seed:full-demo` → `tsc` → `pnpm build` → `pnpm test:e2e`. Sign-in mints a NextAuth JWT in `e2e/global-setup.ts` (no test login route in the app), which also refuses any non-localhost `DATABASE_URL`. See `e2e/README.md`. **Add a spec for every new feature.** The demo seed must keep creating `UserStoreMembership` rows for its users — `requirePermissionInStore` (createInvoice etc.) reads only that table, so without them the demo Admin can open every page but not save an invoice. Tests run in parallel with Vercel's own deploy on a direct push to `main`; they only *block* a bad change if work goes through a PR (or Vercel's deployment checks are turned on).

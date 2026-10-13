@@ -2,6 +2,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { revalidateStockViews } from "@/lib/inventory/revalidate-stock-views";
 import {
   InvoiceStatus,
   InventoryStockStatus,
@@ -1263,6 +1264,7 @@ export async function createKachaInvoice(
     }, { timeout: 15000 });
 
     revalidatePath("/billing/kacha");
+    revalidateStockViews();
 
     return {
       success: true,
@@ -1336,6 +1338,7 @@ export async function recordKachaInvoicePayment(
     ]);
 
     revalidatePath("/billing/kacha");
+    revalidateStockViews({ stock: false });
     revalidatePath(`/billing/kacha/${kachaInvoiceId}`);
 
     return { success: true, message: "Payment recorded" };
@@ -1568,6 +1571,7 @@ export async function convertKachaToPakka(
 
     revalidatePath("/billing");
     revalidatePath("/billing/kacha");
+    revalidateStockViews();
     revalidatePath(`/billing/kacha/${kachaInvoiceId}`);
     revalidatePath(`/billing/${invoice.id}`);
 
@@ -1664,6 +1668,7 @@ export async function deleteKachaInvoice(id: string): Promise<KachaInvoiceFormSt
 
     revalidatePath("/billing/kacha");
     revalidatePath("/inventory/products");
+    revalidateStockViews();
 
     return { success: true, message: "Estimate deleted" };
   } catch (error) {
@@ -2329,6 +2334,7 @@ export async function importKachaInvoicesFromExcel(
     if (notRelinked) notes.push(`${notRelinked} not linked back to their Tax Invoice (not found, or already linked to another Estimate)`);
 
     revalidatePath("/billing/kacha");
+    revalidateStockViews();
 
     const createdCount = plans.length;
     return {
@@ -2499,6 +2505,7 @@ export async function deleteAllKachaInvoices(
     });
 
     revalidatePath("/billing/kacha");
+    revalidateStockViews();
 
     return {
       success: true,

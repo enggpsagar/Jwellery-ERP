@@ -36,6 +36,7 @@ No real secrets are used, and nothing talks to the shared Neon database —
 | `header-rates.spec.ts` | Top bar "Today's Rates": the Store Owner changes Gold 22K's selling rate and it lands on the purity's own selling price and in Metal Rates → Your Selling Rates |
 | `party-sheet.spec.ts` | Parties template = export columns, bad rows reject the whole file, an exported party re-imports equal, Opening Balance Type Payable is stored negative |
 | `party-net-balance.spec.ts` | One party, one ledger: Payable opening balance from the form, a sale then a purchase net into one Receivable/Payable figure on the list, party page, running ledger and payment picker; dashboard Total Receivable/Payable; `/suppliers` redirects to Parties |
+| `party-dialog-live-weights.spec.ts` | Clicking a party name opens the pop-up with details, net balance (Payable/Receivable) and the full ledger open; the side panel's expand icon opens the same; a stocked product shows live stock weights, its template weights only while nothing is in stock |
 | `karigar-sheet.spec.ts` | Artisan export → import round trip (opening cash, inactive, GST, metals, location), duplicate mobiles refused, ledger export columns |
 | `kacha-sheet.spec.ts` | Estimate import posts the party ledger, export → re-import is equal, backup → restore keeps slip number and DMO weight |
 | `taxonomy-io.spec.ts` | Metals/Purities and Stones/Stone Types export → import round trip, metal/stone name clash rejects the file, price changes logged |

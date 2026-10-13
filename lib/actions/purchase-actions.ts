@@ -2,6 +2,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { revalidateStockViews } from "@/lib/inventory/revalidate-stock-views";
 import {
   InvoiceStatus,
   InventoryStockStatus,
@@ -1924,6 +1925,7 @@ export async function createPurchase(
 
     revalidatePath("/purchases");
     revalidatePath("/inventory/stock");
+    revalidateStockViews();
 
     return {
       success: true,
@@ -2018,6 +2020,7 @@ export async function recordPurchasePayment(
 
     revalidatePath("/purchases");
     revalidatePath(`/purchases/${purchaseId}`);
+    revalidateStockViews({ stock: false });
 
     return { success: true, message: "Payment recorded" };
   } catch (error) {
@@ -2419,6 +2422,7 @@ export async function updatePurchase(
     revalidatePath("/purchases");
     revalidatePath(`/purchases/${id}`);
     revalidatePath("/inventory/stock");
+    revalidateStockViews();
 
     return { success: true, message: "Purchase updated" };
   } catch (error) {
@@ -2513,6 +2517,7 @@ export async function deletePurchase(id: string): Promise<PurchaseFormState> {
 
     revalidatePath("/purchases");
     revalidatePath("/inventory/stock");
+    revalidateStockViews();
 
     return { success: true, message: "Purchase deleted" };
   } catch (error) {

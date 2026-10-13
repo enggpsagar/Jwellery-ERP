@@ -2,6 +2,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { revalidateStockViews } from "@/lib/inventory/revalidate-stock-views";
 import QRCode from "qrcode";
 import {
   InvoiceStatus,
@@ -1968,6 +1969,7 @@ export async function createInvoice(
     }, { timeout: 15000 }));
 
     revalidatePath("/billing");
+    revalidateStockViews();
 
     return {
       success: true,
@@ -2105,6 +2107,7 @@ export async function recordInvoicePayment(
 
     revalidatePath("/billing");
     revalidatePath(`/billing/${invoiceId}`);
+    revalidateStockViews({ stock: false });
 
     return { success: true, message: "Payment recorded" };
   } catch (error) {
@@ -2743,6 +2746,7 @@ export async function updateInvoice(
 
     revalidatePath("/billing");
     revalidatePath(`/billing/${id}`);
+    revalidateStockViews();
 
     return { success: true, message: "Invoice updated", invoiceId: id };
   } catch (error) {
@@ -2971,6 +2975,7 @@ export async function updateInvoiceLineItem(
 
     revalidatePath("/billing");
     revalidatePath(`/billing/${invoiceId}`);
+    revalidateStockViews();
 
     return { success: true, message: "Line item updated" };
   } catch (error) {
@@ -3150,6 +3155,7 @@ async function updatePieceLineItem({
 
   revalidatePath("/billing");
   revalidatePath(`/billing/${invoice.id}`);
+  revalidateStockViews();
   return { success: true, message: "Line item updated" };
 }
 
@@ -3295,6 +3301,7 @@ export async function cancelInvoice(
 
     revalidatePath("/billing");
     revalidatePath(`/billing/${id}`);
+    revalidateStockViews();
 
     return { success: true, message: `Invoice ${invoice.invoiceNumber} cancelled` };
   } catch (error) {
@@ -3401,6 +3408,7 @@ export async function deleteInvoice(id: string): Promise<InvoiceFormState> {
 
     revalidatePath("/billing");
     revalidatePath("/inventory/stock");
+    revalidateStockViews();
 
     return { success: true, message: "Invoice deleted" };
   } catch (error) {

@@ -23,6 +23,8 @@ type CustomersTableProps = {
   /** Which row's detail is showing in the panel alongside this table — distinct from selectedCustomerIds, which is the bulk-action checkbox selection. */
   activeCustomerId?: string | null
   onActivate?: (id: string) => void
+  /** Clicking the party's name opens its full pop-up (PartyDetailDialog). */
+  onOpen?: (id: string) => void
 }
 
 export function CustomersTable({
@@ -32,6 +34,7 @@ export function CustomersTable({
   onSelectionChange,
   activeCustomerId,
   onActivate,
+  onOpen,
 }: CustomersTableProps) {
   const allIds = React.useMemo(() => customers.map((customer) => customer.id), [customers])
 
@@ -140,8 +143,22 @@ export function CustomersTable({
 
                   <td className="px-4 py-3 font-medium text-foreground">
                     {/* With a side panel (onActivate) the click already shows
-                        all of this, so no hover card over the list. */}
-                    {onActivate ? (
+                        all of this, so no hover card over the list. The name
+                        itself opens the full pop-up (onOpen); the rest of the
+                        row just picks the side panel's party. */}
+                    {onOpen ? (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          onActivate?.(customer.id)
+                          onOpen(customer.id)
+                        }}
+                        className="text-left font-medium text-foreground underline-offset-4 hover:text-primary hover:underline focus-visible:underline focus-visible:outline-none"
+                      >
+                        {toTitleCase(customer.name)}
+                      </button>
+                    ) : onActivate ? (
                       toTitleCase(customer.name)
                     ) : (
                       <RecordHoverCard

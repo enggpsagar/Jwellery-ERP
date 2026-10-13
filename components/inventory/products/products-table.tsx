@@ -206,24 +206,29 @@ export function ProductsTable({
                           ],
                         },
                         {
-                          // The product's template weights — what a new stock
-                          // entry starts from, not what's on hand.
-                          fields: [
-                            {
-                              label: "Default gross (template)",
-                              value:
-                                product.defaultGrossWeight != null
-                                  ? `${wf.g(product.defaultGrossWeight)} g`
-                                  : null,
-                            },
-                            {
-                              label: "Default net (template)",
-                              value:
-                                product.defaultNetWeight != null
-                                  ? `${wf.g(product.defaultNetWeight)} g`
-                                  : null,
-                            },
-                          ],
+                          // The product's template weights — what a new
+                          // purchase line starts from, not what's on hand.
+                          // Only while nothing is in stock: beside live
+                          // stock they read as a stale stock figure.
+                          fields:
+                            product.stockQty > 0
+                              ? []
+                              : [
+                                  {
+                                    label: "Default gross (pre-fills purchases)",
+                                    value:
+                                      product.defaultGrossWeight != null
+                                        ? `${wf.g(product.defaultGrossWeight)} g`
+                                        : null,
+                                  },
+                                  {
+                                    label: "Default net (pre-fills purchases)",
+                                    value:
+                                      product.defaultNetWeight != null
+                                        ? `${wf.g(product.defaultNetWeight)} g`
+                                        : null,
+                                  },
+                                ],
                         },
                       ]}
                     />

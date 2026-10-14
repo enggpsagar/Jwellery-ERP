@@ -1,25 +1,11 @@
 "use client"
 
 import Link from "next/link"
-
-import { RecordHoverCard } from "@/components/shared/record-hover-card"
 import { ArrowLeftCircle } from "lucide-react"
 
 import { InvoiceStatusBadge } from "@/components/billing/invoice-status-badge"
 import { SortableTableHead } from "@/components/shared/sortable-table-head"
 import { cn, formatShortDate } from "@/lib/utils"
-
-/** Money as it reads on a jewellery ledger. */
-function inr(value: number | string | null | undefined) {
-  if (value === null || value === undefined || value === "") return null
-  const amount = Number(value)
-  if (!Number.isFinite(amount)) return null
-  return new Intl.NumberFormat("en-IN", {
-    style: "currency",
-    currency: "INR",
-    maximumFractionDigits: 0,
-  }).format(amount)
-}
 
 type InvoiceRow = {
   id: string
@@ -80,83 +66,28 @@ export function InvoiceTable({ invoices, activeInvoiceId, onActivate }: InvoiceT
                 )}
               >
                 <td className="px-4 py-3 font-medium">
-                  <RecordHoverCard
-                    label={invoice.invoiceNumber}
-                    href={onActivate ? undefined : `/billing/${invoice.id}`}
-                    title={invoice.invoiceNumber}
-                    subtitle={invoice.customer?.name ?? undefined}
-                    footerLabel="Open invoice"
-                    sections={[
-                      {
-                        fields: [
-                          {
-                            label: "Date",
-                            value: formatShortDate(invoice.invoiceDate),
-                          },
-                          { label: "Party", value: invoice.customer?.name },
-                          { label: "Phone", value: invoice.customer?.phone },
-                          { label: "Status", value: invoice.status },
-                        ],
-                      },
-                      {
-                        fields: [
-                          { label: "Total", value: inr(invoice.totalAmount) },
-                          {
-                            label: "Balance",
-                            value:
-                              invoice.balanceAmount > 0 ? (
-                                <span className="text-red-600">{inr(invoice.balanceAmount)}</span>
-                              ) : (
-                                "Settled"
-                              ),
-                          },
-                          {
-                            label: "From slip",
-                            value: invoice.convertedFromKacha?.slipNumber,
-                          },
-                        ],
-                      },
-                    ]}
-                  />
+                  {onActivate ? (
+                    invoice.invoiceNumber
+                  ) : (
+                    <Link
+                      href={`/billing/${invoice.id}`}
+                      className="underline-offset-4 hover:underline focus-visible:underline"
+                    >
+                      {invoice.invoiceNumber}
+                    </Link>
+                  )}
                 </td>
                 <td className="px-4 py-3">
                   {formatShortDate(invoice.invoiceDate)}
                 </td>
                 <td className="px-4 py-3">
                   {invoice.customer ? (
-                    <RecordHoverCard
-                      label={invoice.customer.name}
+                    <Link
                       href={`/customers/${invoice.customer.id}?from=${encodeURIComponent("/billing")}`}
-                      title={invoice.customer.name}
-                      subtitle={invoice.customer.phone ?? undefined}
-                      footerLabel="View party"
                       className="text-primary underline-offset-4 hover:underline"
-                      sections={[
-                        {
-                          fields: [
-                            { label: "Invoice", value: invoice.invoiceNumber },
-                            { label: "Date", value: invoice.invoiceDate },
-                            { label: "Status", value: invoice.status },
-                          ],
-                        },
-                        {
-                          fields: [
-                            { label: "Total", value: inr(invoice.totalAmount) },
-                            {
-                              label: "Balance",
-                              value:
-                                invoice.balanceAmount > 0
-                                  ? inr(invoice.balanceAmount)
-                                  : "Settled",
-                            },
-                            {
-                              label: "From slip",
-                              value: invoice.convertedFromKacha?.slipNumber,
-                            },
-                          ],
-                        },
-                      ]}
-                    />
+                    >
+                      {invoice.customer.name}
+                    </Link>
                   ) : (
                     "-"
                   )}

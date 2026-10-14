@@ -3,7 +3,7 @@
 import { useWeightFormat } from "@/components/providers/weight-settings-provider"
 import * as React from "react"
 
-import { RecordHoverCard } from "@/components/shared/record-hover-card"
+import Link from "next/link"
 import { DataTablePagination } from "@/components/shared/data-table-pagination"
 import { SortableTableHead } from "@/components/shared/sortable-table-head"
 import { cn } from "@/lib/utils"
@@ -165,73 +165,16 @@ export function ProductsTable({
                   </td>
 
                   <td className="px-4 py-3 font-medium text-foreground">
-                    {/* The Product Code carries the hover-card preview, like
-                        the record identifier in every other table (Customers,
-                        Purchases, Invoices). */}
-                    <RecordHoverCard
-                      label={product.productCode}
-                      href={onActivate ? undefined : `/inventory/products/${product.id}`}
-                      title={product.name}
-                      subtitle={product.productCode}
-                      footerLabel="View product"
-                      sections={[
-                        {
-                          fields: [
-                            { label: "Category", value: product.category },
-                            { label: "Type", value: product.ornamentType },
-                            { label: "Metal", value: product.metalType },
-                            { label: "Purity", value: product.defaultPurity },
-                          ],
-                        },
-                        {
-                          // Live stock — IN_STOCK rows only (getProducts).
-                          fields: [
-                            { label: "In stock", value: `${product.stockQty}` },
-                            { label: "Selling", value: product.soldByWeight ? "Sold by weight" : null },
-                            ...(product.stockQty > 0 &&
-                            ((product.stockGrossWeight ?? 0) > 0 || (product.stockNetWeight ?? 0) > 0)
-                              ? [
-                                  { label: "Gross weight in stock", value: `${wf.g(product.stockGrossWeight ?? 0)} g` },
-                                  { label: "Net weight in stock", value: `${wf.g(product.stockNetWeight ?? 0)} g` },
-                                  { label: "Fine weight in stock", value: `${wf.g(product.stockFineWeight ?? 0)} g` },
-                                ]
-                              : []),
-                            {
-                              label: "Carats in stock",
-                              value:
-                                product.stockQty > 0 && (product.stockCaratWeight ?? 0) > 0
-                                  ? `${wf.ct(product.stockCaratWeight ?? 0)} ct`
-                                  : null,
-                            },
-                          ],
-                        },
-                        {
-                          // The product's template weights — what a new
-                          // purchase line starts from, not what's on hand.
-                          // Only while nothing is in stock: beside live
-                          // stock they read as a stale stock figure.
-                          fields:
-                            product.stockQty > 0
-                              ? []
-                              : [
-                                  {
-                                    label: "Default gross (pre-fills purchases)",
-                                    value:
-                                      product.defaultGrossWeight != null
-                                        ? `${wf.g(product.defaultGrossWeight)} g`
-                                        : null,
-                                  },
-                                  {
-                                    label: "Default net (pre-fills purchases)",
-                                    value:
-                                      product.defaultNetWeight != null
-                                        ? `${wf.g(product.defaultNetWeight)} g`
-                                        : null,
-                                  },
-                                ],
-                        },
-                      ]}
-                    />
+                    {onActivate ? (
+                      product.productCode
+                    ) : (
+                      <Link
+                        href={`/inventory/products/${product.id}`}
+                        className="underline-offset-4 hover:underline focus-visible:underline"
+                      >
+                        {product.productCode}
+                      </Link>
+                    )}
                     {" "}
                     <span
                       className={cn(

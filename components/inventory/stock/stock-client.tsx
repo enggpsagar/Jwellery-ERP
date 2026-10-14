@@ -144,7 +144,6 @@ export function StockClient({ stockItems, pagination, totals, metals, categoryFi
             onSelectionChange={setSelectedIds}
             activeStockId={activeStockId}
             onActivate={setActiveStockId}
-            showLocation={showLocation}
           />
         </div>
 

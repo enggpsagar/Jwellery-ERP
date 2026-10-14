@@ -92,7 +92,9 @@ export function CustomerDetailPanel({
 
   return (
     <div className={shell}>
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      {/* bare = inside PartyDetailDialog: pr-10 keeps the action icons
+          clear of the dialog's top-right close X. */}
+      <div className={`flex flex-wrap items-center justify-between gap-3${bare ? " pr-10" : ""}`}>
         <h2 className="text-lg font-semibold">{toTitleCase(customer.name)}</h2>
         <div className="flex items-center gap-2">
           {headerActions}

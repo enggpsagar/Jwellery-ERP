@@ -2,7 +2,7 @@
 
 import { useWeightSettings } from "@/components/providers/weight-settings-provider"
 
-import { RecordHoverCard } from "@/components/shared/record-hover-card"
+import Link from "next/link"
 import * as React from "react"
 
 import type { getInventoryStock } from "@/lib/actions/inventory/stock-actions"
@@ -33,8 +33,6 @@ type StockTableProps = {
   /** Which row's detail is showing in the panel alongside this table — distinct from selectedIds, which is the bulk-action checkbox selection. */
   activeStockId?: string | null
   onActivate?: (id: string) => void
-  /** False for a single-location (or zero-location) store — see StockClientProps. Defaults true so a caller that hasn't been updated still shows it, matching today's behavior. */
-  showLocation?: boolean
   /** Sums across every stock row matching the current filters (all pages),
    *  from getInventoryStock — shown as the table's footer row. */
   totals?: { grossWeight: number; netWeight: number; fineWeight: number; quantity: number }
@@ -57,7 +55,6 @@ export function StockTable({
   onSelectionChange,
   activeStockId,
   onActivate,
-  showLocation = true,
   totals,
 }: StockTableProps) {
   // Settings > Weights decimals for grams.
@@ -185,30 +182,16 @@ export function StockTable({
                   </td>
 
                   <td className="px-4 py-3 font-medium">
-                    <RecordHoverCard
-                      label={item.product?.name ?? item.stockCode}
-                      href={onActivate ? undefined : `/inventory/stock/${item.id}`}
-                      title={item.product?.name ?? item.stockCode}
-                      subtitle={item.stockCode}
-                      footerLabel="View stock item"
-                      sections={[
-                        {
-                          fields: [
-                            { label: "Tag", value: item.tagNumber },
-                            { label: "Metal", value: item.metalType?.name },
-                            { label: "Purity", value: item.purity },
-                          ],
-                        },
-                        {
-                          fields: [
-                            { label: "Quantity", value: item.quantity },
-                            ...(showLocation
-                              ? [{ label: "Location", value: item.location?.name }]
-                              : []),
-                          ],
-                        },
-                      ]}
-                    />
+                    {onActivate ? (
+                      item.product?.name ?? item.stockCode
+                    ) : (
+                      <Link
+                        href={`/inventory/stock/${item.id}`}
+                        className="underline-offset-4 hover:underline focus-visible:underline"
+                      >
+                        {item.product?.name ?? item.stockCode}
+                      </Link>
+                    )}
                     {/* The linked Product's Category · Type, matching the
                         toolbar's Category → Type filter. */}
                     {(item.product?.category || item.product?.categoryType) && (

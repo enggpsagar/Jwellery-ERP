@@ -39,8 +39,8 @@ export function PartyDetailDialog({
     <Dialog open={customerId !== null} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[92vh] overflow-y-auto p-6 pt-10 sm:max-w-5xl [&>*]:min-w-0">
         {/* The panel renders the visible name heading; these name the
-            dialog for screen readers. pt-10 keeps the close X clear of the
-            header's Edit/Archive/Delete icons. */}
+            dialog for screen readers. pt-10 plus the panel's bare-mode pr-10
+            keep the close X clear of the header's Edit/Archive/Delete icons. */}
         <DialogTitle className="sr-only">Party details</DialogTitle>
         <DialogDescription className="sr-only">
           Party details, net balance and full ledger.

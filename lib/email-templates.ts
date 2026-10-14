@@ -32,25 +32,69 @@ function pieceComponentsLine(components: PieceComponentTextRow[] | null | undefi
     : "";
 }
 
+const EMAIL_FONT = "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif";
+
+/** The app's own burgundy + gold (app/globals.css --primary / --chart-2), as hex for email. */
+const EMAIL_COLORS = {
+  text: "#1f2937",
+  subdued: "#6b7280",
+  border: "#e7e2dc",
+  page: "#f5f2ee",
+  brand: "#5a1620",
+  gold: "#c9a227",
+};
+
+/**
+ * The platform icon (public/apple-icon.png) for the header when the email
+ * has no store logo. Must be a hosted PNG — Gmail/Outlook strip SVG and
+ * data: URIs — so it's skipped on localhost, where the recipient can't load it.
+ */
+function platformLogoUrl() {
+  const base = process.env.NEXTAUTH_URL;
+  if (!base || /localhost|127\.0\.0\.1/.test(base)) return undefined;
+  return `${base.replace(/\/$/, "")}/apple-icon.png`;
+}
+
+/**
+ * Shared shell for every email. Table-based, inline-styled, 600px — the only
+ * layout that renders consistently across Gmail, Outlook and Apple Mail
+ * (the old flex header was stripped by Gmail).
+ */
 function wrapEmail(storeName: string, title: string, bodyHtml: string, logoUrl?: string | null) {
-  return `
-  <div style="font-family: Arial, Helvetica, sans-serif; max-width: 600px; margin: 0 auto; color: #1f2937;">
-    <div style="padding: 20px 24px; background: #111827; border-radius: 8px 8px 0 0; display: flex; align-items: center; gap: 10px;">
-      ${
-        logoUrl
-          ? `<img src="${logoUrl}" alt="${storeName}" width="32" height="32" style="border-radius: 6px; object-fit: cover; display: block;" />`
-          : ""
-      }
-      <h1 style="margin: 0; color: #ffffff; font-size: 18px;">${storeName}</h1>
-    </div>
-    <div style="padding: 24px; border: 1px solid #e5e7eb; border-top: none;">
-      <h2 style="margin-top: 0; font-size: 16px; color: #111827;">${title}</h2>
+  const c = EMAIL_COLORS;
+  const logoSrc = logoUrl || platformLogoUrl();
+  const logo = logoSrc
+    ? `<img src="${escapeHtml(logoSrc)}" width="32" height="32" alt="" style="display:block;border:0;border-radius:7px;object-fit:cover">`
+    : `<div style="width:32px;height:32px;border-radius:7px;background:${c.gold};font-size:17px;line-height:32px;text-align:center;color:${c.brand};font-weight:700">${escapeHtml(storeName.trim().charAt(0).toUpperCase() || "S")}</div>`;
+  const poweredBy =
+    storeName === APP_NAME ? "" : ` &middot; Powered by ${escapeHtml(APP_NAME)}`;
+
+  return `<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light"><meta name="supported-color-schemes" content="light"><title>${title}</title></head>
+<body style="margin:0;padding:0;background:${c.page};-webkit-text-size-adjust:100%">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:${c.page}">
+<tr><td align="center" style="padding:28px 12px">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;font-family:${EMAIL_FONT};color:${c.text}">
+    <tr><td style="background:${c.brand};border-radius:12px 12px 0 0;padding:16px 24px">
+      <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
+        <td style="vertical-align:middle;padding-right:12px">${logo}</td>
+        <td style="vertical-align:middle;font-size:16px;font-weight:700;letter-spacing:.2px;color:#ffffff">${storeName}</td>
+      </tr></table>
+    </td></tr>
+    <tr><td style="height:4px;line-height:4px;font-size:0;background:${c.gold}">&nbsp;</td></tr>
+    <tr><td style="background:#ffffff;border:1px solid ${c.border};border-top:0;border-radius:0 0 12px 12px;padding:28px 28px 26px;font-size:14px;line-height:22px">
+      <h1 style="margin:0 0 18px;font-size:21px;line-height:28px;font-weight:700;color:#111827">${title}</h1>
       ${bodyHtml}
-    </div>
-    <p style="padding: 16px 24px; font-size: 12px; color: #9ca3af;">
-      This is an automated email from ${storeName}. Please do not reply directly to this message.
-    </p>
-  </div>`;
+    </td></tr>
+    <tr><td style="padding:18px 12px 0;font-size:12px;line-height:18px;color:${c.subdued};text-align:center">
+      This is an automated email from ${storeName}${poweredBy}.<br>Please do not reply directly to this message.
+    </td></tr>
+  </table>
+</td></tr>
+</table>
+</body>
+</html>`;
 }
 
 function itemsTable(
@@ -211,9 +255,9 @@ export function otpEmail(params: {
     <p style="margin-top: 0;">Hi ${greeting},</p>
     <p>${intro}</p>
 
-    <div style="margin: 24px 0; padding: 20px; background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; text-align: center;">
-      <div style="font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase; color: #6b7280;">One-time code</div>
-      <div style="margin-top: 10px; font-family: 'Courier New', Courier, monospace; font-size: 32px; font-weight: bold; letter-spacing: 8px; color: #111827;">${code}</div>
+    <div style="margin: 24px 0; padding: 22px 20px; background: #fbf7ec; border: 1px solid #ecdfb8; border-radius: 10px; text-align: center;">
+      <div style="font-size: 11px; font-weight: bold; letter-spacing: 1.5px; text-transform: uppercase; color: #8a6d1c;">One-time code</div>
+      <div style="margin-top: 10px; font-family: 'Courier New', Courier, monospace; font-size: 34px; line-height: 40px; font-weight: bold; letter-spacing: 10px; color: ${EMAIL_COLORS.brand};">${code}</div>
     </div>
 
     <table style="width: 100%; border-collapse: collapse; margin: 0 0 22px;">

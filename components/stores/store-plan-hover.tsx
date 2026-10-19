@@ -3,6 +3,7 @@
 import Link from "next/link"
 import { ArrowUpRight, Bell, BellOff, Mail, MessageCircle } from "lucide-react"
 
+import { OpenRecordButton } from "@/components/shared/record-detail-dialog"
 import type { StorePlanOverview } from "@/lib/actions/store-plan-actions"
 import {
   PlanStatusPill,
@@ -42,15 +43,24 @@ export function StorePlanHover({
   storeName,
   overview,
   disableLink,
+  onOpen,
 }: {
   storeName: string
   /** Absent if the ledger could not be read; the name then renders plain. */
   overview?: StorePlanOverview
   /** In a master-detail list, the row click already activates the detail panel — this avoids a second, competing navigation. */
   disableLink?: boolean
+  /** Clicking the name opens the store's pop-up (RecordDetailDialog). */
+  onOpen?: () => void
 }) {
+  const plainName = onOpen ? (
+    <OpenRecordButton onOpen={onOpen}>{storeName}</OpenRecordButton>
+  ) : (
+    <span className="font-medium">{storeName}</span>
+  )
+
   if (!overview) {
-    return <span className="font-medium">{storeName}</span>
+    return plainName
   }
 
   const { daysRemaining, status } = overview
@@ -61,8 +71,8 @@ export function StorePlanHover({
         {/* A link, not a bare span: hovering is a shortcut, but the store
             page must still be reachable by click and by keyboard — and
             focus opens the card, so this works without a pointer. */}
-        {disableLink ? (
-          <span className="font-medium">{storeName}</span>
+        {onOpen || disableLink ? (
+          plainName
         ) : (
           <Link
             href={`/stores/${overview.storeId}`}

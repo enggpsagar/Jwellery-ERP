@@ -16,6 +16,7 @@ import { PurchasesToolbar } from "@/components/purchases/purchases-toolbar"
 import { PurchaseDetailPanel } from "@/components/purchases/purchase-detail-panel"
 import { DataTablePagination } from "@/components/shared/data-table-pagination"
 import type { LocationOption } from "@/components/shared/location-select"
+import { RecordDetailDialog, useRecordDialog } from "@/components/shared/record-detail-dialog"
 
 type PurchaseRow = {
   id: string
@@ -70,6 +71,11 @@ export function PurchasesClient({ purchases, groups, view, locations, pagination
       current && groups?.some((group) => group.vendor.id === current) ? current : (groups?.[0]?.vendor.id ?? null),
     )
   }, [groups])
+
+  // The bill / party in the full pop-up (first-column click); null = closed.
+  const billDialog = useRecordDialog(groups ? undefined : purchases)
+  const groupRows = React.useMemo(() => groups?.map((group) => ({ id: group.vendor.id })), [groups])
+  const partyDialog = useRecordDialog(groupRows)
 
   React.useEffect(() => {
     setActivePurchaseId((current) => {
@@ -127,12 +133,14 @@ export function PurchasesClient({ purchases, groups, view, locations, pagination
               groups={groups}
               activeVendorId={activeVendorId}
               onActivate={setActiveVendorId}
+              onOpen={partyDialog.open}
             />
           ) : (
             <PurchaseTable
               purchases={purchases}
               activePurchaseId={activePurchaseId}
               onActivate={setActivePurchaseId}
+              onOpen={billDialog.open}
             />
           )}
 
@@ -154,6 +162,22 @@ export function PurchasesClient({ purchases, groups, view, locations, pagination
             locations={locations}
           />
         )}
+
+        <RecordDetailDialog
+          {...billDialog.dialogProps}
+          title="Purchase details"
+          fullPageHref={billDialog.openId ? `/purchases/${billDialog.openId}` : undefined}
+        >
+          <PurchaseDetailPanel purchaseId={billDialog.openId} locations={locations} />
+        </RecordDetailDialog>
+
+        <RecordDetailDialog
+          {...partyDialog.dialogProps}
+          title="Party purchase ledger"
+          fullPageHref={partyDialog.openId ? `/customers/${partyDialog.openId}` : undefined}
+        >
+          <SupplierPurchasePanel group={groups?.find((group) => group.vendor.id === partyDialog.openId) ?? null} />
+        </RecordDetailDialog>
       </div>
     </main>
   )

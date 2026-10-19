@@ -35,9 +35,11 @@ type PurchaseTableProps = {
    * link navigating away. Same convention as CustomersTable. */
   activePurchaseId?: string | null
   onActivate?: (id: string) => void
+  /** Clicking the first column opens the record's pop-up (RecordDetailDialog). */
+  onOpen?: (id: string) => void
 }
 
-export function PurchaseTable({ purchases, activePurchaseId, onActivate }: PurchaseTableProps) {
+export function PurchaseTable({ purchases, activePurchaseId, onActivate, onOpen }: PurchaseTableProps) {
   if (!purchases.length) {
     return (
       <div className="rounded-xl border bg-card p-6 text-sm text-muted-foreground">
@@ -83,6 +85,7 @@ export function PurchaseTable({ purchases, activePurchaseId, onActivate }: Purch
                   <RecordHoverCard
                     label={purchase.purchaseNumber}
                     href={onActivate ? undefined : `/purchases/${purchase.id}`}
+                    onOpen={onOpen ? () => onOpen(purchase.id) : undefined}
                     title={purchase.purchaseNumber}
                     subtitle={purchase.vendor?.name ?? undefined}
                     footerLabel="Open purchase"

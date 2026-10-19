@@ -3,6 +3,7 @@
 import { cn } from "@/lib/utils"
 import { CustomerLedgerCardClient } from "@/components/customers/ledger/customer-ledger-card-client"
 import Link from "next/link"
+import { OpenRecordButton } from "@/components/shared/record-detail-dialog"
 
 type PurchaseRow = {
   id: string
@@ -35,10 +36,13 @@ export function PurchaseSupplierGroups({
   groups,
   activeVendorId,
   onActivate,
+  onOpen,
 }: {
   groups: SupplierGroup[]
   activeVendorId?: string | null
   onActivate?: (vendorId: string) => void
+  /** Clicking the party name opens its ledger in a pop-up (RecordDetailDialog). */
+  onOpen?: (vendorId: string) => void
 }) {
   if (!groups.length) {
     return <div className="rounded-xl border bg-card p-6 text-sm text-muted-foreground">No purchases found yet.</div>
@@ -68,7 +72,11 @@ export function PurchaseSupplierGroups({
                 )}
               >
                 <td className="px-4 py-3 font-medium">
-                  {group.vendor.name}
+                  {onOpen ? (
+                    <OpenRecordButton onOpen={() => onOpen(group.vendor.id)}>{group.vendor.name}</OpenRecordButton>
+                  ) : (
+                    group.vendor.name
+                  )}
                   {group.vendor.phone ? (
                     <div className="text-xs font-normal text-muted-foreground">{group.vendor.phone}</div>
                   ) : null}

@@ -59,6 +59,8 @@ interface Props {
   /** Which row's detail is showing in the panel alongside this table — a separate concern from any future bulk selection. */
   activeUserId?: string | null;
   onActivate?: (id: string) => void;
+  /** Clicking the first column opens the record's pop-up (RecordDetailDialog). */
+  onOpen?: (id: string) => void;
   /** Bulk-action checkbox selection — omit to hide the checkbox column entirely. */
   selectedIds?: string[];
   onSelectionChange?: (ids: string[]) => void;
@@ -71,6 +73,7 @@ export function UserTable({
   allowSuperAdmin = false,
   activeUserId,
   onActivate,
+  onOpen,
   selectedIds,
   onSelectionChange,
 }: Props) {
@@ -183,6 +186,7 @@ export function UserTable({
                   <RecordHoverCard
                     label={user.name ?? "-"}
                     href={onActivate ? undefined : `/users/${user.id}/edit`}
+                    onOpen={onOpen ? () => onOpen(user.id) : undefined}
                     title={user.name ?? "Unnamed user"}
                     subtitle={ROLE_LABELS[user.role]}
                     footerLabel="Edit user"

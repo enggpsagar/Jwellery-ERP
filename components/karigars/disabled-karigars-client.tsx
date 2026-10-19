@@ -8,6 +8,7 @@ import { PageBackHeader } from "@/components/shared/page-back-header"
 import { Input } from "@/components/ui/input"
 import { KarigarTable } from "@/components/karigars/karigar-table"
 import { DisabledKarigarDetailPanel } from "@/components/karigars/disabled-karigar-detail-panel"
+import { RecordDetailDialog, useRecordDialog } from "@/components/shared/record-detail-dialog"
 
 type DisabledKarigarsClientProps = {
   karigars: Karigar[]
@@ -39,6 +40,9 @@ export function DisabledKarigarsClient({
   const [activeKarigarId, setActiveKarigarId] = React.useState<string | null>(
     karigars[0]?.id ?? null,
   )
+
+  // The record in the full pop-up (first-column click); null = closed.
+  const recordDialog = useRecordDialog(karigars)
 
   React.useEffect(() => {
     setSelectedKarigarIds([])
@@ -83,10 +87,18 @@ export function DisabledKarigarsClient({
             onSelectionChange={setSelectedKarigarIds}
             activeKarigarId={activeKarigarId}
             onActivate={setActiveKarigarId}
+            onOpen={recordDialog.open}
           />
         </div>
 
         <DisabledKarigarDetailPanel karigarId={activeKarigarId} />
+
+        <RecordDetailDialog
+          {...recordDialog.dialogProps}
+          title="Disabled artisan details"
+        >
+          <DisabledKarigarDetailPanel karigarId={recordDialog.openId} />
+        </RecordDetailDialog>
       </div>
     </main>
   )

@@ -4,11 +4,14 @@ import { useWeightFormat } from "@/components/providers/weight-settings-provider
 import { Badge } from "@/components/ui/badge"
 import { formatShortDate, cn } from "@/lib/utils"
 import type { MyJobRow } from "@/lib/actions/my-jobs-actions"
+import { OpenRecordButton } from "@/components/shared/record-detail-dialog"
 
 type MyJobsTableProps = {
   jobs: MyJobRow[]
   activeJobId: string | null
   onActivate: (id: string) => void
+  /** Clicking the first column opens the record's pop-up (RecordDetailDialog). */
+  onOpen?: (id: string) => void
 }
 
 /**
@@ -16,7 +19,7 @@ type MyJobsTableProps = {
  * selection/bulk actions/delete, unlike DraftOrdersTable): a karigar can
  * only ever view their own jobs, never modify them from here.
  */
-export function MyJobsTable({ jobs, activeJobId, onActivate }: MyJobsTableProps) {
+export function MyJobsTable({ jobs, activeJobId, onActivate, onOpen }: MyJobsTableProps) {
   const wf = useWeightFormat()
   return (
     <div className="overflow-hidden rounded-xl border bg-card">
@@ -51,7 +54,13 @@ export function MyJobsTable({ jobs, activeJobId, onActivate }: MyJobsTableProps)
                       isActive && "bg-accent",
                     )}
                   >
-                    <td className="px-4 py-3 font-medium">{job.jobNumber ?? "-"}</td>
+                    <td className="px-4 py-3 font-medium">
+                      {onOpen ? (
+                        <OpenRecordButton onOpen={() => onOpen(job.id)}>{job.jobNumber ?? "-"}</OpenRecordButton>
+                      ) : (
+                        job.jobNumber ?? "-"
+                      )}
+                    </td>
                     <td className="hidden px-4 py-3 text-muted-foreground sm:table-cell">
                       {job.itemLabel ?? "-"}
                     </td>

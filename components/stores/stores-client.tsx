@@ -14,6 +14,7 @@ import type { PlanRow } from "@/lib/actions/plan-actions"
 import type { StorePlanOverview } from "@/lib/actions/store-plan-actions"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
+import { RecordDetailDialog, useRecordDialog } from "@/components/shared/record-detail-dialog"
 
 type StoreRow = {
   id: string
@@ -82,6 +83,9 @@ export function StoresClient({
       return stores[0]?.id ?? null
     })
   }, [stores])
+
+  // The record in the full pop-up (first-column click); null = closed.
+  const recordDialog = useRecordDialog(stores)
 
   const activeStore = stores.find((store) => store.id === activeStoreId)
 
@@ -181,6 +185,7 @@ export function StoresClient({
             onSelectionChange={setSelectedIds}
             activeStoreId={activeStoreId}
             onActivate={setActiveStoreId}
+            onOpen={recordDialog.open}
           />
 
           <div className="rounded-xl border">
@@ -200,6 +205,18 @@ export function StoresClient({
           plans={plans}
           currentPlanId={activeStore?.plan?.id ?? null}
         />
+
+        <RecordDetailDialog
+          {...recordDialog.dialogProps}
+          title="Store details"
+          fullPageHref={recordDialog.openId ? `/stores/${recordDialog.openId}` : undefined}
+        >
+          <StoreDetailPanel
+            storeId={recordDialog.openId}
+            plans={plans}
+            currentPlanId={stores.find((store) => store.id === recordDialog.openId)?.plan?.id ?? null}
+          />
+        </RecordDetailDialog>
       </div>
     </div>
   )

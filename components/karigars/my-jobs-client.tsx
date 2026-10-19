@@ -5,6 +5,7 @@ import * as React from "react"
 import { MyJobsTable } from "@/components/karigars/my-jobs-table"
 import { MyJobsDetailPanel } from "@/components/karigars/my-jobs-detail-panel"
 import type { MyJobRow } from "@/lib/actions/my-jobs-actions"
+import { RecordDetailDialog, useRecordDialog } from "@/components/shared/record-detail-dialog"
 
 /**
  * Master-detail layout for the artisan-facing My Jobs page — list on the
@@ -16,10 +17,26 @@ export function MyJobsClient({ jobs }: { jobs: MyJobRow[] }) {
   // other master-detail list in the app.
   const [activeJobId, setActiveJobId] = React.useState<string | null>(jobs[0]?.id ?? null)
 
+  // The record in the full pop-up (first-column click); null = closed.
+  const recordDialog = useRecordDialog(jobs)
+
   return (
     <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)] xl:items-start">
-      <MyJobsTable jobs={jobs} activeJobId={activeJobId} onActivate={setActiveJobId} />
+      <MyJobsTable
+        jobs={jobs}
+        activeJobId={activeJobId}
+        onActivate={setActiveJobId}
+        onOpen={recordDialog.open}
+      />
       <MyJobsDetailPanel jobId={activeJobId} />
+
+      <RecordDetailDialog
+        {...recordDialog.dialogProps}
+        title="Job details"
+        fullPageHref={recordDialog.openId ? `/my-jobs/${recordDialog.openId}` : undefined}
+      >
+        <MyJobsDetailPanel jobId={recordDialog.openId} />
+      </RecordDetailDialog>
     </div>
   )
 }

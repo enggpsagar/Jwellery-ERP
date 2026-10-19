@@ -1,0 +1,241 @@
+import Link from "next/link"
+import { ArrowRightCircle, Printer } from "lucide-react"
+
+import type { getKachaInvoiceById } from "@/lib/actions/kacha-invoice-actions"
+import type { getKachaOldGoldExchange } from "@/lib/actions/old-gold-actions"
+import { formatShortDate } from "@/lib/utils"
+import { InvoiceStatusBadge } from "@/components/billing/invoice-status-badge"
+import { RecordKachaPaymentDialog } from "@/components/billing/kacha/record-kacha-payment-dialog"
+import { EmailKachaInvoiceButton } from "@/components/billing/kacha/email-kacha-invoice-button"
+import { LineStoneDetails, PieceBreakdown } from "@/components/billing/piece-breakdown"
+import { InvoiceOldGoldCard } from "@/components/billing/invoice-old-gold-card"
+import { WeightText } from "@/components/shared/weight-text"
+import { Button } from "@/components/ui/button"
+import { IconTooltip } from "@/components/ui/icon-tooltip"
+
+export type KachaInvoiceDetail = NonNullable<Awaited<ReturnType<typeof getKachaInvoiceById>>>
+export type KachaOldGoldExchange = Awaited<ReturnType<typeof getKachaOldGoldExchange>>
+
+/**
+ * An estimate's header actions — Convert / View Tax Invoice, Email, Print,
+ * Record Payment. Shared by the /billing/kacha/[id] page and the Estimates
+ * list's pop-up (KachaDetailPanel), so the two can't drift.
+ */
+export function KachaDetailActions({ kachaInvoice }: { kachaInvoice: KachaInvoiceDetail }) {
+  return (
+    <div className="flex items-center gap-2">
+      {kachaInvoice.convertedTo ? (
+        <Link href={`/billing/${kachaInvoice.convertedTo.id}`}>
+          <Button variant="outline" className="gap-2">
+            <ArrowRightCircle className="h-4 w-4" />
+            View Tax Invoice ({kachaInvoice.convertedTo.invoiceNumber})
+          </Button>
+        </Link>
+      ) : (
+        <Link href={`/billing/kacha/${kachaInvoice.id}/convert`}>
+          <Button variant="outline">Convert to Tax Invoice</Button>
+        </Link>
+      )}
+
+      <EmailKachaInvoiceButton kachaInvoiceId={kachaInvoice.id} />
+
+      <IconTooltip label="Print slip">
+        <Link
+          href={`/billing/kacha/${kachaInvoice.id}/print`}
+          className="inline-flex h-9 w-9 items-center justify-center rounded-md bg-[var(--chart-2)] text-white shadow-sm hover:bg-[color-mix(in_oklab,var(--chart-2)_88%,black)]"
+          aria-label="Print slip"
+        >
+          <Printer className="h-4 w-4" />
+        </Link>
+      </IconTooltip>
+
+      <RecordKachaPaymentDialog
+        kachaInvoiceId={kachaInvoice.id}
+        balanceAmount={kachaInvoice.balanceAmount}
+      />
+    </div>
+  )
+}
+
+/**
+ * An estimate's body — status, line items, totals, Customer Exchange and
+ * notes. Shared by the detail page and KachaDetailPanel.
+ */
+export function KachaDetailContent({
+  kachaInvoice,
+  oldGoldExchange,
+}: {
+  kachaInvoice: KachaInvoiceDetail
+  oldGoldExchange: KachaOldGoldExchange
+}) {
+  // A column with nothing to show across every line item is dead weight,
+  // not information — Making also carries the Hallmark charge sub-line, so
+  // it stays visible if any item has that even with makingCharge itself 0.
+  const showMaking = kachaInvoice.items.some(
+    (item: (typeof kachaInvoice.items)[number]) => item.makingCharge > 0 || item.hmCharge > 0,
+  )
+  const showStone = kachaInvoice.items.some(
+    (item: (typeof kachaInvoice.items)[number]) => item.stoneCharge > 0,
+  )
+
+  return (
+    <div className="space-y-6">
+      <div className="rounded-xl border bg-card p-6 space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <p className="text-sm text-muted-foreground">Status</p>
+            <div className="flex flex-wrap items-center gap-2">
+              <InvoiceStatusBadge status={kachaInvoice.status} />
+              {kachaInvoice.convertedTo && (
+                <Link
+                  href={`/billing/${kachaInvoice.convertedTo.id}`}
+                  className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700 hover:bg-emerald-100"
+                >
+                  <ArrowRightCircle className="h-3.5 w-3.5" />
+                  Converted to Tax Invoice
+                </Link>
+              )}
+            </div>
+          </div>
+
+          <div>
+            <p className="text-sm text-muted-foreground">Slip Date</p>
+            <p className="font-medium">
+              {formatShortDate(kachaInvoice.invoiceDate)}
+            </p>
+          </div>
+
+          <div>
+            <p className="text-sm text-muted-foreground">Party</p>
+            {kachaInvoice.customer ? (
+              <Link
+                href={`/customers/${kachaInvoice.customer.id}?from=${encodeURIComponent(`/billing/kacha/${kachaInvoice.id}`)}`}
+                className="font-medium text-primary underline-offset-4 hover:underline"
+              >
+                {kachaInvoice.customer.name}
+                {kachaInvoice.customer.phone
+                  ? ` (${kachaInvoice.customer.phone})`
+                  : ""}
+              </Link>
+            ) : (
+              <p className="font-medium">—</p>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div className="overflow-hidden rounded-xl border bg-card">
+        <table className="min-w-full text-sm">
+          <thead className="bg-muted/40">
+            <tr className="border-b">
+              <th className="px-4 py-3 text-left font-medium">Item</th>
+              <th className="px-4 py-3 text-left font-medium">Qty</th>
+              <th className="px-4 py-3 text-left font-medium">Weight</th>
+              <th className="px-4 py-3 text-left font-medium">Rate</th>
+              {showMaking && <th className="px-4 py-3 text-left font-medium">Making</th>}
+              {showStone && <th className="px-4 py-3 text-left font-medium">Stone</th>}
+              <th className="px-4 py-3 text-left font-medium">Line Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            {kachaInvoice.items.map((item: (typeof kachaInvoice.items)[number]) => (
+              <tr key={item.id} className="border-b last:border-0">
+                <td className="px-4 py-3">
+                  {item.itemName}
+                  {item.vendorName ? (
+                    <span className="block text-xs text-muted-foreground">Purchased from {item.vendorName}</span>
+                  ) : null}
+                  {item.components?.length ? (
+                    <PieceBreakdown components={item.components} showGst={false} />
+                  ) : item.stoneMetalTypeName ? (
+                    <span className="block text-xs text-muted-foreground">
+                      Stone: {item.stoneMetalTypeName}
+                      {item.stoneTypeNames ? ` (${item.stoneTypeNames})` : ""}
+                    </span>
+                  ) : null}
+                  <LineStoneDetails item={item} />
+                </td>
+                <td className="px-4 py-3">{item.quantity}</td>
+                <td className="px-4 py-3">
+                  {item.purity === "DIAMOND" ? (
+                    <WeightText value={item.caratWeight} unit="CARAT" fallback="-" />
+                  ) : (
+                    <WeightText value={item.netWeight} fallback="-" />
+                  )}
+                </td>
+                <td className="px-4 py-3">{item.rate ? `₹${item.rate.toFixed(2)}` : "-"}</td>
+                {showMaking && (
+                  <td className="px-4 py-3">
+                    {item.makingCharge > 0 ? `₹${item.makingCharge.toFixed(2)}` : "-"}
+                    {item.hmCharge > 0 ? (
+                      <span className="block text-xs text-muted-foreground">
+                        HM ₹{item.hmCharge.toFixed(2)}
+                      </span>
+                    ) : null}
+                  </td>
+                )}
+                {showStone && (
+                  <td className="px-4 py-3">
+                    {item.stoneCharge > 0 ? `₹${item.stoneCharge.toFixed(2)}` : "-"}
+                  </td>
+                )}
+                <td className="px-4 py-3 font-medium">₹{item.lineTotal.toFixed(2)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="rounded-xl border bg-card p-6 max-w-sm ml-auto space-y-1 text-sm">
+        <div className="flex justify-between">
+          <span>Subtotal</span>
+          <span>₹{kachaInvoice.subtotal.toFixed(2)}</span>
+        </div>
+        <div className="flex justify-between">
+          <span>Making Charges (incl. HM)</span>
+          <span>₹{kachaInvoice.makingCharges.toFixed(2)}</span>
+        </div>
+        <div className="flex justify-between">
+          <span>Stone Charges</span>
+          <span>₹{kachaInvoice.stoneCharges.toFixed(2)}</span>
+        </div>
+        <div className="flex justify-between">
+          <span>Discount</span>
+          <span>-₹{kachaInvoice.discount.toFixed(2)}</span>
+        </div>
+        {kachaInvoice.roundOffAmount !== 0 && (
+          <div className="flex justify-between">
+            <span>Round Off</span>
+            <span>
+              {kachaInvoice.roundOffAmount >= 0 ? "+" : "-"}₹
+              {Math.abs(kachaInvoice.roundOffAmount).toFixed(2)}
+            </span>
+          </div>
+        )}
+        <div className="flex justify-between font-semibold text-base border-t pt-2 mt-2">
+          <span>Total</span>
+          <span>₹{kachaInvoice.totalAmount.toFixed(2)}</span>
+        </div>
+        <div className="flex justify-between text-blue-600 font-medium">
+          <span>Paid</span>
+          <span>₹{kachaInvoice.paidAmount.toFixed(2)}</span>
+        </div>
+        <div className="flex justify-between text-red-600 font-medium">
+          <span>Balance</span>
+          <span>₹{kachaInvoice.balanceAmount.toFixed(2)}</span>
+        </div>
+      </div>
+
+      {oldGoldExchange ? (
+        <InvoiceOldGoldCard totalLabel="Estimate total" exchange={oldGoldExchange} invoiceTotal={kachaInvoice.totalAmount} />
+      ) : null}
+
+      {kachaInvoice.notes && (
+        <div className="rounded-xl border bg-card p-6">
+          <p className="text-sm text-muted-foreground">Notes</p>
+          <p className="font-medium">{kachaInvoice.notes}</p>
+        </div>
+      )}
+    </div>
+  )
+}

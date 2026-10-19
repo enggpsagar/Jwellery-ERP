@@ -10,6 +10,7 @@ import type { getInventoryStock } from "@/lib/actions/inventory/stock-actions"
 import { DataTablePagination } from "@/components/shared/data-table-pagination"
 import { SortableTableHead } from "@/components/shared/sortable-table-head"
 import { cn } from "@/lib/utils"
+import { OpenRecordButton } from "@/components/shared/record-detail-dialog"
 
 // Derived from the actual server action's return shape (rather than
 // hand-declared) so this table never drifts out of sync with whatever
@@ -33,6 +34,8 @@ type StockTableProps = {
   /** Which row's detail is showing in the panel alongside this table — distinct from selectedIds, which is the bulk-action checkbox selection. */
   activeStockId?: string | null
   onActivate?: (id: string) => void
+  /** Clicking the first column opens the record's pop-up (RecordDetailDialog). */
+  onOpen?: (id: string) => void
   /** Sums across every stock row matching the current filters (all pages),
    *  from getInventoryStock — shown as the table's footer row. */
   totals?: { grossWeight: number; netWeight: number; fineWeight: number; quantity: number }
@@ -55,6 +58,7 @@ export function StockTable({
   onSelectionChange,
   activeStockId,
   onActivate,
+  onOpen,
   totals,
 }: StockTableProps) {
   // Settings > Weights decimals for grams.
@@ -172,7 +176,13 @@ export function StockTable({
                   </td>
 
                   <td className="px-4 py-3 text-foreground">
-                    <div className="font-medium">{item.product?.productCode ?? "-"}</div>
+                    {onOpen ? (
+                      <OpenRecordButton onOpen={() => onOpen(item.id)} className="block">
+                        {item.product?.productCode ?? item.stockCode}
+                      </OpenRecordButton>
+                    ) : (
+                      <div className="font-medium">{item.product?.productCode ?? "-"}</div>
+                    )}
                     <div className="text-xs text-muted-foreground">
                       {item.stockCode}{" "}
                       <span className={cn("tabular-nums", item.quantity <= 0 && "font-medium text-red-600")}>

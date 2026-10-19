@@ -8,6 +8,7 @@ import { QuotationDetailPanel } from "@/components/quotations/quotation-detail-p
 import { DataTablePagination } from "@/components/shared/data-table-pagination"
 import { BulkDeleteButton } from "@/components/shared/bulk-delete-button"
 import { bulkDeleteQuotations } from "@/lib/actions/quotation-actions"
+import { RecordDetailDialog, useRecordDialog } from "@/components/shared/record-detail-dialog"
 
 type QuotationRow = {
   id: string
@@ -45,6 +46,9 @@ export function QuotationsClient({ quotations, pagination }: QuotationsClientPro
     quotations[0]?.id ?? null,
   )
 
+  // The record in the full pop-up (first-column click); null = closed.
+  const recordDialog = useRecordDialog(quotations)
+
   useEffect(() => {
     setSelectedIds([])
     setActiveQuotationId((current) => {
@@ -79,6 +83,7 @@ export function QuotationsClient({ quotations, pagination }: QuotationsClientPro
             onSelectionChange={setSelectedIds}
             activeQuotationId={activeQuotationId}
             onActivate={setActiveQuotationId}
+            onOpen={recordDialog.open}
           />
           <DataTablePagination
             page={pagination.page}
@@ -92,6 +97,14 @@ export function QuotationsClient({ quotations, pagination }: QuotationsClientPro
       </div>
 
       <QuotationDetailPanel quotationId={activeQuotationId} />
+
+      <RecordDetailDialog
+        {...recordDialog.dialogProps}
+        title="Quotation details"
+        fullPageHref={recordDialog.openId ? `/quotations/${recordDialog.openId}` : undefined}
+      >
+        <QuotationDetailPanel quotationId={recordDialog.openId} />
+      </RecordDetailDialog>
     </div>
   )
 }

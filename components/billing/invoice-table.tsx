@@ -6,6 +6,7 @@ import { ArrowLeftCircle } from "lucide-react"
 import { InvoiceStatusBadge } from "@/components/billing/invoice-status-badge"
 import { SortableTableHead } from "@/components/shared/sortable-table-head"
 import { cn, formatShortDate } from "@/lib/utils"
+import { OpenRecordButton } from "@/components/shared/record-detail-dialog"
 
 type InvoiceRow = {
   id: string
@@ -25,9 +26,11 @@ type InvoiceTableProps = {
    * link navigating away. Same convention as PurchaseTable/CustomersTable. */
   activeInvoiceId?: string | null
   onActivate?: (id: string) => void
+  /** Clicking the first column opens the record's pop-up (RecordDetailDialog). */
+  onOpen?: (id: string) => void
 }
 
-export function InvoiceTable({ invoices, activeInvoiceId, onActivate }: InvoiceTableProps) {
+export function InvoiceTable({ invoices, activeInvoiceId, onActivate, onOpen }: InvoiceTableProps) {
   if (!invoices.length) {
     return (
       <div className="rounded-xl border bg-card p-6 text-sm text-muted-foreground">
@@ -66,7 +69,11 @@ export function InvoiceTable({ invoices, activeInvoiceId, onActivate }: InvoiceT
                 )}
               >
                 <td className="px-4 py-3 font-medium">
-                  {onActivate ? (
+                  {onOpen ? (
+                    <OpenRecordButton onOpen={() => onOpen(invoice.id)}>
+                      {invoice.invoiceNumber}
+                    </OpenRecordButton>
+                  ) : onActivate ? (
                     invoice.invoiceNumber
                   ) : (
                     <Link

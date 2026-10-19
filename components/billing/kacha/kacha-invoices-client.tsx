@@ -6,6 +6,8 @@ import { KachaInvoiceTable } from "@/components/billing/kacha/kacha-invoice-tabl
 import { KachaInvoicesToolbar } from "@/components/billing/kacha/kacha-invoices-toolbar"
 import { DeleteAllKachaDialog } from "@/components/billing/kacha/delete-all-kacha-dialog"
 import { Button } from "@/components/ui/button"
+import { KachaDetailPanel } from "@/components/billing/kacha/kacha-detail-panel"
+import { RecordDetailDialog, useRecordDialog } from "@/components/shared/record-detail-dialog"
 
 type KachaInvoiceRow = React.ComponentProps<
   typeof KachaInvoiceTable
@@ -35,6 +37,9 @@ export function KachaInvoicesClient({
   React.useEffect(() => {
     setSelectedIds([])
   }, [kachaInvoices])
+
+  // The estimate in the full pop-up (slip-number click); null = closed.
+  const recordDialog = useRecordDialog(kachaInvoices)
 
   const hasRecords = kachaInvoices.length > 0
 
@@ -75,7 +80,16 @@ export function KachaInvoicesClient({
         kachaInvoices={kachaInvoices}
         selectedIds={selectedIds}
         onSelectionChange={setSelectedIds}
+        onOpen={recordDialog.open}
       />
+
+      <RecordDetailDialog
+        {...recordDialog.dialogProps}
+        title="Estimate details"
+        fullPageHref={recordDialog.openId ? `/billing/kacha/${recordDialog.openId}` : undefined}
+      >
+        <KachaDetailPanel kachaInvoiceId={recordDialog.openId} />
+      </RecordDetailDialog>
     </div>
   )
 }

@@ -38,6 +38,7 @@ export function StoreTable({
   onSelectionChange,
   activeStoreId,
   onActivate,
+  onOpen,
 }: {
   stores: StoreRow[]
   planOverviews: Record<string, StorePlanOverview>
@@ -46,6 +47,8 @@ export function StoreTable({
   /** Which row's detail is showing in the panel alongside this table — distinct from selectedIds, which is the bulk-action checkbox selection. */
   activeStoreId?: string | null
   onActivate?: (id: string) => void
+  /** Clicking the first column opens the record's pop-up (RecordDetailDialog). */
+  onOpen?: (id: string) => void
 }) {
   const allIds = stores.map((store) => store.id)
   const allSelected = allIds.length > 0 && allIds.every((id) => selectedIds.includes(id))
@@ -130,6 +133,7 @@ export function StoreTable({
                     storeName={store.name}
                     overview={planOverviews[store.id]}
                     disableLink={Boolean(onActivate)}
+                    onOpen={onOpen ? () => onOpen(store.id) : undefined}
                   />
                 </TableCell>
                 <TableCell>{store.code}</TableCell>

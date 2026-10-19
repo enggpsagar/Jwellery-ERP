@@ -10,6 +10,7 @@ import { ArchivedProductDetailPanel } from "@/components/inventory/products/arch
 import { BulkUnarchiveProductsButton } from "@/components/inventory/products/bulk-unarchive-products-button"
 import { BulkDeleteButton } from "@/components/shared/bulk-delete-button"
 import { bulkDeleteProducts } from "@/lib/actions/inventory/product-actions"
+import { RecordDetailDialog, useRecordDialog } from "@/components/shared/record-detail-dialog"
 
 type ProductRow = React.ComponentProps<typeof ProductsTable>["products"][number]
 
@@ -52,6 +53,9 @@ export function ArchivedProductsClient({
   // activeProductId (see ProductDetailPanel's own identical pattern on the
   // main Products page).
   const [detailRefreshToken, setDetailRefreshToken] = React.useState(0)
+
+  // The record in the full pop-up (first-column click); null = closed.
+  const recordDialog = useRecordDialog(products)
 
   React.useEffect(() => {
     setSelectedIds([])
@@ -117,10 +121,18 @@ export function ArchivedProductsClient({
             onSelectionChange={setSelectedIds}
             activeProductId={activeProductId}
             onActivate={setActiveProductId}
+            onOpen={recordDialog.open}
           />
         </div>
 
         <ArchivedProductDetailPanel productId={activeProductId} canEdit={canEdit} refreshToken={detailRefreshToken} />
+
+        <RecordDetailDialog
+          {...recordDialog.dialogProps}
+          title="Archived product details"
+        >
+          <ArchivedProductDetailPanel productId={recordDialog.openId} canEdit={canEdit} refreshToken={detailRefreshToken} />
+        </RecordDetailDialog>
       </div>
     </main>
   )

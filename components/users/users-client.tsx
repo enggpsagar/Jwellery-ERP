@@ -14,6 +14,7 @@ import { BulkDeleteButton } from "@/components/shared/bulk-delete-button";
 import { exportUsersToExcel, bulkDeleteUsers } from "@/app/(dashboard)/users/actions";
 
 import type { UserRole, UserStatus } from "@prisma/client";
+import { RecordDetailDialog, useRecordDialog } from "@/components/shared/record-detail-dialog";
 
 interface User {
   id: string;
@@ -81,6 +82,9 @@ export function UsersClient({
     });
   }, [users]);
 
+  // The record in the full pop-up (first-column click); null = closed.
+  const recordDialog = useRecordDialog(users);
+
   const activeUser = users.find((user) => user.id === activeUserId) ?? null;
 
   return (
@@ -143,6 +147,7 @@ export function UsersClient({
             allowSuperAdmin={allowSuperAdmin}
             activeUserId={activeUserId}
             onActivate={setActiveUserId}
+            onOpen={recordDialog.open}
             selectedIds={selectedIds}
             onSelectionChange={setSelectedIds}
           />
@@ -160,6 +165,17 @@ export function UsersClient({
         </div>
 
         <UserDetailPanel user={activeUser} karigars={karigars} locations={locations} />
+
+        <RecordDetailDialog
+          {...recordDialog.dialogProps}
+          title="User details"
+        >
+          <UserDetailPanel
+            user={users.find((user) => user.id === recordDialog.openId) ?? null}
+            karigars={karigars}
+            locations={locations}
+          />
+        </RecordDetailDialog>
       </div>
     </div>
   );

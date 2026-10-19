@@ -18,6 +18,7 @@ import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { DateRangePicker, type DateRangeValue } from "@/components/ui/date-range-picker"
 import { PaymentInDetailPanel } from "@/components/payments/payment-in-detail-panel"
+import { OpenRecordButton, RecordDetailDialog, useRecordDialog } from "@/components/shared/record-detail-dialog"
 import { cn } from "@/lib/utils"
 
 /** "YYYY-MM-DD" range bound -> epoch ms, at the start or end of that local
@@ -86,6 +87,9 @@ export function PaymentsInTable({ rows }: { rows: PaymentInRow[] }) {
   const rangeStart = filtered.length === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1
   const rangeEnd = Math.min(currentPage * PAGE_SIZE, filtered.length)
   const activeRow = rows.find((row) => row.id === activeId) ?? null
+
+  // The payment in the full pop-up (first-column click); null = closed.
+  const recordDialog = useRecordDialog(rows)
 
   return (
     <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)] xl:items-start">
@@ -163,7 +167,9 @@ export function PaymentsInTable({ rows }: { rows: PaymentInRow[] }) {
                     className={cn("cursor-pointer hover:bg-accent/50", activeId === row.id && "bg-accent")}
                   >
                     <TableCell className="whitespace-nowrap text-sm text-muted-foreground">
-                      {row.date}
+                      <OpenRecordButton onOpen={() => recordDialog.open(row.id)} className="font-normal">
+                        {row.date}
+                      </OpenRecordButton>
                     </TableCell>
                     <TableCell className="font-medium">
                       {row.customerId ? (
@@ -232,6 +238,10 @@ export function PaymentsInTable({ rows }: { rows: PaymentInRow[] }) {
     </div>
 
       <PaymentInDetailPanel row={activeRow} />
+
+      <RecordDetailDialog {...recordDialog.dialogProps} title="Payment received">
+        <PaymentInDetailPanel row={rows.find((row) => row.id === recordDialog.openId) ?? null} />
+      </RecordDetailDialog>
     </div>
   )
 }

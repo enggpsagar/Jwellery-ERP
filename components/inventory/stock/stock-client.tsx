@@ -15,6 +15,7 @@ import { BulkDeleteButton } from "@/components/shared/bulk-delete-button"
 import { StockImportDialog } from "@/components/inventory/stock/stock-import-dialog"
 import { bulkDeleteInventoryStock } from "@/lib/actions/inventory/stock-actions"
 import type { CategoryFilterOptions, StoreMetalRow } from "@/lib/actions/taxonomy-actions"
+import { RecordDetailDialog, useRecordDialog } from "@/components/shared/record-detail-dialog"
 
 type Pagination = {
   page: number
@@ -47,6 +48,9 @@ export function StockClient({ stockItems, pagination, totals, metals, categoryFi
   const [activeStockId, setActiveStockId] = React.useState<string | null>(
     stockItems[0]?.id ?? null,
   )
+
+  // The record in the full pop-up (first-column click); null = closed.
+  const recordDialog = useRecordDialog(stockItems)
 
   React.useEffect(() => {
     setSelectedIds([])
@@ -144,10 +148,19 @@ export function StockClient({ stockItems, pagination, totals, metals, categoryFi
             onSelectionChange={setSelectedIds}
             activeStockId={activeStockId}
             onActivate={setActiveStockId}
+            onOpen={recordDialog.open}
           />
         </div>
 
         <StockDetailPanel stockId={activeStockId} showLocation={showLocation} />
+
+        <RecordDetailDialog
+          {...recordDialog.dialogProps}
+          title="Stock item details"
+          fullPageHref={recordDialog.openId ? `/inventory/stock/${recordDialog.openId}` : undefined}
+        >
+          <StockDetailPanel stockId={recordDialog.openId} showLocation={showLocation} />
+        </RecordDetailDialog>
       </div>
     </main>
   )

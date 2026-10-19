@@ -17,6 +17,7 @@ import {
 } from "@/lib/actions/inventory/product-actions"
 import type { CategoryFilterOptions, StoreMetalRow } from "@/lib/actions/taxonomy-actions"
 import { UNASSIGNED_METAL_TYPE } from "@/lib/business-units"
+import { RecordDetailDialog, useRecordDialog } from "@/components/shared/record-detail-dialog"
 
 type ProductRow = React.ComponentProps<typeof ProductsTable>["products"][number]
 
@@ -74,6 +75,9 @@ export function ProductsClient({
   const [activeProductId, setActiveProductId] = React.useState<string | null>(
     products[0]?.id ?? null,
   )
+
+  // The record in the full pop-up (first-column click); null = closed.
+  const recordDialog = useRecordDialog(products)
 
   React.useEffect(() => {
     setSelectedIds([])
@@ -183,10 +187,19 @@ export function ProductsClient({
             onSelectionChange={setSelectedIds}
             activeProductId={activeProductId}
             onActivate={setActiveProductId}
+            onOpen={recordDialog.open}
           />
         </div>
 
         <ProductDetailPanel productId={activeProductId} canEdit={canEdit} refreshToken={detailRefreshToken} />
+
+        <RecordDetailDialog
+          {...recordDialog.dialogProps}
+          title="Product details"
+          fullPageHref={recordDialog.openId ? `/inventory/products/${recordDialog.openId}` : undefined}
+        >
+          <ProductDetailPanel productId={recordDialog.openId} canEdit={canEdit} refreshToken={detailRefreshToken} />
+        </RecordDetailDialog>
       </div>
     </main>
   )

@@ -20,6 +20,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import { OpenRecordButton } from "@/components/shared/record-detail-dialog"
 
 type DraftOrdersTableProps = {
   orders: DraftOrderRow[]
@@ -28,6 +29,8 @@ type DraftOrdersTableProps = {
   /** Which row's detail is showing in the panel alongside this table — omit to keep every row's order number as a plain navigation link. */
   activeOrderId?: string | null
   onActivate?: (id: string) => void
+  /** Clicking the first column opens the record's pop-up (RecordDetailDialog). */
+  onOpen?: (id: string) => void
 }
 
 /** Only a DRAFT or already-CANCELLED order can be deleted — mirrors
@@ -43,6 +46,7 @@ export function DraftOrdersTable({
   onSelectionChange,
   activeOrderId,
   onActivate,
+  onOpen,
 }: DraftOrdersTableProps) {
   const router = useRouter()
   const toast = useToast()
@@ -158,7 +162,11 @@ export function DraftOrdersTable({
                       />
                     </td>
                     <td className="px-4 py-3 font-medium">
-                      {onActivate ? (
+                      {onOpen ? (
+                        <OpenRecordButton onOpen={() => onOpen(order.id)}>
+                          {order.orderNumber}
+                        </OpenRecordButton>
+                      ) : onActivate ? (
                         order.orderNumber
                       ) : (
                         <Link href={`/orders/${order.id}`} className="text-primary hover:underline">

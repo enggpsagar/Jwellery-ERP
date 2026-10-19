@@ -19,6 +19,7 @@ import type { DashboardStat } from "@/lib/actions/dashboard-actions"
 import { bulkDeleteKarigars, type Karigar } from "@/lib/actions/karigar-actions"
 import type { KarigarLedgerSummary } from "@/lib/actions/ledger-actions"
 import type { StoreMetalRow } from "@/lib/actions/taxonomy-actions"
+import { RecordDetailDialog, useRecordDialog } from "@/components/shared/record-detail-dialog"
 
 type PaginationInfo = {
   page: number
@@ -90,6 +91,9 @@ export function KarigarsClient({
   const [activeKarigarId, setActiveKarigarId] = React.useState<string | null>(
     karigars[0]?.id ?? null,
   )
+
+  // The record in the full pop-up (first-column click); null = closed.
+  const recordDialog = useRecordDialog(karigars)
 
   React.useEffect(() => {
     setSelectedKarigarIds([])
@@ -165,10 +169,19 @@ export function KarigarsClient({
             onSelectionChange={setSelectedKarigarIds}
             activeKarigarId={activeKarigarId}
             onActivate={setActiveKarigarId}
+            onOpen={recordDialog.open}
           />
         </div>
 
         <KarigarDetailPanel karigarId={activeKarigarId} />
+
+        <RecordDetailDialog
+          {...recordDialog.dialogProps}
+          title="Artisan details"
+          fullPageHref={recordDialog.openId ? `/karigars/${recordDialog.openId}` : undefined}
+        >
+          <KarigarDetailPanel karigarId={recordDialog.openId} />
+        </RecordDetailDialog>
       </div>
     </main>
   )

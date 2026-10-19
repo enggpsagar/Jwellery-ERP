@@ -6,6 +6,7 @@ import type { CreditNoteView } from "@/lib/actions/credit-note-actions"
 import { CreditNoteTable } from "@/components/billing/credit-note-table"
 import { CreditNoteDetailPanel } from "@/components/billing/credit-note-detail-panel"
 import { CreditNotesToolbar } from "@/components/billing/credit-notes-toolbar"
+import { RecordDetailDialog, useRecordDialog } from "@/components/shared/record-detail-dialog"
 
 type CreditNotesClientProps = {
   creditNotes: CreditNoteView[]
@@ -23,6 +24,9 @@ export function CreditNotesClient({ creditNotes }: CreditNotesClientProps) {
     creditNotes[0]?.id ?? null,
   )
 
+  // The record in the full pop-up (first-column click); null = closed.
+  const recordDialog = useRecordDialog(creditNotes)
+
   useEffect(() => {
     setActiveCreditNoteId((current) => {
       if (current && creditNotes.some((creditNote) => creditNote.id === current)) return current
@@ -39,9 +43,18 @@ export function CreditNotesClient({ creditNotes }: CreditNotesClientProps) {
           creditNotes={creditNotes}
           activeCreditNoteId={activeCreditNoteId}
           onActivate={setActiveCreditNoteId}
+          onOpen={recordDialog.open}
         />
 
         <CreditNoteDetailPanel creditNoteId={activeCreditNoteId} />
+
+        <RecordDetailDialog
+          {...recordDialog.dialogProps}
+          title="Credit note details"
+          fullPageHref={recordDialog.openId ? `/billing/credit-notes/${recordDialog.openId}` : undefined}
+        >
+          <CreditNoteDetailPanel creditNoteId={recordDialog.openId} />
+        </RecordDetailDialog>
       </div>
     </div>
   )

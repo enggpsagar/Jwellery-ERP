@@ -9,6 +9,7 @@ import { InvoicesToolbar } from "@/components/billing/invoices-toolbar"
 import { InvoiceDetailPanel } from "@/components/billing/invoice-detail-panel"
 import { DataTablePagination } from "@/components/shared/data-table-pagination"
 import type { LocationOption } from "@/components/shared/location-select"
+import { RecordDetailDialog, useRecordDialog } from "@/components/shared/record-detail-dialog"
 
 type InvoiceRow = {
   id: string
@@ -46,6 +47,9 @@ export function InvoicesClient({ invoices, locations, pagination }: InvoicesClie
   const [activeInvoiceId, setActiveInvoiceId] = React.useState<string | null>(
     invoices[0]?.id ?? null,
   )
+
+  // The record in the full pop-up (first-column click); null = closed.
+  const recordDialog = useRecordDialog(invoices)
 
   React.useEffect(() => {
     setActiveInvoiceId((current) => {
@@ -85,6 +89,7 @@ export function InvoicesClient({ invoices, locations, pagination }: InvoicesClie
             invoices={invoices}
             activeInvoiceId={activeInvoiceId}
             onActivate={setActiveInvoiceId}
+            onOpen={recordDialog.open}
           />
 
           {invoices.length > 0 ? (
@@ -100,6 +105,14 @@ export function InvoicesClient({ invoices, locations, pagination }: InvoicesClie
         </div>
 
         <InvoiceDetailPanel invoiceId={activeInvoiceId} locations={locations} />
+
+        <RecordDetailDialog
+          {...recordDialog.dialogProps}
+          title="Invoice details"
+          fullPageHref={recordDialog.openId ? `/billing/${recordDialog.openId}` : undefined}
+        >
+          <InvoiceDetailPanel invoiceId={recordDialog.openId} locations={locations} />
+        </RecordDetailDialog>
       </div>
     </main>
   )

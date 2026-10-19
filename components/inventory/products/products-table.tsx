@@ -8,6 +8,7 @@ import { DataTablePagination } from "@/components/shared/data-table-pagination"
 import { SortableTableHead } from "@/components/shared/sortable-table-head"
 import { cn } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
+import { OpenRecordButton } from "@/components/shared/record-detail-dialog"
 
 type ProductRow = {
   id: string
@@ -51,6 +52,8 @@ type ProductsTableProps = {
   /** Which row's detail is showing in the panel alongside this table — distinct from selectedIds, which is the bulk-action checkbox selection. */
   activeProductId?: string | null
   onActivate?: (id: string) => void
+  /** Clicking the first column opens the record's pop-up (RecordDetailDialog). */
+  onOpen?: (id: string) => void
   /** Sums across every product matching the current filters (all pages),
    *  from getProducts — shown as the table's footer row. */
   totals?: { grossWeight?: number; netWeight: number; fineWeight?: number; caratWeight?: number; stockQty: number }
@@ -64,6 +67,7 @@ export function ProductsTable({
   onSelectionChange,
   activeProductId,
   onActivate,
+  onOpen,
 }: ProductsTableProps) {
   const wf = useWeightFormat()
   const allIds = React.useMemo(() => products.map((product) => product.id), [products])
@@ -165,7 +169,11 @@ export function ProductsTable({
                   </td>
 
                   <td className="px-4 py-3 font-medium text-foreground">
-                    {onActivate ? (
+                    {onOpen ? (
+                      <OpenRecordButton onOpen={() => onOpen(product.id)}>
+                        {product.productCode}
+                      </OpenRecordButton>
+                    ) : onActivate ? (
                       product.productCode
                     ) : (
                       <Link

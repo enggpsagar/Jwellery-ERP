@@ -38,12 +38,15 @@ type KachaInvoiceTableProps = {
   kachaInvoices: KachaInvoiceRow[]
   selectedIds?: string[]
   onSelectionChange?: (ids: string[]) => void
+  /** Clicking the slip number opens the estimate's pop-up (RecordDetailDialog). */
+  onOpen?: (id: string) => void
 }
 
 export function KachaInvoiceTable({
   kachaInvoices,
   selectedIds = [],
   onSelectionChange,
+  onOpen,
 }: KachaInvoiceTableProps) {
   const allIds = React.useMemo(
     () => kachaInvoices.map((invoice) => invoice.id),
@@ -139,6 +142,7 @@ export function KachaInvoiceTable({
                   <RecordHoverCard
                     label={kachaInvoice.slipNumber}
                     href={`/billing/kacha/${kachaInvoice.id}`}
+                    onOpen={onOpen ? () => onOpen(kachaInvoice.id) : undefined}
                     title={kachaInvoice.slipNumber}
                     subtitle={kachaInvoice.customer?.name ?? undefined}
                     footerLabel="Open slip"

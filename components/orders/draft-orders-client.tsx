@@ -14,6 +14,7 @@ import {
   bulkDeleteDraftOrders,
   type DraftOrderRow,
 } from "@/lib/actions/draft-order-actions"
+import { RecordDetailDialog, useRecordDialog } from "@/components/shared/record-detail-dialog"
 
 const STATUS_OPTIONS = [
   { value: "DRAFT", label: "Draft" },
@@ -64,6 +65,9 @@ export function DraftOrdersClient({
   // matching every other master-detail list in the app.
   const [activeOrderId, setActiveOrderId] = React.useState<string | null>(orders[0]?.id ?? null)
 
+  // The record in the full pop-up (first-column click); null = closed.
+  const recordDialog = useRecordDialog(orders)
+
   React.useEffect(() => {
     setSelectedIds([])
     setActiveOrderId((current) => {
@@ -104,6 +108,7 @@ export function DraftOrdersClient({
           onSelectionChange={setSelectedIds}
           activeOrderId={activeOrderId}
           onActivate={setActiveOrderId}
+          onOpen={recordDialog.open}
         />
 
         <div className="rounded-b-xl border">
@@ -125,6 +130,20 @@ export function DraftOrdersClient({
         defaultLocationId={defaultLocationId}
         sendToArtisanEnabled={sendToArtisanEnabled}
       />
+
+      <RecordDetailDialog
+        {...recordDialog.dialogProps}
+        title="Draft order details"
+        fullPageHref={recordDialog.openId ? `/orders/${recordDialog.openId}` : undefined}
+      >
+        <DraftOrderDetailPanel
+          orderId={recordDialog.openId}
+          karigars={karigars}
+          locations={locations}
+          defaultLocationId={defaultLocationId}
+          sendToArtisanEnabled={sendToArtisanEnabled}
+        />
+      </RecordDetailDialog>
     </div>
   )
 }

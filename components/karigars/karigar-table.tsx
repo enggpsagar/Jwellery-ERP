@@ -34,6 +34,8 @@ type KarigarTableProps = {
   /** Which row's detail is showing in the panel alongside this table — distinct from selectedKarigarIds, which is the bulk-action checkbox selection. */
   activeKarigarId?: string | null
   onActivate?: (id: string) => void
+  /** Clicking the first column opens the record's pop-up (RecordDetailDialog). */
+  onOpen?: (id: string) => void
 }
 
 export function KarigarTable({
@@ -44,6 +46,7 @@ export function KarigarTable({
   onSelectionChange,
   activeKarigarId,
   onActivate,
+  onOpen,
 }: KarigarTableProps) {
   const wf = useWeightFormat()
   const allSelected =
@@ -131,6 +134,7 @@ export function KarigarTable({
                   <RecordHoverCard
                     label={karigar.name}
                     href={onActivate ? undefined : `/karigars/${karigar.id}`}
+                    onOpen={onOpen ? () => onOpen(karigar.id) : undefined}
                     title={karigar.name}
                     subtitle={karigar.code || undefined}
                     footerLabel="View artisan"

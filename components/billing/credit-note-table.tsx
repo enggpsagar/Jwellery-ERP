@@ -2,15 +2,18 @@ import Link from "next/link"
 
 import type { CreditNoteView } from "@/lib/actions/credit-note-actions"
 import { formatShortDate, cn } from "@/lib/utils"
+import { OpenRecordButton } from "@/components/shared/record-detail-dialog"
 
 type CreditNoteTableProps = {
   creditNotes: CreditNoteView[]
   /** Which row's detail is showing in the panel alongside this table — omit to keep every row as a plain navigation link. */
   activeCreditNoteId?: string | null
   onActivate?: (id: string) => void
+  /** Clicking the first column opens the record's pop-up (RecordDetailDialog). */
+  onOpen?: (id: string) => void
 }
 
-export function CreditNoteTable({ creditNotes, activeCreditNoteId, onActivate }: CreditNoteTableProps) {
+export function CreditNoteTable({ creditNotes, activeCreditNoteId, onActivate, onOpen }: CreditNoteTableProps) {
   if (!creditNotes.length) {
     return (
       <div className="rounded-xl border bg-card p-6 text-sm text-muted-foreground">
@@ -47,7 +50,11 @@ export function CreditNoteTable({ creditNotes, activeCreditNoteId, onActivate }:
                   )}
                 >
                   <td className="px-4 py-3 font-medium">
-                    {onActivate ? (
+                    {onOpen ? (
+                      <OpenRecordButton onOpen={() => onOpen(creditNote.id)}>
+                        {creditNote.creditNoteNumber}
+                      </OpenRecordButton>
+                    ) : onActivate ? (
                       creditNote.creditNoteNumber
                     ) : (
                       <Link

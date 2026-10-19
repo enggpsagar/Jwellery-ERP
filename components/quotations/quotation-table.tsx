@@ -41,6 +41,8 @@ type QuotationTableProps = {
   /** Which row's detail is showing in the panel alongside this table — distinct from selectedIds, which is the bulk-action checkbox selection. */
   activeQuotationId?: string | null
   onActivate?: (id: string) => void
+  /** Clicking the first column opens the record's pop-up (RecordDetailDialog). */
+  onOpen?: (id: string) => void
 }
 
 export function QuotationTable({
@@ -49,6 +51,7 @@ export function QuotationTable({
   onSelectionChange,
   activeQuotationId,
   onActivate,
+  onOpen,
 }: QuotationTableProps) {
   const allIds = useMemo(() => quotations.map((q) => q.id), [quotations])
 
@@ -149,6 +152,7 @@ export function QuotationTable({
                   <RecordHoverCard
                     label={quotation.quotationNumber}
                     href={onActivate ? undefined : `/quotations/${quotation.id}`}
+                    onOpen={onOpen ? () => onOpen(quotation.id) : undefined}
                     title={quotation.quotationNumber}
                     subtitle={quotation.customer?.name ?? undefined}
                     footerLabel="Open quotation"

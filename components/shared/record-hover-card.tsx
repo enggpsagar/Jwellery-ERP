@@ -8,6 +8,7 @@ import {
   HoverCardContent,
   HoverCardTrigger,
 } from "@/components/ui/hover-card"
+import { OpenRecordButton } from "@/components/shared/record-detail-dialog"
 
 /**
  * The summary-on-hover pattern from the stores list, made reusable.
@@ -52,6 +53,7 @@ export function RecordHoverCard({
   sections,
   footerLabel = "View details",
   className,
+  onOpen,
 }: {
   /** What shows in the table cell. */
   label: React.ReactNode
@@ -63,6 +65,8 @@ export function RecordHoverCard({
   sections: HoverSection[]
   footerLabel?: string
   className?: string
+  /** Clicking the label opens the record's pop-up (RecordDetailDialog) instead of navigating. */
+  onOpen?: () => void
 }) {
   // Drop empty fields here rather than at every call site, so a table can
   // pass its whole field list and let the card decide what is worth showing.
@@ -78,7 +82,11 @@ export function RecordHoverCard({
     }))
     .filter((section) => section.fields.length > 0)
 
-  const trigger = href ? (
+  const trigger = onOpen ? (
+    <OpenRecordButton onOpen={onOpen} className={className}>
+      {label}
+    </OpenRecordButton>
+  ) : href ? (
     // A link, so the record stays reachable by click and by keyboard —
     // focus opens the card, which makes this work without a pointer.
     <Link

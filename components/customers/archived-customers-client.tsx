@@ -8,6 +8,7 @@ import { PageBackHeader } from "@/components/shared/page-back-header"
 import { Input } from "@/components/ui/input"
 import { CustomersTable } from "@/components/customers/customers-table"
 import { ArchivedCustomerDetailPanel } from "@/components/customers/archived-customer-detail-panel"
+import { RecordDetailDialog, useRecordDialog } from "@/components/shared/record-detail-dialog"
 
 type StateItem = {
   id: string
@@ -47,6 +48,9 @@ export function ArchivedCustomersClient({
   const [activeCustomerId, setActiveCustomerId] = React.useState<string | null>(
     customers[0]?.id ?? null,
   )
+
+  // The record in the full pop-up (first-column click); null = closed.
+  const recordDialog = useRecordDialog(customers)
 
   React.useEffect(() => {
     setSelectedCustomerIds([])
@@ -91,6 +95,7 @@ export function ArchivedCustomersClient({
             onSelectionChange={setSelectedCustomerIds}
             activeCustomerId={activeCustomerId}
             onActivate={setActiveCustomerId}
+            onOpen={recordDialog.open}
           />
         </div>
 
@@ -98,6 +103,13 @@ export function ArchivedCustomersClient({
           customerId={activeCustomerId}
           states={states}
         />
+
+        <RecordDetailDialog
+          {...recordDialog.dialogProps}
+          title="Archived party details"
+        >
+          <ArchivedCustomerDetailPanel customerId={recordDialog.openId} states={states} />
+        </RecordDetailDialog>
       </div>
     </main>
   )

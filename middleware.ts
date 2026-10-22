@@ -188,8 +188,11 @@ export const config = {
   // below it exactly as before. "/" is listed on its own only so a signed-in
   // visitor can be redirected to /dashboard — the early `pathname === "/"`
   // branch in middleware() lets everyone else through.
+  // The platform icons are excluded too: emails use /apple-icon.png as their
+  // header logo, and Gmail's image proxy (no session) was being redirected
+  // to /login — an HTML page — so the logo rendered as a broken image.
   matcher: [
     "/",
-    "/((?!api|_next/static|_next/image|favicon.ico|login|register|contact|faq).+)",
+    "/((?!api|_next/static|_next/image|favicon.ico|apple-icon.png|icon.svg|icon-light-32x32.png|icon-dark-32x32.png|login|register|contact|faq).+)",
   ],
 };

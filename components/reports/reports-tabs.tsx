@@ -84,6 +84,8 @@ type GoldFlow = {
 type MetalWiseRow = {
   metalId: string
   metalName: string
+  /** "ct" = a gemstone row, every weight in carats (loose + set stones). */
+  unit: "g" | "ct"
   purchasedCount: number
   purchasedWeight: number
   purchasedAmount: number
@@ -1297,7 +1299,8 @@ export function ReportsTabs({
             One row per metal your store has configured in Settings → Metals &amp; Categories —
             add a new metal there and it appears here automatically, no code change needed.
             All weights below are fine weight (pure 24K / 999 equivalent, g) — 100 g of 22K counts
-            as 91.6 g; a metal without a purity (e.g. a gemstone) counts at its own weight.
+            as 91.6 g. A gemstone row is in carats (ct) instead — every stone of that kind, loose
+            or set in a metal piece.
           </p>
 
           <ReportSearchBar
@@ -1327,7 +1330,11 @@ export function ReportsTabs({
                     </td>
                   </tr>
                 ) : (
-                  metalWiseTable.pageRows.map((row) => (
+                  metalWiseTable.pageRows.map((row) => {
+                    // Weight in this row's own unit: fine grams, or carats for a gemstone.
+                    const w = (value: number) => (row.unit === "ct" ? `${wf.ct(value)} ct` : `${wf.g(value)} g`)
+                    const wCell = (value: number) => (row.unit === "ct" ? `${wf.ct(value)} ct` : `${wf.g(value)}g`)
+                    return (
                     <tr key={row.metalId} className="border-b last:border-0 align-top">
                       <td className="px-4 py-3 font-medium">
                         {/* The row splits each metal across five columns;
@@ -1335,21 +1342,21 @@ export function ReportsTabs({
                         <RecordHoverCard
                           label={row.metalName}
                           title={row.metalName}
-                          subtitle="Metal position (fine 24K, g)"
+                          subtitle={row.unit === "ct" ? "Stone position (carats, loose + set)" : "Metal position (fine 24K, g)"}
                           sections={[
                             {
                               fields: [
                                 {
                                   label: "Purchased",
-                                  value: `${wf.g(row.purchasedWeight)} g · ${row.purchasedCount}`,
+                                  value: `${w(row.purchasedWeight)} · ${row.purchasedCount}`,
                                 },
                                 {
                                   label: "Sold",
-                                  value: `${wf.g(row.soldWeight)} g · ${row.soldCount}`,
+                                  value: `${w(row.soldWeight)} · ${row.soldCount}`,
                                 },
                                 {
                                   label: "In stock",
-                                  value: `${wf.g(row.inStockWeight)} g · ${row.inStockCount}`,
+                                  value: `${w(row.inStockWeight)} · ${row.inStockCount}`,
                                 },
                               ],
                             },
@@ -1364,24 +1371,30 @@ export function ReportsTabs({
                         />
                       </td>
                       <td className="px-4 py-3">
-                        <div>{wf.g(row.purchasedWeight)}g</div>
+                        <div>{wCell(row.purchasedWeight)}</div>
                         <div className="text-xs text-muted-foreground">
                           {row.purchasedCount} item(s) · ₹{row.purchasedAmount.toFixed(2)}
                         </div>
                       </td>
                       <td className="px-4 py-3">
-                        <div>{wf.g(row.soldWeight)}g</div>
+                        <div>{wCell(row.soldWeight)}</div>
                         <div className="text-xs text-muted-foreground">
                           {row.soldCount} item(s) · ₹{row.soldAmount.toFixed(2)}
                         </div>
                       </td>
                       <td className="px-4 py-3">
-                        <div>{wf.g(row.inStockWeight)}g</div>
+                        <div>{wCell(row.inStockWeight)}</div>
                         <div className="text-xs text-muted-foreground">
                           {row.inStockCount} item(s) · ₹{row.inStockValue.toFixed(2)}
                         </div>
                       </td>
-                      <td className="px-4 py-3">{wf.g(row.withKarigarWeight)}g</td>
+                      <td className="px-4 py-3">
+                        {row.unit === "ct" ? (
+                          <span className="text-muted-foreground" title="Artisan jobs are weighed in grams, not carats">—</span>
+                        ) : (
+                          `${wf.g(row.withKarigarWeight)}g`
+                        )}
+                      </td>
                       <td className="px-4 py-3">
                         <span
                           className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ${
@@ -1391,12 +1404,13 @@ export function ReportsTabs({
                           }`}
                         >
                           {Math.abs(row.reconciliationGap) > 0.01
-                            ? `Gap: ${wf.g(row.reconciliationGap)}g`
+                            ? `Gap: ${wCell(row.reconciliationGap)}`
                             : "Reconciled"}
                         </span>
                       </td>
                     </tr>
-                  ))
+                    )
+                  })
                 )}
               </tbody>
             </table>

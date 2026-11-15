@@ -630,7 +630,7 @@ Playwright suite in `e2e/`, run by `.github/workflows/regression.yml` on every p
 
 - A stone is kept on a stock row / purchase line **by name** (`stoneMetalTypeName` + `caratWeight`), or as STONE `PieceComponent`s on a multi-part piece; a loose stone's stock row has `metalTypeId: null`. So the dashboard's per-metal stock cards (by `metalTypeId`) never counted any stone. `stoneBreakdown(row)` (`lib/piece-components.ts`) is now the one reader: STONE components if present, else the row's own stone — never both (the parent's caratWeight is a summary). Gemstone (`isGemstone`) cards total carats from loose + set stones and show "ct".
 - Supplier Ledger "Metal Purchased" used to take a line's metal **or** its stone; a gold piece with a stone now lists both, and multi-part lines list each row.
-- Not done: the Metal-wise report and metal daily ledger still ignore set stones (their reconciliation is per metalTypeId, in grams).
+- 2026-11-15: the Metal-wise report (`getMetalWiseReport`) and metal daily ledger (`getMetalDailyLedger`) now count gemstones (`isGemstone`) in carats from loose and set stones, via `gemstoneCarats(row, metal)` (`lib/piece-components.ts`, also behind the dashboard cards) × the line's / stock row's quantity. A loose stone (no metal) is counted — and its amount credited — under its gemstone, not "Unassigned". Gemstone rows show "ct" (`MetalWiseRow.unit`; export names the metal "X (ct)"); artisan jobs are weighed in grams, so a gemstone's With Artisan stays empty. Metal rows are unchanged. e2e: `reports.spec.ts`.
 - Rich row tooltips open beside the row (`side="left"` on the Supplier Ledger date, `side="right"` on FinishBadge) so they don't cover the table.
 
 ### Changed 2026-10-13: one Party, one ledger, one net balance

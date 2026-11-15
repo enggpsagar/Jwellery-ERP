@@ -6,8 +6,8 @@ import { InventoryStockStatus, InventoryTransactionType, InvoiceStatus, UserRole
 import { prisma } from "@/lib/prisma";
 import { requireStoreScope } from "@/lib/store-context";
 import { getLocationScope, locationWhere } from "@/lib/location-scope";
-import { fineOrNet, pieceMetalsSelect } from "@/lib/fine-weight-read";
-import { metalBreakdown } from "@/lib/piece-components";
+import { fineOrNet, piecePartsSelect, pieceMetalsSelect, pieceStonesSelect } from "@/lib/fine-weight-read";
+import { gemstoneCarats, looseStoneGemstone, metalBreakdown, type GemstoneCaratRow } from "@/lib/piece-components";
 import { ROLE_LABELS } from "@/lib/roles";
 import { financialYearStartOf } from "@/lib/date-range";
 import { getPartyNetBalances } from "@/lib/core/customer";
@@ -561,6 +561,9 @@ export async function getGoldFlowReport(range: DateRange = {}) {
 type MetalWiseRow = {
   metalId: string;
   metalName: string;
+  /** "ct" for a gemstone (isGemstone) row — every weight column of that row
+   * is carats of stone, loose and set; "g" (fine grams) otherwise. */
+  unit: "g" | "ct";
   purchasedCount: number;
   purchasedWeight: number;
   purchasedAmount: number;
@@ -574,10 +577,11 @@ type MetalWiseRow = {
   reconciliationGap: number;
 };
 
-function emptyMetalWiseRow(metalId: string, metalName: string): MetalWiseRow {
+function emptyMetalWiseRow(metalId: string, metalName: string, unit: "g" | "ct" = "g"): MetalWiseRow {
   return {
     metalId,
     metalName,
+    unit,
     purchasedCount: 0,
     purchasedWeight: 0,
     purchasedAmount: 0,
@@ -601,6 +605,15 @@ function emptyMetalWiseRow(metalId: string, metalName: string): MetalWiseRow {
  * appear here automatically on the next load — nothing here is hardcoded
  * to Gold/Silver. Purchased/sold are date-ranged; in-stock/with-karigar
  * are point-in-time (current), same convention as getGoldFlowReport.
+ *
+ * A gemstone (StoreMetal.isGemstone) row is in carats instead (`unit: "ct"`):
+ * every stone of that name, loose or set in a metal piece, via
+ * gemstoneCarats (lib/piece-components.ts — STONE components if present,
+ * else the row's own stone), × the line's / stock row's quantity (carats are
+ * per piece). A loose stone line / stock row (no metal of its own) counts
+ * under its gemstone, not "Unassigned". Artisan jobs are weighed in grams
+ * with no carats, so a gemstone row's With Artisan stays 0. Non-gemstone
+ * rows are computed exactly as before.
  */
 export async function getMetalWiseReport(range: DateRange = {}) {
   const storeId = await requireStoreScope();
@@ -617,13 +630,31 @@ export async function getMetalWiseReport(range: DateRange = {}) {
         where: {
           purchase: { storeId, ...locationWhere(scope), ...toDateRangeWhere(range, "purchaseDate") },
         },
-        select: { metalTypeId: true, netWeight: true, fineWeight: true, lineTotal: true, components: pieceMetalsSelect },
+        select: {
+          metalTypeId: true,
+          netWeight: true,
+          fineWeight: true,
+          lineTotal: true,
+          quantity: true,
+          caratWeight: true,
+          stoneMetalTypeName: true,
+          components: piecePartsSelect,
+        },
       }),
       prisma.invoiceItem.findMany({
         where: {
           invoice: { storeId, ...locationWhere(scope), ...toDateRangeWhere(range, "invoiceDate") },
         },
-        select: { metalTypeId: true, netWeight: true, fineWeight: true, lineTotal: true, components: pieceMetalsSelect },
+        select: {
+          metalTypeId: true,
+          netWeight: true,
+          fineWeight: true,
+          lineTotal: true,
+          quantity: true,
+          caratWeight: true,
+          stoneMetalTypeName: true,
+          components: piecePartsSelect,
+        },
       }),
       prisma.kachaInvoiceItem.findMany({
         where: {
@@ -633,7 +664,19 @@ export async function getMetalWiseReport(range: DateRange = {}) {
             ...toDateRangeWhere(range, "invoiceDate"),
           },
         },
-        select: { metalTypeId: true, netWeight: true, fineWeight: true, lineTotal: true },
+        // STONE components only: this report never read a Kacha line's metal
+        // components, and metalBreakdown ignores STONE rows, so its metal
+        // weights are unchanged.
+        select: {
+          metalTypeId: true,
+          netWeight: true,
+          fineWeight: true,
+          lineTotal: true,
+          quantity: true,
+          caratWeight: true,
+          stoneMetalTypeName: true,
+          components: pieceStonesSelect,
+        },
       }),
       prisma.inventoryStock.findMany({
         where: {
@@ -648,7 +691,9 @@ export async function getMetalWiseReport(range: DateRange = {}) {
           saleRate: true,
           quantity: true,
           purchaseAmount: true,
-          components: pieceMetalsSelect,
+          caratWeight: true,
+          stoneMetalTypeName: true,
+          components: piecePartsSelect,
         },
       }),
       prisma.karigarJob.findMany({
@@ -658,8 +703,26 @@ export async function getMetalWiseReport(range: DateRange = {}) {
     ]);
 
   const byMetal = new Map<string, MetalWiseRow>(
-    metals.map((metal) => [metal.id, emptyMetalWiseRow(metal.id, metal.name)]),
+    metals.map((metal) => [metal.id, emptyMetalWiseRow(metal.id, metal.name, metal.isGemstone ? "ct" : "g")]),
   );
+  const gemstones = metals.filter((metal) => metal.isGemstone);
+  const gemstoneIds = new Set(gemstones.map((metal) => metal.id));
+
+  /** Fine grams of the row's metals, gemstone rows excluded (they're in ct). */
+  function eachMetalPart(item: GemstoneCaratRow, add: (row: MetalWiseRow, fine: number) => void) {
+    for (const part of metalBreakdown(item)) {
+      if (part.metalTypeId && gemstoneIds.has(part.metalTypeId)) continue;
+      add(getRow(part.metalTypeId), part.fineWeight);
+    }
+  }
+
+  /** Carats of each gemstone in the row, × quantity (carats are per piece). */
+  function eachGemstone(item: GemstoneCaratRow, quantity: number, add: (row: MetalWiseRow, carats: number) => void) {
+    for (const gem of gemstones) {
+      const carats = gemstoneCarats(item, gem) * (quantity || 1);
+      if (carats > 0) add(getRow(gem.id), carats);
+    }
+  }
 
   function getRow(metalTypeId: string | null) {
     const key = metalTypeId ?? "unassigned";
@@ -674,34 +737,44 @@ export async function getMetalWiseReport(range: DateRange = {}) {
   // Weights go metal by metal (a piece of several metals credits each
   // metal its own pure weight — metalBreakdown); count/amount stay with the
   // line's first metal.
+  // A loose stone (no metal of its own) is counted under its gemstone.
   for (const item of purchaseItems) {
-    const row = getRow(item.metalTypeId);
+    const loose = looseStoneGemstone(item, gemstones);
+    const row = getRow(loose ? loose.id : item.metalTypeId);
     row.purchasedCount += 1;
     row.purchasedAmount += Number(item.lineTotal ?? 0);
-    for (const part of metalBreakdown(item)) getRow(part.metalTypeId).purchasedWeight += part.fineWeight;
+    if (!loose) eachMetalPart(item, (target, fine) => (target.purchasedWeight += fine));
+    eachGemstone(item, item.quantity, (target, carats) => (target.purchasedWeight += carats));
   }
 
   for (const item of [...invoiceItems, ...kachaInvoiceItems]) {
-    const row = getRow(item.metalTypeId);
+    const loose = looseStoneGemstone(item, gemstones);
+    const row = getRow(loose ? loose.id : item.metalTypeId);
     row.soldCount += 1;
     row.soldAmount += Number(item.lineTotal ?? 0);
-    for (const part of metalBreakdown(item)) getRow(part.metalTypeId).soldWeight += part.fineWeight;
+    if (!loose) eachMetalPart(item, (target, fine) => (target.soldWeight += fine));
+    eachGemstone(item, item.quantity, (target, carats) => (target.soldWeight += carats));
   }
 
   for (const stock of stockRows) {
-    const row = getRow(stock.metalTypeId);
+    const loose = looseStoneGemstone(stock, gemstones);
+    const row = getRow(loose ? loose.id : stock.metalTypeId);
     row.inStockCount += 1;
     // netWeight is per-unit — inStockValue two lines below already
     // multiplies by quantity; this didn't, undercounting any stock row
     // with more than 1 piece (and skewing reconciliationGap below to look
     // like unexplained shrinkage that was actually just this bug).
-    for (const part of metalBreakdown(stock)) getRow(part.metalTypeId).inStockWeight += part.fineWeight * stock.quantity;
+    if (!loose) eachMetalPart(stock, (target, fine) => (target.inStockWeight += fine * stock.quantity));
+    eachGemstone(stock, stock.quantity, (target, carats) => (target.inStockWeight += carats));
     row.inStockValue += stock.saleRate
       ? Number(stock.saleRate) * stock.quantity
       : Number(stock.purchaseAmount ?? 0);
   }
 
   for (const job of openKarigarJobs) {
+    // Artisan jobs are weighed in grams (no carats) — not added to a
+    // gemstone row, whose columns are carats.
+    if (job.metalTypeId && gemstoneIds.has(job.metalTypeId)) continue;
     const row = getRow(job.metalTypeId);
     row.withKarigarWeight += Number(job.issueFineWeight ?? job.issueWeight ?? 0);
   }

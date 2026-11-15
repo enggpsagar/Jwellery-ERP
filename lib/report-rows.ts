@@ -186,15 +186,17 @@ export async function getReportRows(type: ReportType, range: DateRange) {
     }
     case "metalWise": {
       const report = await getMetalWiseReport(range)
+      // A gemstone row's weights are carats (loose + set stones); its name
+      // says so, so the metal rows' columns stay exactly as they were.
       return report.metals.map((row) => ({
-        Metal: row.metalName,
+        Metal: row.unit === "ct" ? `${row.metalName} (ct)` : row.metalName,
         "Purchased Fine Wt 24K (g)": g(row.purchasedWeight),
         "Purchased Amount (₹)": row.purchasedAmount,
         "Sold Fine Wt 24K (g)": g(row.soldWeight),
         "Sold Amount (₹)": row.soldAmount,
         "In Stock Fine Wt 24K (g)": g(row.inStockWeight),
         "In Stock Value (₹)": row.inStockValue,
-        "With Artisan Fine Wt 24K (g)": g(row.withKarigarWeight),
+        "With Artisan Fine Wt 24K (g)": row.unit === "ct" ? "" : g(row.withKarigarWeight),
         "Reconciliation Gap (fine g)": g(row.reconciliationGap),
       }))
     }

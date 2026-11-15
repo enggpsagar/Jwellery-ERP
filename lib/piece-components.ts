@@ -415,6 +415,46 @@ export function stoneBreakdown(row: {
   return parts.filter((part) => part.name && part.carats > 0)
 }
 
+/** A stored row as gemstoneCarats reads it (metal and stone fields). */
+export type GemstoneCaratRow = Parameters<typeof metalBreakdown>[0] & Parameters<typeof stoneBreakdown>[0]
+
+/**
+ * Carats of one gemstone (a StoreMetal with isGemstone) in a stored line /
+ * stock row, per piece (same basis as the row): every stone of that name in
+ * it — a loose stone (its row carries the stone, metalTypeId null) or one set
+ * in a metal piece (the row's own stone, or its STONE components — never
+ * both, see stoneBreakdown). An older row stocked directly under the
+ * gemstone with no stone recorded falls back to its own carat weight, else
+ * its net weight. Shared by the dashboard's gemstone cards, the Metal-wise
+ * report and the metal daily ledger.
+ */
+export function gemstoneCarats(row: GemstoneCaratRow, metal: { id: string; name: string }): number {
+  const name = metal.name.trim().toLowerCase()
+  const carats = stoneBreakdown(row)
+    .filter((part) => part.name.toLowerCase() === name)
+    .reduce((acc, part) => acc + part.carats, 0)
+  if (carats > 0 || row.metalTypeId !== metal.id) return carats
+  const own = Number(row.caratWeight ?? 0)
+  if (Number.isFinite(own) && own > 0) return own
+  return metalBreakdown(row)
+    .filter((part) => part.metalTypeId === metal.id)
+    .reduce((acc, part) => acc + part.fineWeight, 0)
+}
+
+/**
+ * The gemstone a loose stone row belongs to: a row with no metal of its own
+ * (metalTypeId null) whose first stone names one of `gemstones`. Null for
+ * anything else. Lets a report credit a loose stone's count / amount to its
+ * gemstone instead of an "Unassigned" bucket.
+ */
+export function looseStoneGemstone<T extends { name: string }>(row: GemstoneCaratRow, gemstones: T[]): T | null {
+  if (row.metalTypeId) return null
+  const first = stoneBreakdown(row)[0]
+  if (!first) return null
+  const name = first.name.toLowerCase()
+  return gemstones.find((gem) => gem.name.trim().toLowerCase() === name) ?? null
+}
+
 /** All metals' pure weight together (for totals that don't split by metal). */
 export function totalFine(row: Parameters<typeof metalBreakdown>[0]) {
   return metalBreakdown(row).reduce((sum, part) => sum + part.fineWeight, 0)

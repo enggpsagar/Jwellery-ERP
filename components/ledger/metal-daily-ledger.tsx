@@ -71,7 +71,7 @@ export function MetalDailyLedger({ data }: MetalDailyLedgerProps) {
           <div className="flex flex-col gap-1">
             <CardTitle>Metal-wise Daily Ledger</CardTitle>
             <CardDescription>
-              Purchased, sold, and running closing balance per unit, by day. Metal weights are fine (pure 24K / 999) grams — 100 g of 22K counts as 91.6 g.
+              Purchased, sold, and running closing balance per unit, by day. Metal weights are fine (pure 24K / 999) grams — 100 g of 22K counts as 91.6 g. Stones are in carats — loose and set in pieces alike.
             </CardDescription>
           </div>
           <ExportMenu href="/ledger/export?scope=metal-wise" label="Export" iconOnly />

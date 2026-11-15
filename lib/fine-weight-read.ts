@@ -33,3 +33,26 @@ export function fineOrNet(row: {
   const num = Number(value);
   return Number.isFinite(num) ? num : 0;
 }
+
+/** Prisma `select` for every PieceComponent of a row, metals and stones —
+ *  what metalBreakdown (reads METAL rows only, so it's interchangeable with
+ *  pieceMetalsSelect there) and stoneBreakdown / gemstoneCarats
+ *  (lib/piece-components.ts, read STONE rows) need together. */
+export const piecePartsSelect = {
+  select: {
+    kind: true,
+    metalTypeId: true,
+    netWeight: true,
+    fineWeight: true,
+    stoneMetalTypeName: true,
+    caratWeight: true,
+  },
+};
+
+/** Only a row's STONE PieceComponents — for a query that must not start
+ *  reading metal components it didn't read before (metalBreakdown ignores
+ *  STONE rows, so the row's own metal still counts as it did). */
+export const pieceStonesSelect = {
+  where: { kind: "STONE" as const },
+  select: { kind: true, stoneMetalTypeName: true, caratWeight: true },
+};

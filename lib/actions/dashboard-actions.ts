@@ -10,7 +10,7 @@ import { getLocationScope, locationWhere } from "@/lib/location-scope";
 import { formatShortDateTime } from "@/lib/utils";
 import { parseDateRangeBoundary } from "@/lib/date-range";
 import { fineOrNet, pieceMetalsSelect } from "@/lib/fine-weight-read";
-import { metalBreakdown, stoneBreakdown } from "@/lib/piece-components";
+import { gemstoneCarats, metalBreakdown, stoneBreakdown } from "@/lib/piece-components";
 import { getPartyNetBalances } from "@/lib/core/customer";
 import { partyBalanceDirection, partyBalanceTotals } from "@/lib/party-balance";
 
@@ -110,19 +110,9 @@ function metalFineOf(row: StockWeightRow, metalId: string) {
     .reduce((acc, part) => acc + part.fineWeight, 0);
 }
 
-/**
- * Carats of this gemstone in a piece: every stone of that name in it — a
- * loose stone (its stock row carries the stone, metalTypeId null) or one
- * set in a metal piece. An older row stocked directly under the gemstone
- * with no stone recorded falls back to its own carat / net weight.
- */
+/** Carats of this gemstone in a piece — lib/piece-components.ts gemstoneCarats. */
 function stoneCaratsOf(row: StockWeightRow, metal: { id: string; name: string }) {
-  const name = metal.name.trim().toLowerCase();
-  const carats = stoneBreakdown(row)
-    .filter((part) => part.name.toLowerCase() === name)
-    .reduce((acc, part) => acc + part.carats, 0);
-  if (carats > 0 || row.metalTypeId !== metal.id) return carats;
-  return Number(row.caratWeight ?? 0) || metalFineOf(row, metal.id);
+  return gemstoneCarats(row, metal);
 }
 
 export async function getDashboardStats(): Promise<DashboardStat[]> {

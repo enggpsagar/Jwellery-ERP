@@ -11,8 +11,8 @@ import { ledgerEntryMatches } from "@/lib/ledger-filters"
 import { MONEY_UNIT } from "@/lib/business-units"
 import { getActiveBusinessUnits, type BusinessUnitOption } from "@/lib/business-units.server"
 import { formatShortDate } from "@/lib/utils"
-import { fineOrNet, pieceMetalsSelect } from "@/lib/fine-weight-read"
-import { metalBreakdown } from "@/lib/piece-components"
+import { fineOrNet, piecePartsSelect, pieceStonesSelect } from "@/lib/fine-weight-read"
+import { gemstoneCarats, looseStoneGemstone, metalBreakdown, type GemstoneCaratRow } from "@/lib/piece-components"
 
 export type LedgerEntryRow = {
   id: string
@@ -743,6 +743,11 @@ export type MetalDailyLedgerResult = {
  * classifyMetalName name-guess, is the right join key here) — a metal
  * outside the store's configured units is omitted, same as before. Only
  * days with actual purchase/sale activity are included.
+ *
+ * A gemstone unit (isGemstone) is in carats: every stone of its name on the
+ * line — loose, or set in a metal piece (STONE components if present, else
+ * the line's own stone) — × the line's quantity, via gemstoneCarats. A loose
+ * stone line's amount goes to its gemstone. Metal units are unchanged.
  */
 export async function getMetalDailyLedger(): Promise<MetalDailyLedgerResult> {
   const storeId = await requireStoreScope()
@@ -753,6 +758,13 @@ export async function getMetalDailyLedger(): Promise<MetalDailyLedgerResult> {
   }
   const unitById = new Map(activeUnits.map((unit) => [unit.value, unit]))
   const activeMetalIds = activeUnits.map((unit) => unit.value)
+  const activeMetalIdSet = new Set(activeMetalIds)
+  // Gemstone units count stones by name (loose, or set in a metal piece).
+  const gemstones = activeUnits.filter((unit) => unit.isGemstone).map((unit) => ({ id: unit.value, name: unit.label }))
+  const stoneWhere = gemstones.flatMap((gem) => [
+    { stoneMetalTypeName: { equals: gem.name, mode: "insensitive" as const } },
+    { components: { some: { kind: "STONE" as const, stoneMetalTypeName: { equals: gem.name, mode: "insensitive" as const } } } },
+  ])
 
   const scope = await getLocationScope()
 
@@ -760,45 +772,63 @@ export async function getMetalDailyLedger(): Promise<MetalDailyLedgerResult> {
     prisma.purchaseItem.findMany({
       where: {
         purchase: { storeId, ...locationWhere(scope) },
-        // A piece of several metals counts under each of its metals.
-        OR: [{ metalTypeId: { in: activeMetalIds } }, { components: { some: { metalTypeId: { in: activeMetalIds } } } }],
+        // A piece of several metals counts under each of its metals; a
+        // stone under its gemstone unit wherever it sits.
+        OR: [
+          { metalTypeId: { in: activeMetalIds } },
+          { components: { some: { metalTypeId: { in: activeMetalIds } } } },
+          ...stoneWhere,
+        ],
       },
       select: {
         netWeight: true,
         fineWeight: true,
         caratWeight: true,
+        stoneMetalTypeName: true,
+        quantity: true,
         lineTotal: true,
         metalTypeId: true,
-        components: pieceMetalsSelect,
+        components: piecePartsSelect,
         purchase: { select: { purchaseDate: true } },
       },
     }),
     prisma.invoiceItem.findMany({
       where: {
         invoice: { storeId, status: { not: InvoiceStatus.CANCELLED }, ...locationWhere(scope) },
-        OR: [{ metalTypeId: { in: activeMetalIds } }, { components: { some: { metalTypeId: { in: activeMetalIds } } } }],
+        OR: [
+          { metalTypeId: { in: activeMetalIds } },
+          { components: { some: { metalTypeId: { in: activeMetalIds } } } },
+          ...stoneWhere,
+        ],
       },
       select: {
         netWeight: true,
         fineWeight: true,
         caratWeight: true,
+        stoneMetalTypeName: true,
+        quantity: true,
         lineTotal: true,
         metalTypeId: true,
-        components: pieceMetalsSelect,
+        components: piecePartsSelect,
         invoice: { select: { invoiceDate: true } },
       },
     }),
     prisma.kachaInvoiceItem.findMany({
       where: {
         kachaInvoice: { storeId, ...locationWhere(scope) },
-        metalTypeId: { in: activeMetalIds },
+        OR: [{ metalTypeId: { in: activeMetalIds } }, ...stoneWhere],
       },
       select: {
         netWeight: true,
         fineWeight: true,
         caratWeight: true,
+        stoneMetalTypeName: true,
+        quantity: true,
         lineTotal: true,
         metalTypeId: true,
+        // STONE rows only: a Kacha line's metal components were never read
+        // here (metalBreakdown ignores STONE rows, so metals are unchanged).
+        components: pieceStonesSelect,
         kachaInvoice: { select: { invoiceDate: true } },
       },
     }),
@@ -825,14 +855,26 @@ export async function getMetalDailyLedger(): Promise<MetalDailyLedgerResult> {
     return entry
   }
 
-  // A gemstone unit is carat-based, not weight-based — its "quantity" is
-  // caratWeight, never the line's rupee amount. Any other unit totals fine
-  // (pure 24K/999) weight, never the physical net weight.
-  function valueFor(
-    unit: BusinessUnitOption,
-    item: { netWeight: unknown; fineWeight: unknown; caratWeight: unknown },
-  ) {
-    return unit.isGemstone ? Number(item.caratWeight ?? 0) : fineOrNet(item)
+  // A metal unit totals fine (pure 24K/999) weight, never the physical net
+  // weight. A gemstone unit is carat-based — see addGemstoneCarats.
+  function valueFor(item: { netWeight: unknown; fineWeight: unknown }) {
+    return fineOrNet(item)
+  }
+
+  type LineRow = Parameters<typeof metalBreakdown>[0] & GemstoneCaratRow
+
+  /** METAL components only — a line's STONE rows don't make it multi-metal. */
+  function hasMetalParts(item: LineRow) {
+    return (item.components ?? []).some((component) => component.kind === "METAL")
+  }
+
+  /** Matched the query before stones were counted — such a line always
+   * opened its day (kept so metal-only days are exactly as before). */
+  function matchedMetalFilter(item: LineRow) {
+    return (
+      (item.metalTypeId != null && activeMetalIdSet.has(item.metalTypeId)) ||
+      (item.components ?? []).some((component) => component.kind === "METAL" && component.metalTypeId != null && activeMetalIdSet.has(component.metalTypeId))
+    )
   }
 
   // A piece of several metals credits each metal its own pure weight; its
@@ -848,34 +890,56 @@ export async function getMetalDailyLedger(): Promise<MetalDailyLedgerResult> {
     }
   }
 
+  /** Carats of every gemstone unit in the line (loose or set), × quantity
+   * — carats are per piece (lib/piece-components.ts gemstoneCarats). */
+  function addGemstoneCarats(
+    dateISO: string,
+    item: LineRow & { quantity: number },
+    add: (entry: ReturnType<typeof unitTotals>, carats: number) => void,
+  ) {
+    for (const gem of gemstones) {
+      const carats = gemstoneCarats(item, gem) * (item.quantity || 1)
+      if (carats > 0) add(unitTotals(dayTotals(dateISO), gem.id), carats)
+    }
+  }
+
+  /** The unit a line's amount goes to: its own metal, or for a loose stone
+   * (no metal of its own) its gemstone. */
+  function amountUnit(item: LineRow) {
+    if (item.metalTypeId) return unitById.get(item.metalTypeId)
+    const loose = looseStoneGemstone(item, gemstones)
+    return loose ? unitById.get(loose.id) : undefined
+  }
+
   for (const item of purchaseItems) {
     const dateISO = item.purchase.purchaseDate.toISOString().slice(0, 10)
-    const totals = dayTotals(dateISO)
-    addMetalParts(totals, item, (entry, fine) => (entry.purchasedValue += fine))
-    if (!item.metalTypeId) continue
-    const unit = unitById.get(item.metalTypeId)
+    if (matchedMetalFilter(item)) {
+      const totals = dayTotals(dateISO)
+      addMetalParts(totals, item, (entry, fine) => (entry.purchasedValue += fine))
+    }
+    addGemstoneCarats(dateISO, item, (entry, carats) => (entry.purchasedValue += carats))
+    const unit = amountUnit(item)
     if (!unit) continue
 
-    const amount = Number(item.lineTotal ?? 0)
-    const entry = unitTotals(totals, unit.value)
-    entry.purchasedValue += item.components?.length ? metalBreakdown(item)[0].fineWeight : valueFor(unit, item)
-    entry.purchasedAmount += amount
+    const entry = unitTotals(dayTotals(dateISO), unit.value)
+    if (!unit.isGemstone) entry.purchasedValue += hasMetalParts(item) ? metalBreakdown(item)[0].fineWeight : valueFor(item)
+    entry.purchasedAmount += Number(item.lineTotal ?? 0)
   }
 
   for (const item of [...invoiceItems, ...kachaInvoiceItems]) {
     const invoiceDate = "invoice" in item ? item.invoice.invoiceDate : item.kachaInvoice.invoiceDate
     const dateISO = invoiceDate.toISOString().slice(0, 10)
-    const totals = dayTotals(dateISO)
-    const components = "components" in item ? item.components : []
-    addMetalParts(totals, { ...item, components }, (entry, fine) => (entry.soldValue += fine))
-    if (!item.metalTypeId) continue
-    const unit = unitById.get(item.metalTypeId)
+    if (matchedMetalFilter(item)) {
+      const totals = dayTotals(dateISO)
+      addMetalParts(totals, item, (entry, fine) => (entry.soldValue += fine))
+    }
+    addGemstoneCarats(dateISO, item, (entry, carats) => (entry.soldValue += carats))
+    const unit = amountUnit(item)
     if (!unit) continue
 
-    const amount = Number(item.lineTotal ?? 0)
-    const entry = unitTotals(totals, unit.value)
-    entry.soldValue += components.length ? metalBreakdown({ ...item, components })[0].fineWeight : valueFor(unit, item)
-    entry.soldAmount += amount
+    const entry = unitTotals(dayTotals(dateISO), unit.value)
+    if (!unit.isGemstone) entry.soldValue += hasMetalParts(item) ? metalBreakdown(item)[0].fineWeight : valueFor(item)
+    entry.soldAmount += Number(item.lineTotal ?? 0)
   }
 
   const sortedDays = Array.from(byDay.keys()).sort()

@@ -22,8 +22,7 @@ import { prisma } from "@/lib/prisma";
 import { METALS_AND_STONES_COLUMN, describePieceComponentsText } from "@/lib/piece-components-text";
 import { getWeightFormat } from "@/lib/weight-settings.server";
 import { getFineWeightResolver, lineWeights, storedLineWeights } from "@/lib/fine-weight";
-import { lookupPromotionCode } from "@/lib/promotions.server";
-import { computePromotion, type PromotionLine } from "@/lib/promotions";
+import { resolveDocumentPromotion } from "@/lib/promotions.server";
 import {
   getPieceResolver,
   resolveLineStoneDetails,
@@ -385,26 +384,16 @@ async function resolveInvoicePromotion(
   items: InvoiceLineItemInput[],
   rawCode: string,
 ): Promise<{ error: string } | { promotionId: string; voucherId: string | null; code: string; total: number } | null> {
-  if (!rawCode.trim()) {
-    if (items.some((item) => toNumber(item.promoDiscount) > 0)) {
-      return { error: "The offer was removed — re-apply it or clear its discount." };
-    }
-    return null;
-  }
-  const found = await lookupPromotionCode(storeId, rawCode, customerId);
-  if (!found.ok) return { error: found.reason };
-
   const stockIds = items.flatMap((item) => (item.inventoryStockId ? [item.inventoryStockId] : []));
-  const stocks = stockIds.length
+  const stocks = rawCode.trim() && stockIds.length
     ? await prisma.inventoryStock.findMany({
         where: { storeId, id: { in: stockIds } },
         select: { id: true, product: { select: { categoryId: true } } },
       })
     : [];
   const categoryOfStock = new Map(stocks.map((stock) => [stock.id, stock.product.categoryId]));
-  const keyOf = (index: number) => `line-${index}`;
-  const lines: PromotionLine[] = items.map((item, index) => ({
-    key: keyOf(index),
+  const lines = items.map((item, index) => ({
+    key: `line-${index}`,
     categoryId: (item.inventoryStockId ? categoryOfStock.get(item.inventoryStockId) : item.categoryId) ?? null,
     metalTypeIds: item.piece
       ? item.piece.components.flatMap((row) => (row.kind === "METAL" && row.metalTypeId ? [row.metalTypeId] : []))
@@ -422,14 +411,11 @@ async function resolveInvoicePromotion(
           100,
       ) / 100,
     making: toNumber(item.makingCharge) + toNumber(item.hmCharge),
+    promoDiscount: toNumber(item.promoDiscount),
   }));
-  const result = computePromotion(found.promotion, lines);
-  if (!result.ok) return { error: result.reason };
-  const mismatch = items.some(
-    (item, index) => Math.abs((result.perLine[keyOf(index)] ?? 0) - toNumber(item.promoDiscount)) > 0.05,
-  );
-  if (mismatch) return { error: "The offer's discount has changed — remove it and apply the code again." };
-  return { promotionId: found.promotion.id, voucherId: found.voucherId, code: found.code, total: result.total };
+  const resolved = await resolveDocumentPromotion(storeId, customerId, lines, rawCode);
+  if (!resolved || "error" in resolved) return resolved;
+  return { promotionId: resolved.promotionId, voucherId: resolved.voucherId, code: resolved.code, total: resolved.total };
 }
 
 function lineTotal(item: InvoiceLineItemInput) {

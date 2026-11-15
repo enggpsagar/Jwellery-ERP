@@ -70,6 +70,8 @@ import { IncludesStoneToggle } from "@/components/ui/includes-stone-toggle"
 import { AddMetalDialog } from "@/components/inventory/shared/add-metal-dialog"
 import { AddPurityDialog } from "@/components/inventory/shared/add-purity-dialog"
 import { PieceComponentsEditor, StoneDetailsInputs } from "@/components/shared/piece-components-editor"
+import { PromotionCodeBox, usePromotionCode } from "@/components/billing/promotion-code-box"
+import { computePromotion, type PromotionLine } from "@/lib/promotions"
 import { stockPieceDrafts, stockSaleRate, stoneSellingRate, type LinkedStoneDetails } from "@/lib/inventory/stock-pick-rates"
 import { MultiPartQuestion } from "@/components/shared/multi-part-question"
 import type { GstRateRow } from "@/lib/actions/gst-rate-actions"
@@ -867,6 +869,29 @@ export function KachaInvoiceForm({
   const lineTotal = (item: LineItem) =>
     lineMetalValue(item) + item.makingCharge + item.hmCharge + lineStoneValue(item)
 
+  // Offer / gift voucher (lib/promotions.ts) — every line, keyed like the
+  // server's check (resolveDocumentPromotion), valued before the offer.
+  const promoCode = usePromotionCode(customerId)
+  const promoLines = (): PromotionLine[] =>
+    items.map((item) => {
+      const stock = item.inventoryStockId ? stockItems.find((s) => s.id === item.inventoryStockId) : undefined
+      return {
+        key: item.key,
+        categoryId: stock?.categoryId ?? null,
+        metalTypeIds: item.multiPart
+          ? item.components.flatMap((row) => (row.kind === "METAL" && row.metalTypeId ? [row.metalTypeId] : []))
+          : item.metalTypeId
+            ? [item.metalTypeId]
+            : [],
+        quantity: item.quantity || 1,
+        value: Math.round((lineMetalValue(item) + item.makingCharge + item.hmCharge + lineStoneValue(item)) * 100) / 100,
+        making: item.makingCharge + item.hmCharge,
+      }
+    })
+  const promoResult = promoCode.applied ? computePromotion(promoCode.applied.promotion, promoLines()) : null
+  const promoOf = (item: LineItem) => (promoResult?.ok ? promoResult.perLine[item.key] ?? 0 : 0)
+  const promoTotal = promoResult?.ok ? promoResult.total : 0
+
   const subtotal = useMemo(
     () => items.reduce((sum, item) => sum + lineMetalValue(item), 0),
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -883,7 +908,7 @@ export function KachaInvoiceForm({
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [items],
   )
-  const rawTotal = subtotal + makingChargesTotal + stoneChargesTotal - discount
+  const rawTotal = subtotal + makingChargesTotal + stoneChargesTotal - discount - promoTotal
   // Live preview of the same server-side round-off createKachaInvoice
   // applies — see lib/round-off.ts. The client never submits this value;
   // it's entirely recomputed server-side from the persisted line items.
@@ -946,6 +971,7 @@ export function KachaInvoiceForm({
         dmoWeight: toUnit(item.dmoWeight) || null,
         stoneWeight: toUnit(item.stoneWeightInput) || null,
         hmCharge: item.hmCharge,
+        promoDiscount: promoOf(item),
         inventoryStockId: item.inventoryStockId || null,
         vendorId: item.inventoryStockId ? null : item.sourcePartyId || null,
         multiPart: item.multiPart && item.components.length > 0,
@@ -1802,6 +1828,7 @@ export function KachaInvoiceForm({
           value={discount}
           onChange={setDiscount}
         />
+        <PromotionCodeBox state={promoCode} result={promoResult} note="A voucher is spent when the estimate is saved." />
       </div>
 
       <PaidNowFields
@@ -1832,6 +1859,12 @@ export function KachaInvoiceForm({
           <span>Discount</span>
           <span>-₹{discount.toFixed(2)}</span>
         </div>
+        {promoTotal > 0 && promoCode.applied && (
+          <div className="flex justify-between text-emerald-700" data-testid="promo-total">
+            <span>Offer ({promoCode.applied.code})</span>
+            <span>-₹{promoTotal.toFixed(2)}</span>
+          </div>
+        )}
         {roundOffAmount !== 0 && (
           <div className="flex justify-between">
             <span>Round Off</span>

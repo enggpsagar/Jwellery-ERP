@@ -58,6 +58,8 @@ import { IncludesStoneToggle } from "@/components/ui/includes-stone-toggle"
 import { AddMetalDialog } from "@/components/inventory/shared/add-metal-dialog"
 import { AddPurityDialog } from "@/components/inventory/shared/add-purity-dialog"
 import { PieceComponentsEditor, StoneDetailsInputs } from "@/components/shared/piece-components-editor"
+import { PromotionCodeBox, usePromotionCode } from "@/components/billing/promotion-code-box"
+import { computePromotion, type PromotionLine } from "@/lib/promotions"
 import { stockPieceDrafts, stockSaleRate, stoneSellingRate, type LinkedStoneDetails } from "@/lib/inventory/stock-pick-rates"
 import { MultiPartQuestion } from "@/components/shared/multi-part-question"
 import {
@@ -843,6 +845,29 @@ export function QuotationForm({
   const lineTotal = (item: LineItem) =>
     lineMetalValue(item) + item.makingCharge + item.hmCharge + lineStoneValue(item)
 
+  // Offer / gift voucher (lib/promotions.ts) — every line, keyed like the
+  // server's check (resolveDocumentPromotion), valued before the offer.
+  const promoCode = usePromotionCode(customerId)
+  const promoLines = (): PromotionLine[] =>
+    items.map((item) => {
+      const stock = item.inventoryStockId ? stockItems.find((s) => s.id === item.inventoryStockId) : undefined
+      return {
+        key: item.key,
+        categoryId: stock?.categoryId ?? null,
+        metalTypeIds: item.multiPart
+          ? item.components.flatMap((row) => (row.kind === "METAL" && row.metalTypeId ? [row.metalTypeId] : []))
+          : item.metalTypeId
+            ? [item.metalTypeId]
+            : [],
+        quantity: item.quantity || 1,
+        value: Math.round((lineMetalValue(item) + item.makingCharge + item.hmCharge + lineStoneValue(item)) * 100) / 100,
+        making: item.makingCharge + item.hmCharge,
+      }
+    })
+  const promoResult = promoCode.applied ? computePromotion(promoCode.applied.promotion, promoLines()) : null
+  const promoOf = (item: LineItem) => (promoResult?.ok ? promoResult.perLine[item.key] ?? 0 : 0)
+  const promoTotal = promoResult?.ok ? promoResult.total : 0
+
   const subtotal = useMemo(
     () => items.reduce((sum, item) => sum + lineMetalValue(item), 0),
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -870,7 +895,8 @@ export function QuotationForm({
   // stays in the base, same split as invoice-form.tsx's lineGst. With no
   // multi-part line this is exactly the single computeGst() call above.
   const hasMultiPart = items.some((item) => item.multiPart)
-  const taxableValue = subtotal + makingChargesTotal + stoneChargesTotal - discount
+  // The offer comes off before GST, like on an invoice.
+  const taxableValue = subtotal + makingChargesTotal + stoneChargesTotal - discount - promoTotal
   const gstBreakdown = useMemo(() => {
     const round = (value: number) => Math.round(value * 100) / 100
     const pieceLines = items.filter((item) => item.multiPart)
@@ -893,7 +919,7 @@ export function QuotationForm({
   const taxAmount = gstBreakdown.sgst + gstBreakdown.cgst + gstBreakdown.igst
 
   const rawTotal =
-    subtotal + makingChargesTotal + stoneChargesTotal - discount + taxAmount
+    subtotal + makingChargesTotal + stoneChargesTotal - discount - promoTotal + taxAmount
   // Live preview of the same computeRoundOff() the server applies on save
   // (see createQuotation in quotation-actions.ts) — never submitted itself,
   // just shown here so the displayed Total already matches what gets saved.
@@ -950,6 +976,7 @@ export function QuotationForm({
           item.hasStoneComponent && !item.multiPart ? item.stoneCertificateNumber?.trim() || null : null,
         stoneWeight: toUnit(item.stoneWeightInput) || null,
         hmCharge: item.hmCharge,
+        promoDiscount: promoOf(item),
         inventoryStockId: item.inventoryStockId || null,
         vendorId: item.inventoryStockId ? null : item.sourcePartyId || null,
         multiPart: item.multiPart && item.components.length > 0,
@@ -1701,6 +1728,7 @@ export function QuotationForm({
             value={discount}
             onChange={setDiscount}
           />
+          <PromotionCodeBox state={promoCode} result={promoResult} note="Nothing is spent now — the code is checked again, and a voucher spent, when the quotation is converted." />
         </div>
 
         <div className="space-y-2 rounded-lg transition-colors focus-within:bg-accent/40">
@@ -1784,6 +1812,12 @@ export function QuotationForm({
           <span>Discount</span>
           <span>-₹{discount.toFixed(2)}</span>
         </div>
+        {promoTotal > 0 && promoCode.applied && (
+          <div className="flex justify-between text-emerald-700" data-testid="promo-total">
+            <span>Offer ({promoCode.applied.code}) — before GST</span>
+            <span>-₹{promoTotal.toFixed(2)}</span>
+          </div>
+        )}
         <div className="flex justify-between">
           <span>Tax</span>
           <span>₹{taxAmount.toFixed(2)}</span>

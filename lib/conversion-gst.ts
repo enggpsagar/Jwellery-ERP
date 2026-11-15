@@ -6,7 +6,9 @@
 // Same base as New Invoice (invoice-form.tsx's taxableValue): per line,
 // metal value (rate × weight × quantity) + making + HM + stone charge; the
 // document-level discount is not taken off the tax base (as on a direct
-// invoice). A piece of several metals/stones taxes each row (amount ×
+// invoice), but a line's offer share (promoDiscount) is — it becomes the
+// invoice line's pre-GST schemeDiscount; on a piece of several rows every
+// part is scaled by the same factor (as invoice-form.tsx does). A piece of several metals/stones taxes each row (amount ×
 // quantity) at the row's own GST rate (fallback: the picked rate), making/HM
 // at the picked rate.
 import { computeGst } from "@/lib/gst"
@@ -21,6 +23,8 @@ export type ConversionGstItem = {
   makingCharge: number
   hmCharge: number
   stoneCharge: number
+  /** This line's share of an offer, taken off before GST. */
+  promoDiscount?: number
   components?: { amount: number; gstRatePercent?: number | null }[] | null
 }
 
@@ -52,16 +56,20 @@ export function conversionGst(
   const perItem = items.map((item) => {
     const quantity = item.quantity || 1
     const components = item.components ?? []
+    const promo = Math.max(0, item.promoDiscount ?? 0)
     if (!components.length) {
       const weight = (item.purity === "DIAMOND" ? item.caratWeight : item.netWeight) ?? 0
-      const taxable = (item.rate ?? 0) * weight * quantity + item.makingCharge + item.hmCharge + item.stoneCharge
-      return tax(taxable, pickedRate)
+      const base = (item.rate ?? 0) * weight * quantity + item.makingCharge + item.hmCharge + item.stoneCharge
+      return tax(Math.max(0, base - promo), pickedRate)
     }
     const sum = { sgst: 0, cgst: 0, igst: 0 }
-    const parts = [
+    const rawParts = [
       ...components.map((row) => ({ taxable: row.amount * quantity, rate: row.gstRatePercent ?? pickedRate })),
       { taxable: item.makingCharge + item.hmCharge, rate: pickedRate },
     ]
+    const base = rawParts.reduce((acc, part) => acc + Math.max(0, part.taxable), 0)
+    const factor = promo > 0 && base > 0 ? Math.max(0, (base - promo) / base) : 1
+    const parts = rawParts.map((part) => ({ ...part, taxable: part.taxable * factor }))
     for (const part of parts) {
       if (!(part.taxable > 0)) continue
       const gst = tax(part.taxable, part.rate)
@@ -89,6 +97,7 @@ export function toConversionGstItem(item: {
   makingCharge: unknown
   hmCharge: unknown
   stoneCharge: unknown
+  promoDiscount?: unknown
   components?: { amount: unknown; gstRatePercent?: unknown }[] | null
 }): ConversionGstItem {
   const n = (value: unknown) => (value == null ? null : Number(value))
@@ -101,6 +110,7 @@ export function toConversionGstItem(item: {
     makingCharge: Number(item.makingCharge ?? 0),
     hmCharge: Number(item.hmCharge ?? 0),
     stoneCharge: Number(item.stoneCharge ?? 0),
+    promoDiscount: Number(item.promoDiscount ?? 0),
     components: (item.components ?? []).map((row) => ({
       amount: Number(row.amount ?? 0),
       gstRatePercent: row.gstRatePercent == null ? null : Number(row.gstRatePercent),

@@ -49,6 +49,9 @@ type QuotationSummary = {
   makingCharges: number
   stoneCharges: number
   discount: number
+  /** Offer / voucher quoted on it (lib/promotions.ts), apart from discount. */
+  promotionCode?: string | null
+  promotionDiscount?: number
   totalAmount: number
   notes: string | null
   /** Customer Exchange estimate saved on the quotation, if any. */
@@ -70,6 +73,8 @@ type QuotationSummary = {
     hmCharge: number
     stoneCharge: number
     lineTotal: number
+    /** This line's share of the quoted offer. */
+    promoDiscount?: number
     /** A piece made of several metals/stones — its rows, each with its own
      * snapshotted GST rate (lib/piece-components.ts). */
     components?: { amount: number; gstRatePercent?: number | null }[]
@@ -108,11 +113,23 @@ export function ConvertToInvoiceForm({
   const router = useRouter()
   const toast = useToast()
 
+  // The quoted offer is taken off each line before GST, unless the shop
+  // converts without it (the server also drops it, and refuses to convert
+  // with it when its code no longer applies — lookupPromotionCode).
+  const quotedOffer = quotation.promotionCode && (quotation.promotionDiscount ?? 0) > 0 ? quotation.promotionCode : null
+  const [dropOffer, setDropOffer] = useState(false)
+  const offerTotal = quotedOffer && !dropOffer ? quotation.promotionDiscount ?? 0 : 0
+  const gstItems = useMemo(
+    () => quotation.items.map((item) => ({ ...item, promoDiscount: quotedOffer && !dropOffer ? item.promoDiscount ?? 0 : 0 })),
+    [quotation.items, quotedOffer, dropOffer],
+  )
+
   const subtotalBeforeTax =
     quotation.subtotal +
     quotation.makingCharges +
     quotation.stoneCharges -
-    quotation.discount
+    quotation.discount -
+    offerTotal
 
   const [gstRateId, setGstRateId] = useState<string>(
     () =>
@@ -127,7 +144,7 @@ export function ConvertToInvoiceForm({
   // quotation's discount comes off the total, not the tax base — as on a
   // direct invoice.
   const taxAt = (ratePercent: number) =>
-    conversionGst(quotation.items, ratePercent, gstScheme, storeState, quotation.customer?.state ?? null).taxAmount
+    conversionGst(gstItems, ratePercent, gstScheme, storeState, quotation.customer?.state ?? null).taxAmount
   const initialGstRate = gstRates.find((r) => r.id === gstRateId)
   const initialTaxAmount = initialGstRate ? taxAt(initialGstRate.ratePercent) : defaultTaxAmount
 
@@ -144,6 +161,15 @@ export function ConvertToInvoiceForm({
     const rate = gstRates.find((r) => r.id === id)
     if (rate) {
       setTaxAmount(taxAt(rate.ratePercent))
+    }
+  }
+
+  const toggleDropOffer = (checked: boolean) => {
+    setDropOffer(checked)
+    const rate = gstRates.find((r) => r.id === gstRateId)
+    if (rate) {
+      const items = quotation.items.map((item) => ({ ...item, promoDiscount: quotedOffer && !checked ? item.promoDiscount ?? 0 : 0 }))
+      setTaxAmount(conversionGst(items, rate.ratePercent, gstScheme, storeState, quotation.customer?.state ?? null).taxAmount)
     }
   }
 
@@ -205,6 +231,7 @@ export function ConvertToInvoiceForm({
       <input type="hidden" name="taxAmount" value={taxAmount} />
       <input type="hidden" name="paidAmount" value={paidAmount} />
       <input type="hidden" name="gstRateId" value={gstRateId} />
+      {dropOffer && <input type="hidden" name="dropOffer" value="on" />}
       {estimate && (
         <>
           {exchangeConfirm && <input type="hidden" name="exchangeConfirm" value="on" />}
@@ -378,6 +405,21 @@ export function ConvertToInvoiceForm({
           <span>Subtotal + Charges</span>
           <span>₹{subtotalBeforeTax.toFixed(2)}</span>
         </div>
+        {quotedOffer && (
+          <div className="space-y-1 border-b pb-2" data-testid="convert-offer">
+            <div className={`flex justify-between ${dropOffer ? "text-muted-foreground line-through" : "text-emerald-700"}`}>
+              <span>Offer ({quotedOffer}) — before GST</span>
+              <span>-₹{(quotation.promotionDiscount ?? 0).toFixed(2)}</span>
+            </div>
+            <label className="flex items-center gap-2 text-xs text-muted-foreground">
+              <input type="checkbox" checked={dropOffer} onChange={(e) => toggleDropOffer(e.target.checked)} />
+              Convert without the offer
+            </label>
+            {!dropOffer && (
+              <p className="text-xs text-muted-foreground">The code is checked again when you convert.</p>
+            )}
+          </div>
+        )}
         <div className="flex justify-between">
           <span>Tax</span>
           <span>₹{taxAmount.toFixed(2)}</span>

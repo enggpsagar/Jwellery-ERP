@@ -94,6 +94,11 @@ import {
 } from "@/lib/purity";
 import { classifyPurityFamily } from "@/lib/business-units";
 import { logger } from "@/lib/logger";
+import {
+  PromotionVoucherSpentError,
+  resolveDocumentPromotion,
+  saleDocumentPromotionLines,
+} from "@/lib/promotions.server";
 import { IMPORT_SUGGESTION_MARK, namesAsCandidates, suggestFrom } from "@/lib/import-suggest";
 import { parseDateRangeBoundary } from "@/lib/date-range";
 
@@ -136,6 +141,9 @@ export type KachaInvoiceLineItemInput = {
   components?: PieceComponentPayload[] | null;
   // Server-only: the resolved rows (resolvePieceLines), never from the client.
   piece?: ResolvedPiece;
+  // This line's share of an offer / voucher (lib/promotions.ts) — re-checked
+  // by createKachaInvoice (resolveDocumentPromotion).
+  promoDiscount?: number;
 };
 
 export type KachaInvoiceFormState = {
@@ -358,7 +366,11 @@ type KachaTotals = {
 
 /** A slip's totals from its (resolved) lines — shared by the form and the
  * Excel import so both land on the same figures. */
-function computeKachaTotals(items: KachaInvoiceLineItemInput[], discount: number): KachaTotals {
+function computeKachaTotals(
+  items: KachaInvoiceLineItemInput[],
+  discount: number,
+  promotionDiscount = 0,
+): KachaTotals {
   const subtotal = items.reduce((sum, item) => sum + lineMetalValue(item), 0);
   // Hallmarking charge folds into the slip's Making Charges total — same
   // convention as invoice-actions.ts's own makingCharges.
@@ -367,7 +379,9 @@ function computeKachaTotals(items: KachaInvoiceLineItemInput[], discount: number
     0,
   );
   const stoneCharges = items.reduce((sum, item) => sum + toNumber(item.stoneCharge), 0);
-  const rawTotal = subtotal + makingCharges + stoneCharges - discount;
+  // An offer comes off the same way the hand-typed discount does (an
+  // estimate carries no GST); it stays a separate figure on the slip.
+  const rawTotal = subtotal + makingCharges + stoneCharges - discount - promotionDiscount;
   // Indian-billing convention: the persisted Total is always a whole
   // rupee, with the (small, signed) adjustment recorded separately rather
   // than silently absorbed — see lib/round-off.ts.
@@ -405,6 +419,8 @@ type WriteKachaSlipInput = {
    * ledger (delete-all removes slips, not their ledger entries). */
   postLedger?: boolean;
   convertedToId?: string | null;
+  /** Offer / voucher on the slip (New Estimate only). */
+  promotion?: { promotionId: string; voucherId: string | null; code: string; total: number } | null;
 };
 
 /**
@@ -450,6 +466,9 @@ async function writeKachaSlip(tx: Prisma.TransactionClient, input: WriteKachaSli
       notes: input.notes,
       locationId,
       convertedToId: input.convertedToId ?? undefined,
+      promotionId: input.promotion?.promotionId ?? undefined,
+      promotionCode: input.promotion?.code ?? undefined,
+      promotionDiscount: input.promotion?.total ?? 0,
       items: {
         create: items.map((item) => ({
           itemName: item.itemName,
@@ -476,6 +495,7 @@ async function writeKachaSlip(tx: Prisma.TransactionClient, input: WriteKachaSli
           dmoWeight: item.dmoWeight ?? undefined,
           hmCharge: item.hmCharge ?? 0,
           lineTotal: lineTotal(item),
+          promoDiscount: item.promoDiscount ?? 0,
           inventoryStockId: isManualLine(item) ? undefined : (item.inventoryStockId as string),
           lotDraw: isManualLine(item) ? undefined : lotDrawJson(item.lotDraw),
           vendorId: isManualLine(item) ? item.vendorId ?? undefined : undefined,
@@ -486,6 +506,16 @@ async function writeKachaSlip(tx: Prisma.TransactionClient, input: WriteKachaSli
   });
 
   await markSourcePartiesAsSuppliers(tx, storeId, sourcePartyNames.keys());
+
+  // A single-use voucher is spent on this estimate — conditional on it
+  // still being unused, so two bills can't redeem the same code at once.
+  if (input.promotion?.voucherId) {
+    const spent = await tx.promotionVoucher.updateMany({
+      where: { id: input.promotion.voucherId, storeId, usedAt: null },
+      data: { usedAt: new Date(), kachaInvoiceId: created.id },
+    });
+    if (spent.count !== 1) throw new PromotionVoucherSpentError();
+  }
 
   for (const item of items) {
     if (isManualLine(item)) continue;
@@ -724,6 +754,9 @@ function mapKachaInvoice(kachaInvoice: any) {
     makingCharges: Number(kachaInvoice.makingCharges),
     stoneCharges: Number(kachaInvoice.stoneCharges),
     discount: Number(kachaInvoice.discount),
+    // Offer / voucher on the slip (lib/promotions.ts) — kept apart from discount.
+    promotionCode: (kachaInvoice.promotionCode as string | null) ?? null,
+    promotionDiscount: Number(kachaInvoice.promotionDiscount ?? 0),
     roundOffAmount: Number(kachaInvoice.roundOffAmount),
     totalAmount: Number(kachaInvoice.totalAmount),
     paidAmount: Number(kachaInvoice.paidAmount),
@@ -768,6 +801,7 @@ function mapKachaInvoice(kachaInvoice: any) {
       dmoWeight: item.dmoWeight ? Number(item.dmoWeight) : null,
       hmCharge: Number(item.hmCharge ?? 0),
       lineTotal: Number(item.lineTotal),
+      promoDiscount: Number(item.promoDiscount ?? 0),
       inventoryStockId: item.inventoryStockId,
       vendorName: item.vendorName ?? null,
       // A piece of several metals/stones — see PieceBreakdown.
@@ -1117,7 +1151,22 @@ export async function createKachaInvoice(
     const notes = String(formData.get("notes") || "").trim() || null;
     const locationId = String(formData.get("locationId") || "").trim() || null;
 
-    const totals = computeKachaTotals(items, discount);
+    // Offer / gift voucher (lib/promotions.ts): re-checked and recomputed
+    // from the lines, each line keeping its share (promoDiscount).
+    const promotionLines = await saleDocumentPromotionLines(storeId, items, lineMetalValue);
+    const promotion = await resolveDocumentPromotion(
+      storeId,
+      customerId,
+      promotionLines,
+      String(formData.get("promotionCode") || ""),
+    );
+    if (promotion && "error" in promotion) return { success: false, message: promotion.error };
+    items = items.map((item, index) => ({
+      ...item,
+      promoDiscount: promotion ? (promotion.perLine[`line-${index}`] ?? 0) : 0,
+    }));
+
+    const totals = computeKachaTotals(items, discount, promotion?.total ?? 0);
     const { totalAmount } = totals;
 
     // The exchange goes against the slip first (Kacha has no store-credit
@@ -1229,6 +1278,7 @@ export async function createKachaInvoice(
         sourcePartyNames: sourceParties.names,
         fineOf,
         payments,
+        promotion: promotion ?? null,
       });
 
       // Customer → Business half of a Customer Exchange: the EX purchase,
@@ -1275,6 +1325,7 @@ export async function createKachaInvoice(
     if (error instanceof OversellError) {
       return { success: false, message: error.message };
     }
+    if (error instanceof PromotionVoucherSpentError) return { success: false, message: error.message };
     logger.error("createKachaInvoice error", error);
     return { success: false, message: actionErrorMessage(error, "Failed to create Estimate") };
   }
@@ -1429,7 +1480,10 @@ export async function convertKachaToPakka(
     const discount = Number(kachaInvoice.discount);
     const paidAmount = Number(kachaInvoice.paidAmount);
 
-    const rawTotal = subtotal + makingCharges + stoneCharges - discount + taxAmount;
+    // The estimate's offer moves onto the invoice as each line's pre-GST
+    // schemeDiscount (conversionGst already took it off the tax base).
+    const promotionDiscount = Number(kachaInvoice.promotionDiscount ?? 0);
+    const rawTotal = subtotal + makingCharges + stoneCharges - discount - promotionDiscount + taxAmount;
     // Same Indian-billing round-off convention as createKachaInvoice, applied
     // here to the new Invoice being created (not the source KachaInvoice,
     // which keeps its own already-persisted roundOffAmount untouched).
@@ -1475,6 +1529,9 @@ export async function convertKachaToPakka(
           gstRateId: gstRateSnapshot?.gstRateId ?? undefined,
           gstRateName: gstRateSnapshot?.gstRateName ?? undefined,
           gstRatePercent: gstRateSnapshot?.gstRatePercent ?? undefined,
+          promotionId: kachaInvoice.promotionId ?? undefined,
+          promotionCode: kachaInvoice.promotionCode ?? undefined,
+          promotionDiscount,
           items: {
             create: kachaInvoice.items.map((item, index) => ({
               itemName: item.itemName,
@@ -1501,6 +1558,7 @@ export async function convertKachaToPakka(
               dmoWeight: item.dmoWeight ?? undefined,
               hmCharge: item.hmCharge,
               lineTotal: item.lineTotal,
+              schemeDiscount: item.promoDiscount,
               inventoryStockId: item.inventoryStockId ?? undefined,
               // The weight the slip drew off a lot moves with the line, so
               // cancelling/deleting the new invoice gives back exactly that.
@@ -1554,6 +1612,13 @@ export async function convertKachaToPakka(
       await tx.kachaInvoice.updateMany({
         where: { id: kachaInvoiceId, storeId },
         data: { convertedToId: created.id, balanceAmount: 0, status: InvoiceStatus.PAID },
+      });
+
+      // A voucher spent on the estimate now belongs to the invoice (still
+      // used — cancelling the invoice frees it, like any invoice voucher).
+      await tx.promotionVoucher.updateMany({
+        where: { storeId, kachaInvoiceId },
+        data: { kachaInvoiceId: null, invoiceId: created.id },
       });
 
       // A Customer Exchange recorded on the slip now also belongs to the Tax
@@ -1616,6 +1681,11 @@ export async function deleteKachaInvoice(id: string): Promise<KachaInvoiceFormSt
     // only ledger row (it carries no kachaInvoiceId — matched by its
     // description, kachaSaleLedgerDescription).
     const deleted = await prisma.$transaction(async (tx) => {
+      // A voucher spent on this estimate is usable again.
+      await tx.promotionVoucher.updateMany({
+        where: { storeId, kachaInvoiceId: id },
+        data: { usedAt: null, kachaInvoiceId: null },
+      });
       const { count } = await tx.kachaInvoice.deleteMany({ where: { id, storeId } });
       if (count === 0) return false;
 
@@ -2569,7 +2639,8 @@ export async function emailKachaInvoiceAction(
       subtotal: Number(kachaInvoice.subtotal),
       makingCharges: Number(kachaInvoice.makingCharges),
       stoneCharges: Number(kachaInvoice.stoneCharges),
-      discount: Number(kachaInvoice.discount),
+      // The offer is shown inside Discount, as on the prints.
+      discount: Number(kachaInvoice.discount) + Number(kachaInvoice.promotionDiscount ?? 0),
       totalAmount: Number(kachaInvoice.totalAmount),
       paidAmount: Number(kachaInvoice.paidAmount),
       balanceAmount: Number(kachaInvoice.balanceAmount),

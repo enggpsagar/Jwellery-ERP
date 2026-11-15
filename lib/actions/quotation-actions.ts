@@ -50,6 +50,12 @@ import type {
   DataTableExportResult,
 } from "@/components/shared/data-table-toolbar";
 import { logger } from "@/lib/logger";
+import {
+  lookupPromotionCode,
+  PromotionVoucherSpentError,
+  resolveDocumentPromotion,
+  saleDocumentPromotionLines,
+} from "@/lib/promotions.server";
 import { markSourcePartiesAsSuppliers, resolveLineSourceParties } from "@/lib/inventory/line-source-party";
 import { parseDateRangeBoundary } from "@/lib/date-range";
 import { stockOptionProductDetailsSelect, toStockOptionProductDetails } from "@/lib/inventory/stock-option-details";
@@ -153,6 +159,9 @@ export type QuotationLineItemInput = {
   // (planLineLotDraws) — a quotation reserves nothing, so it isn't stored;
   // the weight is drawn when the quotation is converted.
   lotDraw?: LotDraw | null;
+  // This line's share of an offer / voucher (lib/promotions.ts) — re-checked
+  // by createQuotation (resolveDocumentPromotion).
+  promoDiscount?: number;
 };
 
 export type QuotationFormState = {
@@ -424,6 +433,9 @@ function mapQuotation(quotation: any) {
     makingCharges: Number(quotation.makingCharges),
     stoneCharges: Number(quotation.stoneCharges),
     discount: Number(quotation.discount),
+    // Offer / voucher quoted (lib/promotions.ts) — kept apart from discount.
+    promotionCode: (quotation.promotionCode as string | null) ?? null,
+    promotionDiscount: Number(quotation.promotionDiscount ?? 0),
     taxAmount: Number(quotation.taxAmount),
     // Document-level tax split — Quotation never broke tax into components
     // per line the way Invoice/InvoiceItem does, so these live only here.
@@ -488,6 +500,7 @@ function mapQuotation(quotation: any) {
       stoneCertificateNumber: item.stoneCertificateNumber ?? null,
       hmCharge: Number(item.hmCharge ?? 0),
       lineTotal: Number(item.lineTotal),
+      promoDiscount: Number(item.promoDiscount ?? 0),
       inventoryStockId: item.inventoryStockId,
       vendorName: item.vendorName ?? null,
       // A piece made of several metals/stones — see lib/piece-components.ts.
@@ -857,6 +870,22 @@ export async function createQuotation(
     items = pieceLines;
 
     const discount = toNumber(formData.get("discount"));
+    // Offer / gift voucher (lib/promotions.ts): checked and recomputed now so
+    // the quoted price is right, but nothing is spent — a quotation reserves
+    // nothing. Conversion re-checks the code and spends any voucher then.
+    const customerForOffer = String(formData.get("customerId") || "");
+    const promotion = await resolveDocumentPromotion(
+      storeId,
+      customerForOffer,
+      await saleDocumentPromotionLines(storeId, items, lineMetalValue),
+      String(formData.get("promotionCode") || ""),
+    );
+    if (promotion && "error" in promotion) return { success: false, message: promotion.error };
+    items = items.map((item, index) => ({
+      ...item,
+      promoDiscount: promotion ? (promotion.perLine[`line-${index}`] ?? 0) : 0,
+    }));
+    const promotionDiscount = promotion?.total ?? 0;
     const taxAmount = toNumber(formData.get("taxAmount"));
     // Computed client-side by computeGst() (lib/gst.ts) — sgst+cgst on an
     // intra-state quote, igst alone on an inter-state one, never both. Kept
@@ -881,7 +910,7 @@ export async function createQuotation(
       0,
     );
     const stoneCharges = items.reduce((sum, item) => sum + toNumber(item.stoneCharge), 0);
-    const rawTotal = subtotal + makingCharges + stoneCharges - discount + taxAmount;
+    const rawTotal = subtotal + makingCharges + stoneCharges - discount - promotionDiscount + taxAmount;
     // Standard Indian-billing "Round Off" — see computeRoundOff's own doc
     // comment. Server-derived only: the client never submits a round-off
     // value, it just previews the same computation.
@@ -1011,6 +1040,9 @@ export async function createQuotation(
         gstRateId: gstRateSnapshot?.gstRateId ?? undefined,
         gstRateName: gstRateSnapshot?.gstRateName ?? undefined,
         gstRatePercent: gstRateSnapshot?.gstRatePercent ?? undefined,
+        promotionId: promotion?.promotionId ?? undefined,
+        promotionCode: promotion?.code ?? undefined,
+        promotionDiscount,
         items: {
           create: items.map((item) => ({
             itemName: item.itemName,
@@ -1036,6 +1068,7 @@ export async function createQuotation(
             stoneCertificateNumber: item.stoneCertificateNumber ?? null,
             hmCharge: item.hmCharge ?? 0,
             lineTotal: lineTotal(item),
+            promoDiscount: item.promoDiscount ?? 0,
             inventoryStockId:
               item.inventoryStockId && validStockIds.has(item.inventoryStockId)
                 ? item.inventoryStockId
@@ -1055,6 +1088,7 @@ export async function createQuotation(
       quotationId: quotation.id,
     };
   } catch (error) {
+    if (error instanceof PromotionVoucherSpentError) return { success: false, message: error.message };
     logger.error("createQuotation error", error);
     return { success: false, message: actionErrorMessage(error, "Failed to create quotation") };
   }
@@ -1211,7 +1245,7 @@ async function quotationPieceShortage(
     const left = row && row.status === InventoryStockStatus.IN_STOCK ? row.quantity : 0
     if (left < quantity) {
       const code = row ? ` (${row.stockCode})` : ""
-      return `Only ${left} of ${itemName}${code} ${left === 1 ? "is" : "are"} in stock, but the quotation has ${quantity}. Edit the quotation to what's left, then convert it.`
+      return `Only ${left} of ${itemName}${code} ${left === 1 ? "is" : "are"} in stock, but the quotation has ${quantity}. Make a new quotation for what's left and convert that.`
     }
   }
   return null
@@ -1296,8 +1330,33 @@ export async function convertQuotationToInvoice(
     // making + HM + stone; a multi-part piece row by row at each row's own
     // rate) — shared with the convert screen's preview (lib/conversion-gst.ts)
     // so the preview is exactly what's saved.
+    // The quoted offer is honoured only if its code still applies today
+    // (lookupPromotionCode: running, in date, limits, voucher unused). If it
+    // doesn't, the shop either converts at the full price ("Convert without
+    // the offer") or makes a new quotation — never a silent price change.
+    // The per-line shares are the quoted ones.
+    let offer: { promotionId: string; voucherId: string | null; code: string; total: number } | null = null;
+    const dropOffer = formData.get("dropOffer") === "on";
+    if (quotation.promotionCode && Number(quotation.promotionDiscount) > 0 && !dropOffer) {
+      const found = await lookupPromotionCode(storeId, quotation.promotionCode, quotation.customerId);
+      if (found.ok) {
+        offer = {
+          promotionId: found.promotion.id,
+          voucherId: found.voucherId,
+          code: found.code,
+          total: Number(quotation.promotionDiscount),
+        };
+      } else {
+        return {
+          success: false,
+          message: `The quoted offer ${quotation.promotionCode} no longer applies: ${found.reason} Tick "Convert without the offer" to bill at the full price.`,
+        };
+      }
+    }
+    const linePromo = (item: { promoDiscount: unknown }) => (offer ? Number(item.promoDiscount ?? 0) : 0);
+
     const conversion = conversionGst(
-      quotation.items.map(toConversionGstItem),
+      quotation.items.map((item) => ({ ...toConversionGstItem(item), promoDiscount: linePromo(item) })),
       gstRatePercent,
       gstScheme,
       storeState,
@@ -1312,7 +1371,7 @@ export async function convertQuotationToInvoice(
     const stoneCharges = Number(quotation.stoneCharges);
     const discount = Number(quotation.discount);
 
-    const rawTotal = subtotal + makingCharges + stoneCharges - discount + taxAmount;
+    const rawTotal = subtotal + makingCharges + stoneCharges - discount - (offer?.total ?? 0) + taxAmount;
     // Standard Indian-billing "Round Off" — see computeRoundOff's own doc
     // comment. This is a fresh Invoice being created from the quotation
     // (its own tax input, per this function's doc comment), so it gets its
@@ -1388,7 +1447,7 @@ export async function convertQuotationToInvoice(
       if (!plan.ok) {
         return {
           success: false,
-          message: `${plan.error} Edit the quotation's weight for ${item.itemName} to what's left, then convert it.`,
+          message: `${plan.error} Make a new quotation for what's left of ${item.itemName} and convert that.`,
         };
       }
       const draw: LotDraw = plan.draw;
@@ -1441,6 +1500,9 @@ export async function convertQuotationToInvoice(
           // the Sales-by-User report's "Not recorded" bucket.
           createdById: actor.id ?? null,
           createdByName: actor.name ?? actor.email ?? null,
+          promotionId: offer?.promotionId ?? undefined,
+          promotionCode: offer?.code ?? undefined,
+          promotionDiscount: offer?.total ?? 0,
           items: {
             create: quotation.items.map((item, index) => ({
               itemName: item.itemName,
@@ -1466,6 +1528,7 @@ export async function convertQuotationToInvoice(
               stoneCertificateNumber: item.stoneCertificateNumber ?? null,
               hmCharge: item.hmCharge,
               lineTotal: item.lineTotal,
+              schemeDiscount: linePromo(item),
               inventoryStockId: item.inventoryStockId ?? undefined,
               lotDraw: lotDrawJson(lotDrawByItem.get(item.id)),
               // The piece's metal/stone rows travel with it onto the invoice.
@@ -1506,6 +1569,16 @@ export async function convertQuotationToInvoice(
           },
         },
       });
+
+      // A single-use voucher is spent now, on the invoice — conditional on it
+      // still being unused, so two bills can't redeem the same code at once.
+      if (offer?.voucherId) {
+        const spent = await tx.promotionVoucher.updateMany({
+          where: { id: offer.voucherId, storeId, usedAt: null },
+          data: { usedAt: new Date(), invoiceId: created.id },
+        });
+        if (spent.count !== 1) throw new PromotionVoucherSpentError();
+      }
 
       // The piece is sold now, so the party a hand-typed line came in from
       // becomes a supplier here — see markSourcePartiesAsSuppliers.
@@ -1650,6 +1723,7 @@ export async function convertQuotationToInvoice(
     };
   } catch (error) {
     if (error instanceof OversellError) return { success: false, message: error.message };
+    if (error instanceof PromotionVoucherSpentError) return { success: false, message: error.message };
     logger.error("convertQuotationToInvoice error", error);
     if (error instanceof QuotationStockError) return { success: false, message: error.message };
     return { success: false, message: actionErrorMessage(error, "Failed to convert quotation to invoice") };

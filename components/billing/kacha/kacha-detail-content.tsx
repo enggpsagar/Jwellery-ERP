@@ -200,8 +200,8 @@ export function KachaDetailContent({
           <span>₹{kachaInvoice.stoneCharges.toFixed(2)}</span>
         </div>
         <div className="flex justify-between">
-          <span>Discount</span>
-          <span>-₹{kachaInvoice.discount.toFixed(2)}</span>
+          <span>Discount{kachaInvoice.promotionCode ? ` (incl. offer ${kachaInvoice.promotionCode})` : ""}</span>
+          <span>-₹{(kachaInvoice.discount + (kachaInvoice.promotionDiscount ?? 0)).toFixed(2)}</span>
         </div>
         {kachaInvoice.roundOffAmount !== 0 && (
           <div className="flex justify-between">

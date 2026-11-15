@@ -1253,6 +1253,18 @@ model KachaInvoice {
   locationId     String?
   location       StoreLocation?     @relation(fields: [locationId], references: [id])
 
+  // Offer / gift voucher on this document (lib/promotions.ts), kept apart
+  // from the hand-typed `discount`: promotionDiscount is the total, each
+  // line carries its share (promoDiscount), which becomes that line's
+  // pre-GST schemeDiscount when the document is converted to an invoice.
+  promotionId       String?
+  promotion         Promotion?        @relation(fields: [promotionId], references: [id], onDelete: SetNull)
+  promotionCode     String?
+  promotionDiscount Decimal           @default(0) @db.Decimal(12, 2)
+  // A single-use voucher spent on this estimate (moves to the invoice on
+  // conversion; freed when the estimate is deleted).
+  promotionVoucher  PromotionVoucher? @relation("VoucherRedeemedOnKacha")
+
   // Old gold / silver / diamonds the customer traded in against this slip.
   oldGoldExchange   Purchase?        @relation("OldGoldExchangeKacha")
   @@unique([storeId, slipNumber])
@@ -1304,6 +1316,8 @@ model KachaInvoiceItem {
   stoneClarity       String?
   stoneCertificateNumber String?
   lineTotal          Decimal         @default(0) @db.Decimal(12, 2)
+  // This line's share of the document's offer (promotionDiscount).
+  promoDiscount      Decimal         @default(0) @db.Decimal(12, 2)
   inventoryStockId   String?
   // Set only when this line drew part of a sold-by-weight lot (Product.
   // soldByWeight): the exact weights taken off the stock row
@@ -2045,6 +2059,16 @@ model Quotation {
   // quotation buys nothing: on conversion the shop confirms it and it
   // becomes a real exchange on the new invoice.
   exchangeEstimate  Json?
+  // Offer / gift voucher on this document (lib/promotions.ts), kept apart
+  // from the hand-typed `discount`: promotionDiscount is the total, each
+  // line carries its share (promoDiscount), which becomes that line's
+  // pre-GST schemeDiscount when the document is converted to an invoice.
+  promotionId       String?
+  promotion         Promotion?        @relation(fields: [promotionId], references: [id], onDelete: SetNull)
+  promotionCode     String?
+  promotionDiscount Decimal           @default(0) @db.Decimal(12, 2)
+  // A quotation spends nothing: the code is re-checked and any voucher
+  // spent when it is converted to an invoice.
   @@unique([storeId, quotationNumber])
   @@index([customerId])
   @@index([quotationDate])
@@ -2091,6 +2115,8 @@ model QuotationItem {
   stoneClarity       String?
   stoneCertificateNumber String?
   lineTotal          Decimal         @default(0) @db.Decimal(12, 2)
+  // This line's share of the document's offer (promotionDiscount).
+  promoDiscount      Decimal         @default(0) @db.Decimal(12, 2)
   inventoryStockId   String?
   quotation          Quotation       @relation(fields: [quotationId], references: [id], onDelete: Cascade)
   inventoryStock     InventoryStock? @relation(fields: [inventoryStockId], references: [id])
@@ -3447,6 +3473,8 @@ model Promotion {
   updatedAt        DateTime           @updatedAt
   vouchers         PromotionVoucher[]
   invoices         Invoice[]
+  kachaInvoices    KachaInvoice[]
+  quotations       Quotation[]
 
   @@unique([storeId, code])
   @@index([storeId])
@@ -3469,6 +3497,10 @@ model PromotionVoucher {
   usedAt      DateTime?
   invoiceId   String?   @unique
   invoice     Invoice?  @relation("VoucherRedeemedOn", fields: [invoiceId], references: [id], onDelete: SetNull)
+  // Spent on an estimate (Kacha) instead — moved to invoiceId when the
+  // estimate is converted. At most one of the two is set.
+  kachaInvoiceId String?       @unique
+  kachaInvoice   KachaInvoice? @relation("VoucherRedeemedOnKacha", fields: [kachaInvoiceId], references: [id], onDelete: SetNull)
 
   @@unique([storeId, code])
   @@index([promotionId])

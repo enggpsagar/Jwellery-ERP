@@ -37,6 +37,9 @@ type KachaInvoiceSummary = {
   makingCharges: number
   stoneCharges: number
   discount: number
+  /** Offer / voucher on the estimate (lib/promotions.ts) — moves to the invoice. */
+  promotionCode?: string | null
+  promotionDiscount?: number
   totalAmount: number
   notes: string | null
   customer: {
@@ -50,6 +53,8 @@ type KachaInvoiceSummary = {
     netWeight: number | null
     rate: number | null
     lineTotal: number
+    /** This line's share of the estimate's offer, taken off before GST. */
+    promoDiscount?: number
     purity: string | null
     caratWeight: number | null
     makingCharge: number
@@ -122,7 +127,8 @@ export function ConvertToPakkaForm({
     kachaInvoice.subtotal +
     kachaInvoice.makingCharges +
     kachaInvoice.stoneCharges -
-    kachaInvoice.discount
+    kachaInvoice.discount -
+    (kachaInvoice.promotionDiscount ?? 0)
 
   const [gstRateId, setGstRateId] = useState<string>(
     () =>
@@ -263,6 +269,12 @@ export function ConvertToPakkaForm({
       </div>
 
       <div className="rounded-lg border bg-muted/30 p-4 space-y-1 text-sm max-w-sm ml-auto">
+        {kachaInvoice.promotionCode && (kachaInvoice.promotionDiscount ?? 0) > 0 && (
+          <div className="flex justify-between text-emerald-700" data-testid="convert-offer">
+            <span>Offer ({kachaInvoice.promotionCode}) — before GST</span>
+            <span>-₹{(kachaInvoice.promotionDiscount ?? 0).toFixed(2)}</span>
+          </div>
+        )}
         <div className="flex justify-between">
           <span>Subtotal + Charges</span>
           <span>₹{taxableAmount.toFixed(2)}</span>

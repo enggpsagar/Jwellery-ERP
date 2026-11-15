@@ -570,8 +570,29 @@ customer, optional expiry). Admin: Billing → Offers & Vouchers
   same transaction with a conditional `usedAt: null` update (no double use).
   Cancel/delete frees it. Prints and the detail page label the discount
   "(incl. offer CODE)".
-- New Invoice only (Edit Invoice keeps the discount already on the lines;
-  not on Kacha/Quotation yet).
+- New Invoice, New Estimate and New Quotation (Edit Invoice keeps the
+  discount already on the lines). **Estimates & Quotations (2026-11-15,
+  migration `20261115100000_offers_on_estimates_quotations`):** shared
+  server check `resolveDocumentPromotion` + `saleDocumentPromotionLines`
+  (`lib/promotions.server.ts`; Invoice's `resolveInvoicePromotion` uses it
+  too), shared box `components/billing/promotion-code-box.tsx`. Both docs
+  keep `promotionId/Code/Discount` apart from the hand-typed `discount`, and
+  each line its share in `promoDiscount`.
+  - **Estimate** = a sale: the voucher is spent at save
+    (`PromotionVoucher.kachaInvoiceId`), freed on delete; on Kacha → Pakka it
+    moves to the invoice (`invoiceId`) and each line's share becomes its
+    `schemeDiscount` — `conversionGst` takes `promoDiscount` off the tax base
+    (a multi-part piece scales every part). Delete-all keeps vouchers spent
+    (it keeps the ledger too).
+  - **Quotation** reserves nothing: the code is re-checked at conversion
+    (`lookupPromotionCode`) and a voucher spent on the invoice then. If it no
+    longer applies, conversion refuses unless "Convert without the offer"
+    (`dropOffer`) is ticked. The quoted per-line shares are honoured.
+  - Usage limits and the Offers page count live invoices **plus estimates
+    not yet converted**. Prints / detail / e-mail show the offer inside the
+    Discount row ("incl. offer CODE").
+  - Quotations can't have their lines edited (`updateQuotation` = dates and
+    notes only), so a refused conversion means a new quotation.
 
 ### Added 2026-10-13: party pop-up; live weights replace template weights
 

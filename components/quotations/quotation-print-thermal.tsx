@@ -36,7 +36,7 @@ function lineQuantity(item: QuotationItem) {
  * — duplicated per this codebase's per-file helper convention. */
 function effectiveGstPercent(quotation: Quotation) {
   if (quotation.gstRatePercent != null) return quotation.gstRatePercent
-  const taxable = quotation.subtotal + quotation.makingCharges + quotation.stoneCharges - quotation.discount
+  const taxable = quotation.subtotal + quotation.makingCharges + quotation.stoneCharges - (quotation.discount + (quotation.promotionDiscount ?? 0))
   if (taxable > 0 && quotation.taxAmount > 0) {
     return Math.round((quotation.taxAmount / taxable) * 10000) / 100
   }
@@ -119,10 +119,10 @@ export function QuotationPrintThermal({ quotation, settings }: QuotationPrintThe
           <span>Sub Total</span>
           <span>₹{fmt(subtotal)}</span>
         </div>
-        {quotation.discount > 0 && (
+        {(quotation.discount + (quotation.promotionDiscount ?? 0)) > 0 && (
           <div className="flex justify-between">
-            <span>Discount</span>
-            <span>-₹{fmt(quotation.discount)}</span>
+            <span>Discount{quotation.promotionCode ? ` (incl. offer ${quotation.promotionCode})` : ""}</span>
+            <span>-₹{fmt((quotation.discount + (quotation.promotionDiscount ?? 0)))}</span>
           </div>
         )}
         {hasGst &&

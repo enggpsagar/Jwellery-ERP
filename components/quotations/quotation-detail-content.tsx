@@ -156,8 +156,8 @@ export function QuotationDetailContent({ quotation }: QuotationDetailContentProp
           <span>₹{quotation.stoneCharges.toFixed(2)}</span>
         </div>
         <div className="flex justify-between">
-          <span>Discount</span>
-          <span>-₹{quotation.discount.toFixed(2)}</span>
+          <span>Discount{quotation.promotionCode ? ` (incl. offer ${quotation.promotionCode})` : ""}</span>
+          <span>-₹{(quotation.discount + (quotation.promotionDiscount ?? 0)).toFixed(2)}</span>
         </div>
         <div className="flex justify-between">
           <span>Tax</span>

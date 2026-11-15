@@ -101,10 +101,10 @@ export function KachaPrintThermal({ kachaInvoice, settings, exchange }: KachaPri
           <span>Sub Total</span>
           <span>₹{fmt(subtotal)}</span>
         </div>
-        {kachaInvoice.discount > 0 && (
+        {(kachaInvoice.discount + (kachaInvoice.promotionDiscount ?? 0)) > 0 && (
           <div className="flex justify-between">
-            <span>Discount</span>
-            <span>-₹{fmt(kachaInvoice.discount)}</span>
+            <span>Discount{kachaInvoice.promotionCode ? ` (incl. offer ${kachaInvoice.promotionCode})` : ""}</span>
+            <span>-₹{fmt((kachaInvoice.discount + (kachaInvoice.promotionDiscount ?? 0)))}</span>
           </div>
         )}
         {kachaInvoice.roundOffAmount !== 0 && (

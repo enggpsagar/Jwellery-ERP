@@ -278,7 +278,7 @@ test("a quotation for more weight than a lot has left isn't converted", async ({
 
   await page.goto(`/quotations/${quotation.id}/convert`)
   await page.getByRole("button", { name: "Convert to Invoice" }).click()
-  await expect(page.getByText(/Only 100 g is left of .* Edit the quotation's weight/).first()).toBeVisible()
+  await expect(page.getByText(/Only 100 g is left of .* Make a new quotation/).first()).toBeVisible()
   expect((await db().quotation.findUniqueOrThrow({ where: { id: quotation.id } })).convertedToId).toBeNull()
   expect(await lot(stock.id)).toMatchObject({ quantity: 1, status: "IN_STOCK", net: 100 })
 

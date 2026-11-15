@@ -236,10 +236,10 @@ export function KachaPrintModern({ kachaInvoice, settings, exchange }: KachaPrin
                   <span>Sub Total</span>
                   <span>₹{fmt(subtotal)}</span>
                 </div>
-                {kachaInvoice.discount > 0 && (
+                {(kachaInvoice.discount + (kachaInvoice.promotionDiscount ?? 0)) > 0 && (
                   <div className="flex justify-between border-b border-slate-100 px-3 py-1.5">
-                    <span>Discount</span>
-                    <span>-₹{fmt(kachaInvoice.discount)}</span>
+                    <span>Discount{kachaInvoice.promotionCode ? ` (incl. offer ${kachaInvoice.promotionCode})` : ""}</span>
+                    <span>-₹{fmt((kachaInvoice.discount + (kachaInvoice.promotionDiscount ?? 0)))}</span>
                   </div>
                 )}
                 {kachaInvoice.roundOffAmount !== 0 && (

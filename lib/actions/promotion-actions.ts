@@ -100,10 +100,19 @@ export async function getPromotions(): Promise<PromotionRow[]> {
   if (!promotions.length) return [];
   const ids = promotions.map((p) => p.id);
 
-  const [redemptions, issued, used] = await Promise.all([
+  // Redemptions = live invoices + estimates not yet converted (a converted
+  // estimate's invoice already counts) — the same rule lookupPromotionCode
+  // enforces usage limits with. Quotations reserve nothing.
+  const [redemptions, estimateRedemptions, issued, used] = await Promise.all([
     prisma.invoice.groupBy({
       by: ["promotionId"],
       where: { storeId, promotionId: { in: ids }, status: { not: InvoiceStatus.CANCELLED } },
+      _count: { _all: true },
+      _sum: { promotionDiscount: true },
+    }),
+    prisma.kachaInvoice.groupBy({
+      by: ["promotionId"],
+      where: { storeId, promotionId: { in: ids }, convertedToId: null },
       _count: { _all: true },
       _sum: { promotionDiscount: true },
     }),
@@ -120,6 +129,7 @@ export async function getPromotions(): Promise<PromotionRow[]> {
   ]);
 
   const redemptionMap = new Map(redemptions.map((r) => [r.promotionId, r]));
+  const estimateMap = new Map(estimateRedemptions.map((r) => [r.promotionId, r]));
   const issuedMap = new Map(issued.map((r) => [r.promotionId, r._count._all]));
   const usedMap = new Map(used.map((r) => [r.promotionId, r._count._all]));
 
@@ -145,8 +155,10 @@ export async function getPromotions(): Promise<PromotionRow[]> {
     usageLimit: p.usageLimit,
     perCustomerLimit: p.perCustomerLimit,
     createdAt: p.createdAt.toISOString(),
-    redemptions: redemptionMap.get(p.id)?._count._all ?? 0,
-    discountGiven: Number(redemptionMap.get(p.id)?._sum.promotionDiscount ?? 0),
+    redemptions: (redemptionMap.get(p.id)?._count._all ?? 0) + (estimateMap.get(p.id)?._count._all ?? 0),
+    discountGiven:
+      Number(redemptionMap.get(p.id)?._sum.promotionDiscount ?? 0) +
+      Number(estimateMap.get(p.id)?._sum.promotionDiscount ?? 0),
     vouchersIssued: issuedMap.get(p.id) ?? 0,
     vouchersUsed: usedMap.get(p.id) ?? 0,
   }));

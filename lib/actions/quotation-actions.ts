@@ -1182,6 +1182,41 @@ export async function bulkDeleteQuotations(ids: string[]): Promise<BulkDeleteRes
  * "paid now" are fresh inputs on the convert form since a quotation has
  * neither concept.
  */
+
+/** Thrown inside the conversion transaction when stock ran out mid-way. */
+class QuotationStockError extends Error {}
+
+/**
+ * Why a quotation's stock pieces can't all be billed now, or null. Pieces
+ * of one stock row across several lines are added up first.
+ */
+async function quotationPieceShortage(
+  storeId: string,
+  items: { inventoryStockId: string; quantity: number; itemName: string }[],
+): Promise<string | null> {
+  if (!items.length) return null
+  const wanted = new Map<string, { quantity: number; itemName: string }>()
+  for (const item of items) {
+    const entry = wanted.get(item.inventoryStockId) ?? { quantity: 0, itemName: item.itemName }
+    entry.quantity += Math.max(1, item.quantity || 1)
+    wanted.set(item.inventoryStockId, entry)
+  }
+  const rows = await prisma.inventoryStock.findMany({
+    where: { storeId, id: { in: [...wanted.keys()] } },
+    select: { id: true, quantity: true, status: true, stockCode: true },
+  })
+  const byId = new Map(rows.map((row) => [row.id, row]))
+  for (const [stockId, { quantity, itemName }] of wanted) {
+    const row = byId.get(stockId)
+    const left = row && row.status === InventoryStockStatus.IN_STOCK ? row.quantity : 0
+    if (left < quantity) {
+      const code = row ? ` (${row.stockCode})` : ""
+      return `Only ${left} of ${itemName}${code} ${left === 1 ? "is" : "are"} in stock, but the quotation has ${quantity}. Edit the quotation to what's left, then convert it.`
+    }
+  }
+  return null
+}
+
 export async function convertQuotationToInvoice(
   quotationId: string,
   prevState: QuotationFormState = initialState,
@@ -1361,6 +1396,19 @@ export async function convertQuotationToInvoice(
       lotLeft.set(lot.id, subtractLotWeights(left, draw));
     }
 
+    // Pieces get the same rule as lots: a quotation reserves nothing, so if
+    // the pieces were sold elsewhere in the meantime the conversion stops
+    // here rather than billing pieces it can't take out of stock. The
+    // quotation can be edited down to what's left and converted then.
+    const pieceShortage = await quotationPieceShortage(
+      storeId,
+      quotation.items.filter(
+        (item): item is typeof item & { inventoryStockId: string } =>
+          Boolean(item.inventoryStockId) && !lotDrawByItem.has(item.id),
+      ),
+    );
+    if (pieceShortage) return { success: false, message: pieceShortage };
+
     // Default interactive-transaction timeout is 5s — the per-item stock
     // lookup+decrement loop below can exceed that on a multi-line quotation
     // over a real (non-local) DB connection and throw P2028 ("Transaction
@@ -1485,32 +1533,29 @@ export async function convertQuotationToInvoice(
         }
 
         // Decrement rather than flipping the whole row to SOLD: a row of
-        // 100 pieces that sells 2 still has 98 on hand.
-        //
-        // Clamped at zero instead of refusing: a quotation reserves nothing,
-        // so between quoting and converting the stock may legitimately have
-        // been sold elsewhere. Going negative would be worse than clamping,
-        // and blocking the conversion outright would strand the quotation.
+        // 100 pieces that sells 2 still has 98 on hand. Guarded, so a sale
+        // elsewhere between the check above and here can't take it below
+        // zero — the whole conversion rolls back instead.
         const soldQty = Math.max(1, item.quantity || 1);
-        const currentStock = await tx.inventoryStock.findFirst({
-          where: { id: item.inventoryStockId, storeId },
-          select: { quantity: true },
-        });
-        if (!currentStock) continue;
-
-        const takeQty = Math.min(soldQty, currentStock.quantity);
-        const remaining = currentStock.quantity - takeQty;
-
-        // saleAmount is deliberately left untouched — see the identical
-        // comment in invoice-actions.ts's createInvoice.
+        const takeQty = soldQty;
         const { count } = await tx.inventoryStock.updateMany({
-          where: { id: item.inventoryStockId, storeId },
-          data: {
-            ...(takeQty > 0 ? { quantity: { decrement: takeQty } } : {}),
-            ...(remaining <= 0 ? { status: InventoryStockStatus.SOLD } : {}),
+          where: {
+            id: item.inventoryStockId,
+            storeId,
+            status: InventoryStockStatus.IN_STOCK,
+            quantity: { gte: soldQty },
           },
+          data: { quantity: { decrement: soldQty } },
         });
-        if (count === 0) continue;
+        if (count === 0) {
+          throw new QuotationStockError(
+            `${item.itemName} was just sold elsewhere, so there isn't enough of it left. Refresh, edit the quotation and try again.`,
+          );
+        }
+        await tx.inventoryStock.updateMany({
+          where: { id: item.inventoryStockId, storeId, quantity: { lte: 0 } },
+          data: { status: InventoryStockStatus.SOLD },
+        });
 
         await tx.inventoryTransaction.create({
           data: {
@@ -1606,6 +1651,7 @@ export async function convertQuotationToInvoice(
   } catch (error) {
     if (error instanceof OversellError) return { success: false, message: error.message };
     logger.error("convertQuotationToInvoice error", error);
+    if (error instanceof QuotationStockError) return { success: false, message: error.message };
     return { success: false, message: actionErrorMessage(error, "Failed to convert quotation to invoice") };
   }
 }

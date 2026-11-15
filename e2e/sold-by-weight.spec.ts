@@ -205,16 +205,18 @@ test("a sold-by-weight product with stock refuses a Sold by weight switch even i
   expect(crashes).toEqual([])
 })
 
-test("an invoice with a return can't be cancelled, so a returned lot isn't given back twice", async ({ page }) => {
+test("cancelling an invoice with a return gives back only what wasn't returned", async ({ page }) => {
   const crashes = watchForPageCrash(page)
   const { storeId, stock, product } = await seedBarLot()
 
   const invoiceId = await sellFromLot(page, product.productCode, "30")
   expect(await lot(stock.id)).toMatchObject({ net: 70 })
 
-  // A credit note on the invoice (its stock was already returned by it).
+  // A credit note returned the lot line. Seeded directly, so the stock
+  // isn't put back here — which makes a second restore by cancel visible.
   const invoice = await db().invoice.findUniqueOrThrow({ where: { id: invoiceId }, include: { items: true } })
-  const note = await db().creditNote.create({
+  await db().invoice.update({ where: { id: invoiceId }, data: { status: "PARTIAL" } })
+  await db().creditNote.create({
     data: {
       storeId,
       invoiceId,
@@ -234,11 +236,15 @@ test("an invoice with a return can't be cancelled, so a returned lot isn't given
   await page.goto(`/billing/${invoiceId}`)
   await page.getByRole("button", { name: "Cancel Invoice" }).click()
   await page.getByRole("dialog").getByRole("button", { name: "Cancel Invoice" }).click()
-  await expect(page.getByText(new RegExp(`returned \\(credit note ${note.creditNoteNumber}\\), so it can't be cancelled`)).first()).toBeVisible()
-  expect((await db().invoice.findUniqueOrThrow({ where: { id: invoiceId } })).status).not.toBe("CANCELLED")
+  await expect.poll(async () => (await db().invoice.findUniqueOrThrow({ where: { id: invoiceId } })).status).toBe("CANCELLED")
+  // The returned line's 30 g is not given back a second time.
   expect(await lot(stock.id)).toMatchObject({ net: 70 })
+  expect(
+    await db().inventoryTransaction.count({
+      where: { inventoryStockId: stock.id, referenceId: invoiceId, transactionType: "SALE_RETURN" },
+    }),
+  ).toBe(0)
 
-  await db().creditNote.delete({ where: { id: note.id } })
   expect(crashes).toEqual([])
 })
 

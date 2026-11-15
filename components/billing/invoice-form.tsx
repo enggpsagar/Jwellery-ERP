@@ -89,9 +89,16 @@ import { AddCategoryDialog } from "@/components/inventory/shared/add-category-di
 import { AddCategoryTypeDialog } from "@/components/inventory/shared/add-category-type-dialog"
 import { LinkedProductDetails } from "@/components/inventory/shared/linked-product-details"
 import type { StockOptionProductDetails } from "@/lib/inventory/stock-option-details"
-import { stockPieceDrafts, stoneSellingRate, type LinkedStoneDetails } from "@/lib/inventory/stock-pick-rates"
+import { stockPieceDrafts, stockSaleRate, stoneSellingRate, type LinkedStoneDetails } from "@/lib/inventory/stock-pick-rates"
 import { IconTooltip } from "@/components/ui/icon-tooltip"
-import { LOT_EPSILON, lotMeasure, previewLotDraw, toLotWeights, type LotMeasure, type LotWeights } from "@/lib/inventory/weight-lot"
+import { LOT_EPSILON, type LotMeasure, type LotWeights } from "@/lib/inventory/weight-lot"
+import {
+  lotHint as sharedLotHint,
+  lotLeftFor as sharedLotLeftFor,
+  lotLinePatch as sharedLotLinePatch,
+  lotOfStock as sharedLotOfStock,
+  lotProblem as sharedLotProblem,
+} from "@/lib/inventory/sale-form-lots"
 
 type CustomerOption = {
   id: string
@@ -774,72 +781,29 @@ export function InvoiceForm({
   // Sold-by-weight lots (lib/inventory/weight-lot.ts). The lot is always
   // the picked option's own weights (never the line's, which are already
   // the reduced draw), so the proportional maths runs from the whole lot.
-  const lotOfStock = (stock: StockOption | undefined) => {
-    if (!stock?.sellsByWeight || stock.components?.length) return null
-    const weights = toLotWeights(stock)
-    const measure = lotMeasure(weights)
-    return measure ? { weights, measure, label: stock.productName } : null
-  }
+  const lotOfStock = (stock: StockOption | undefined) => sharedLotOfStock(stock)
   const lotFor = (item: LineItem) =>
     item.inventoryStockId && !item.multiPart
       ? lotOfStock(stockItems.find((s) => s.id === item.inventoryStockId))
       : null
-  // What's left of a lot for one line: the lot less every other line on it.
-  const lotLeftFor = (
-    stockId: string,
-    lot: { weights: LotWeights; measure: LotMeasure },
-    excludeKey: string,
-    lines: LineItem[] = items,
-  ) =>
-    lot.weights[lot.measure] -
-    lines
-      .filter((line) => line.key !== excludeKey && line.inventoryStockId === stockId && !line.multiPart)
-      .reduce((sum, line) => sum + (line[lot.measure] || 0), 0)
-  // The line's weights for `amount` of the lot (in its measure): every
-  // weight in proportion, so metal value, stone charge, % making and GST
-  // all re-derive from the existing line fields.
+  // Shared with the other sale forms: lib/inventory/sale-form-lots.ts.
+  const lotLeftFor = (stockId: string, lot: { weights: LotWeights; measure: LotMeasure }, excludeKey: string) =>
+    sharedLotLeftFor(items, stockId, lot, excludeKey)
   const lotLinePatch = (
     item: Pick<LineItem, "stoneRate" | "stoneChargeTouched" | "caratWeight">,
     lot: { weights: LotWeights; measure: LotMeasure },
     amount: number,
-  ): Partial<LineItem> => {
-    const draw = previewLotDraw(lot.weights, amount)
-    const patch: Partial<LineItem> = draw
-      ? {
-          grossWeight: draw.grossWeight,
-          netWeight: draw.netWeight,
-          caratWeight: draw.caratWeight,
-          stoneWeightInput: draw.stoneWeight,
-        }
-      : { [lot.measure]: amount }
-    patch.quantity = 1
-    const carats = patch.caratWeight ?? item.caratWeight
-    if (!item.stoneChargeTouched && item.stoneRate > 0) {
-      patch.stoneCharge = Number((item.stoneRate * carats).toFixed(2))
-    }
-    return patch
-  }
+  ): Partial<LineItem> => sharedLotLinePatch(item, lot, amount)
   const handleLotAmountChange = (item: LineItem, amount: number) => {
     const lot = lotFor(item)
     if (lot) updateItem(item.key, lotLinePatch(item, lot, amount))
   }
   const formatLotWeight = (measure: LotMeasure, value: number) =>
     measure === "caratWeight" ? wf.carats(value) : wf.grams(value)
-  // A lot line's problem, if any: nothing sold, or the lines on this lot
-  // together asking for more than is left.
-  const lotProblem = (item: LineItem): string | null => {
-    const lot = lotFor(item)
-    if (!lot) return null
-    const amount = item[lot.measure] || 0
-    if (!(amount > LOT_EPSILON)) return `Enter how much of ${lot.label} is sold.`
-    const billed = lot.weights[lot.measure] - lotLeftFor(item.inventoryStockId, lot, "")
-    if (billed > lot.weights[lot.measure] + LOT_EPSILON) {
-      return `Only ${formatLotWeight(lot.measure, lot.weights[lot.measure])} of ${lot.label} is left, but ${formatLotWeight(lot.measure, billed)} is on this bill.`
-    }
-    return null
-  }
+  const lotProblem = (item: LineItem): string | null =>
+    sharedLotProblem(items, item, lotFor(item), { verb: "sold", noun: "bill" }, formatLotWeight)
   const lotHint = (item: LineItem, lot: { weights: LotWeights; measure: LotMeasure }) =>
-    `of ${formatLotWeight(lot.measure, Math.max(0, lotLeftFor(item.inventoryStockId, lot, item.key)))} left — sold by weight`
+    sharedLotHint(items, item, lot, formatLotWeight)
 
   /**
    * Everything a picked or scanned stock piece puts on its line — one
@@ -1147,14 +1111,8 @@ export function InvoiceForm({
   // resolveStockSellingRate), else today's fine rate (the Metal Rates board,
   // 24K gold / silver) scaled by the purity's fineness — so 18K at 75% of
   // today's 24K rate instead of a blank field. Still editable.
-  const stockSellingRate = (stock: StockOption) => {
-    const metal = metalById.get(stock.metalType?.id ?? "")
-    const configured = resolveStockSellingRate(stock, metal?.sellingPrice)
-    if (configured > 0 || stock.purityFineness == null) return configured
-    const family = classifyMetalName(metal?.name ?? stock.metalType?.name)
-    const fineRate = family === "GOLD" ? fineRates.gold : family === "SILVER" ? fineRates.silver : null
-    return fineRate ? Number(((fineRate * stock.purityFineness) / 100).toFixed(2)) : configured
-  }
+  const stockSellingRate = (stock: StockOption) =>
+    stockSaleRate(stock, metalById.get(stock.metalType?.id ?? ""), fineRates)
 
   // Real per-Metal Purity options (Settings > Taxonomy > Purities),
   // replacing the old global PURITY_SELECT_OPTIONS enum list — cached per
@@ -3118,7 +3076,7 @@ export function InvoiceForm({
                 ) : (
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-emerald-800">
-                      This customer has <span className="font-semibold">₹{customerCredit.toFixed(2)}</span> credit available.
+                      You owe this party <span className="font-semibold">₹{customerCredit.toFixed(2)}</span> (credit notes, advances or purchases) — set it off against this bill.
                     </span>
                     <Button
                       type="button"

@@ -1938,6 +1938,9 @@ export async function createInvoice(
             locationId: resolvedLocationId ?? undefined,
           },
         });
+        await tx.ledgerEntry.create({
+          data: storeCreditUsedEntry(storeId, customerId, creditApplied, invoiceNumber, resolvedLocationId),
+        });
       }
 
       // A single-use voucher is spent on this invoice — conditional on it
@@ -2108,6 +2111,15 @@ export async function recordInvoicePayment(
                 locationId: invoice.locationId ?? undefined,
               },
             }),
+            prisma.ledgerEntry.create({
+              data: storeCreditUsedEntry(
+                storeId,
+                invoice.customerId,
+                creditApplied,
+                invoice.invoiceNumber,
+                invoice.locationId,
+              ),
+            }),
           ]
         : []),
     ]);
@@ -2193,11 +2205,51 @@ export async function setInvoiceDueDate(
 }
 
 /**
- * Why an invoice with returns can't be cancelled or edited, or null when it
- * has none. A credit note has already put its lines' stock back (and posted
- * its own refund); cancel / edit restore every line again from the invoice,
- * so the returned pieces or lot weight would come back twice. Edit also
- * recreates the lines, which the credit note's lines still point at.
+ * The other half of applying store credit. The CREDIT_APPLIED credit on the
+ * invoice settles the invoice (it counts as paid); this matching DEBIT, not
+ * tied to the invoice, uses the party's existing credit up. Without it the
+ * party's net balance never dropped, so the same credit could be applied
+ * again and again. Together they net to zero on the party's balance.
+ */
+function storeCreditUsedEntry(
+  storeId: string,
+  customerId: string,
+  amount: number,
+  invoiceNumber: string,
+  locationId: string | null | undefined,
+) {
+  return {
+    storeId,
+    type: LedgerEntryType.DEBIT,
+    sourceType: LedgerSourceType.CREDIT_APPLIED,
+    customerId,
+    amount,
+    description: `Store credit used on ${invoiceNumber}`,
+    locationId: locationId ?? undefined,
+  };
+}
+
+/** Σ CreditNoteItem.quantity per invoice line. */
+async function returnedQuantities(
+  tx: Pick<typeof prisma, "creditNoteItem">,
+  invoiceItemIds: string[],
+): Promise<Map<string, number>> {
+  if (!invoiceItemIds.length) return new Map();
+  const rows = await tx.creditNoteItem.groupBy({
+    by: ["invoiceItemId"],
+    where: { invoiceItemId: { in: invoiceItemIds } },
+    _sum: { quantity: true },
+  });
+  return new Map(rows.map((row) => [row.invoiceItemId, row._sum.quantity ?? 0]));
+}
+
+/**
+ * Why an invoice with returns can't be edited, or null when it has none. A
+ * credit note has already put its lines' stock back (and posted its own
+ * refund); edit restores every line again from the invoice, so returned
+ * pieces or lot weight would come back twice, and it recreates the lines the
+ * credit note's lines still point at. (Cancel is allowed: it skips what was
+ * returned — see cancelInvoice.)
  */
 async function invoiceReturnsBlock(storeId: string, invoiceId: string, action: string): Promise<string | null> {
   const notes = await prisma.creditNote.findMany({
@@ -3227,9 +3279,6 @@ export async function cancelInvoice(
       };
     }
 
-    const cancelReturnsBlock = await invoiceReturnsBlock(storeId, invoice.id, "cancelled");
-    if (cancelReturnsBlock) return { success: false, message: cancelReturnsBlock };
-
     const cancellationReason = String(formData.get("cancellationReason") || "").trim() || null;
     const balanceAmount = Number(invoice.balanceAmount);
 
@@ -3237,12 +3286,19 @@ export async function cancelInvoice(
     // loop can exceed the default 5s interactive-transaction timeout on a
     // multi-line invoice.
     await prisma.$transaction(async (tx) => {
+      // What credit notes already returned per line — that stock is back
+      // already, so cancelling gives back only the rest (never twice).
+      const returnedByItem = await returnedQuantities(tx, invoice.items.map((item) => item.id));
+
       for (const item of invoice.items) {
         if (!item.inventoryStockId) continue;
+        const returned = returnedByItem.get(item.id) ?? 0;
 
-        // A lot line gives back exactly the weight it drew.
+        // A lot line gives back exactly the weight it drew — unless a credit
+        // note already did (a lot line is always returned whole).
         const draw = parseLotDraw(item.lotDraw);
         if (draw) {
+          if (returned > 0) continue;
           await restoreToLot(tx, {
             storeId,
             stockId: item.inventoryStockId,
@@ -3254,7 +3310,8 @@ export async function cancelInvoice(
           continue;
         }
 
-        const restoreQty = Math.max(1, item.quantity || 1);
+        const restoreQty = Math.max(1, item.quantity || 1) - returned;
+        if (restoreQty <= 0) continue;
 
         // No `gte` guard needed for an increment — there's no way to
         // "over-restore" past what this invoice itself decremented.

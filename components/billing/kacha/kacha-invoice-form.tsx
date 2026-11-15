@@ -15,7 +15,14 @@ import {
 import { computeRoundOff } from "@/lib/round-off"
 import { useToast } from "@/components/providers/toast-provider"
 import { cn } from "@/lib/utils"
-import { LOT_EPSILON, lotMeasure, previewLotDraw, toLotWeights, type LotMeasure, type LotWeights } from "@/lib/inventory/weight-lot"
+import { LOT_EPSILON, type LotMeasure, type LotWeights } from "@/lib/inventory/weight-lot"
+import {
+  lotHint as sharedLotHint,
+  lotLeftFor as sharedLotLeftFor,
+  lotLinePatch as sharedLotLinePatch,
+  lotOfStock as sharedLotOfStock,
+  lotProblem as sharedLotProblem,
+} from "@/lib/inventory/sale-form-lots"
 
 import { Input } from "@/components/ui/input"
 import { LinkedProductDetails } from "@/components/inventory/shared/linked-product-details"
@@ -63,7 +70,7 @@ import { IncludesStoneToggle } from "@/components/ui/includes-stone-toggle"
 import { AddMetalDialog } from "@/components/inventory/shared/add-metal-dialog"
 import { AddPurityDialog } from "@/components/inventory/shared/add-purity-dialog"
 import { PieceComponentsEditor, StoneDetailsInputs } from "@/components/shared/piece-components-editor"
-import { stockPieceDrafts, stoneSellingRate, type LinkedStoneDetails } from "@/lib/inventory/stock-pick-rates"
+import { stockPieceDrafts, stockSaleRate, stoneSellingRate, type LinkedStoneDetails } from "@/lib/inventory/stock-pick-rates"
 import { MultiPartQuestion } from "@/components/shared/multi-part-question"
 import type { GstRateRow } from "@/lib/actions/gst-rate-actions"
 import {
@@ -562,67 +569,29 @@ export function KachaInvoiceForm({
   // invoice-form.tsx. The lot is always the picked option's own weights
   // (never the line's already-reduced ones), so the proportional maths
   // runs from the whole lot.
-  const lotOfStock = (stock: StockOption | undefined) => {
-    if (!stock?.sellsByWeight || stock.components?.length) return null
-    const weights = toLotWeights(stock)
-    const measure = lotMeasure(weights)
-    return measure ? { weights, measure, label: stock.productName } : null
-  }
+  const lotOfStock = (stock: StockOption | undefined) => sharedLotOfStock(stock)
   const lotFor = (item: LineItem) =>
     item.inventoryStockId && !item.multiPart
       ? lotOfStock(stockItems.find((s) => s.id === item.inventoryStockId))
       : null
-  // What's left of a lot for one line: the lot less every other line on it.
+  // Shared with the other sale forms: lib/inventory/sale-form-lots.ts.
   const lotLeftFor = (stockId: string, lot: { weights: LotWeights; measure: LotMeasure }, excludeKey: string) =>
-    lot.weights[lot.measure] -
-    items
-      .filter((line) => line.key !== excludeKey && line.inventoryStockId === stockId && !line.multiPart)
-      .reduce((sum, line) => sum + (line[lot.measure] || 0), 0)
-  // The line's weights for `amount` of the lot (in its measure): every
-  // weight in proportion, so metal value, stone charge, % making and the
-  // total all re-derive from the existing line fields.
+    sharedLotLeftFor(items, stockId, lot, excludeKey)
   const lotLinePatch = (
     item: Pick<LineItem, "stoneRate" | "stoneChargeTouched" | "caratWeight">,
     lot: { weights: LotWeights; measure: LotMeasure },
     amount: number,
-  ): Partial<LineItem> => {
-    const draw = previewLotDraw(lot.weights, amount)
-    const patch: Partial<LineItem> = draw
-      ? {
-          grossWeight: draw.grossWeight,
-          netWeight: draw.netWeight,
-          caratWeight: draw.caratWeight,
-          stoneWeightInput: draw.stoneWeight,
-        }
-      : { [lot.measure]: amount }
-    patch.quantity = 1
-    const carats = patch.caratWeight ?? item.caratWeight
-    if (!item.stoneChargeTouched && item.stoneRate > 0) {
-      patch.stoneCharge = Number((item.stoneRate * carats).toFixed(2))
-    }
-    return patch
-  }
+  ): Partial<LineItem> => sharedLotLinePatch(item, lot, amount)
   const handleLotAmountChange = (item: LineItem, amount: number) => {
     const lot = lotFor(item)
     if (lot) updateItem(item.key, lotLinePatch(item, lot, amount))
   }
   const formatLotWeight = (measure: LotMeasure, value: number) =>
     measure === "caratWeight" ? wf.carats(value) : wf.grams(value)
-  // A lot line's problem, if any: nothing sold, or the lines on this lot
-  // together asking for more than is left.
-  const lotProblem = (item: LineItem): string | null => {
-    const lot = lotFor(item)
-    if (!lot) return null
-    const amount = item[lot.measure] || 0
-    if (!(amount > LOT_EPSILON)) return `Enter how much of ${lot.label} is sold.`
-    const billed = lot.weights[lot.measure] - lotLeftFor(item.inventoryStockId, lot, "")
-    if (billed > lot.weights[lot.measure] + LOT_EPSILON) {
-      return `Only ${formatLotWeight(lot.measure, lot.weights[lot.measure])} of ${lot.label} is left, but ${formatLotWeight(lot.measure, billed)} is on this estimate.`
-    }
-    return null
-  }
+  const lotProblem = (item: LineItem): string | null =>
+    sharedLotProblem(items, item, lotFor(item), { verb: "sold", noun: "estimate" }, formatLotWeight)
   const lotHint = (item: LineItem, lot: { weights: LotWeights; measure: LotMeasure }) =>
-    `of ${formatLotWeight(lot.measure, Math.max(0, lotLeftFor(item.inventoryStockId, lot, item.key)))} left — sold by weight`
+    sharedLotHint(items, item, lot, formatLotWeight)
 
   const applyStockToItem = (key: string, stockId: string) => {
     const stock = stockItems.find((s) => s.id === stockId)
@@ -711,7 +680,9 @@ export function KachaInvoiceForm({
       // See resolveStockSellingRate's own doc comment (lib/purity.ts) — the
       // store's own configured per-Purity/per-Stone-Type Selling Price
       // (Settings > Taxonomy) now wins over the legacy metal-level fallback.
-      rate: resolveStockSellingRate(stock, metalById.get(stock.metalType?.id ?? "")?.sellingPrice),
+      // …else today's Metal Rates board × the purity's fineness, same as
+      // Invoice (stockSaleRate, lib/inventory/stock-pick-rates.ts).
+      rate: stockSaleRate(stock, metalById.get(stock.metalType?.id ?? ""), fineRates),
       quantity: available > 0 ? 1 : 0,
       caratWeight: stock.caratWeight ?? 0,
       // The piece's / Product's own stone rate, else the Stone Type's

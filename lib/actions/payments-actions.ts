@@ -360,38 +360,24 @@ export async function getPaymentFormCustomersWithBalance(): Promise<PaymentCusto
 }
 
 /**
- * How much of a single customer's own store credit (a negative ledger-
- * derived currentBalance — see PaymentCustomerOption's own comment for the
- * full formula, same as mapCustomer's) is available to draw down against a
- * new document right now. Zero for a customer with no credit (a positive or
- * zero balance), never negative. Scoped to one customer via findFirst
- * rather than reusing getPaymentFormCustomersWithBalance's findMany, since
- * a caller here only ever needs this for whichever single customer is
- * currently selected — see invoice-form.tsx's "Apply Credit" flow and
- * createInvoice's own re-validation of it in invoice-actions.ts, both of
- * which call this exact function so the formula can never drift between
- * what's shown and what's enforced.
+ * How much credit a party has that can be applied to a new invoice right
+ * now: what the store owes them on their ONE net balance (lib/party-balance.ts
+ * — sales, payments, returns AND purchases from them, opening balance
+ * included), so money owed to a party that also supplies the store can be
+ * set off against what they buy. Zero when they owe the store or are
+ * settled, never negative. invoice-form.tsx's "Apply Credit" flow and
+ * createInvoice / recordInvoicePayment's re-check both call this, so what's
+ * shown and what's enforced can't drift. Applying it posts a matching
+ * "store credit used" debit (storeCreditUsedEntry, invoice-actions.ts), so
+ * the same credit can't be applied twice.
  */
 export async function getCustomerAvailableCredit(customerId: string): Promise<number> {
   const storeId = await requireStoreScope()
-
-  const customer = await prisma.customer.findFirst({
-    where: { id: customerId, storeId },
-    select: {
-      openingBalance: true,
-      ledgerEntries: { select: { amount: true, type: true } },
-    },
-  })
-  if (!customer) return 0
-
-  const currentBalance =
-    Number(customer.openingBalance ?? 0) +
-    customer.ledgerEntries.reduce(
-      (sum, e) => sum + (e.type === "DEBIT" ? Number(e.amount ?? 0) : -Number(e.amount ?? 0)),
-      0,
-    )
-
-  return Math.max(0, -currentBalance)
+  const exists = await prisma.customer.findFirst({ where: { id: customerId, storeId }, select: { id: true } })
+  if (!exists) return 0
+  const nets = await getPartyNetBalances(storeId, [customerId])
+  const net = nets.get(customerId) ?? 0
+  return Math.max(0, Math.round(-net * 100) / 100)
 }
 
 /**

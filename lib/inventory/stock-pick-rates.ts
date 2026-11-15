@@ -9,6 +9,7 @@
 // purity's fineness, else the row's stored rate.
 
 import { classifyMetalName } from "@/lib/business-units"
+import { resolveStockSellingRate } from "@/lib/purity"
 import {
   fromStoredComponents,
   round2,
@@ -87,4 +88,26 @@ export function stockPieceDrafts(
       ) || draft.rate
     return { ...draft, rate, amount: round2((draft.caratWeight || 0) * rate), amountTouched: false }
   })
+}
+
+/**
+ * A picked single-part piece's Rate / g on any sale form: its own sale
+ * rate, else the configured per-Purity / per-Stone-Type / per-Metal Selling
+ * Price (resolveStockSellingRate), else today's fine rate (the Metal Rates
+ * board, 24K gold / silver) scaled by the purity's fineness — so 18K opens at
+ * 75% of today's 24K rate instead of a blank field. Still editable.
+ */
+export function stockSaleRate(
+  stock: Parameters<typeof resolveStockSellingRate>[0] & {
+    purityFineness: number | null
+    metalType?: { id: string; name: string } | null
+  },
+  metal: MetalLike | undefined,
+  fineRates: FineRates,
+): number {
+  const configured = resolveStockSellingRate(stock, metal?.sellingPrice)
+  if (configured > 0 || stock.purityFineness == null) return configured
+  const family = classifyMetalName(metal?.name ?? stock.metalType?.name)
+  const fineRate = family === "GOLD" ? fineRates.gold : family === "SILVER" ? fineRates.silver : null
+  return fineRate ? round2((fineRate * stock.purityFineness) / 100) : configured
 }

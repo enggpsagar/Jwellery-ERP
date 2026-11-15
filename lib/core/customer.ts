@@ -596,8 +596,14 @@ export async function updateCustomerCore(
 export async function getPartyNetBalances(
   storeId: string,
   partyIds?: string[],
+  options: { locationIds?: string[] } = {},
 ): Promise<Map<string, number>> {
   const idFilter = partyIds ? { in: partyIds } : { not: null };
+  // locationIds (a location-restricted user, lib/location-scope.ts): only
+  // ledger entries filed at those locations count, and opening balances are
+  // left out — an opening balance belongs to the party, not to a counter.
+  const locationIds = options.locationIds;
+  const locationFilter = locationIds ? { locationId: { in: locationIds } } : {};
   const [parties, saleSide, purchaseSide] = await Promise.all([
     prisma.customer.findMany({
       where: { storeId, ...(partyIds ? { id: { in: partyIds } } : {}) },
@@ -605,14 +611,14 @@ export async function getPartyNetBalances(
     }),
     prisma.ledgerEntry.groupBy({
       by: ["customerId", "type"],
-      where: { storeId, customerId: idFilter },
+      where: { storeId, customerId: idFilter, ...locationFilter },
       _sum: { amount: true },
     }),
     // Same rule as CUSTOMER_LIST_INCLUDE.ledgerEntriesAsVendor: a row with a
     // customerId is already counted on the sale side.
     prisma.ledgerEntry.groupBy({
       by: ["vendorId", "type"],
-      where: { storeId, customerId: null, vendorId: idFilter },
+      where: { storeId, customerId: null, vendorId: idFilter, ...locationFilter },
       _sum: { amount: true },
     }),
   ]);
@@ -628,7 +634,7 @@ export async function getPartyNetBalances(
   return new Map(
     parties.map((party) => [
       party.id,
-      partyNetBalance(party.openingBalance, [{ type: "DEBIT", amount: deltas.get(party.id) ?? 0 }]),
+      partyNetBalance(locationIds ? 0 : party.openingBalance, [{ type: "DEBIT", amount: deltas.get(party.id) ?? 0 }]),
     ]),
   );
 }

@@ -1,6 +1,7 @@
 "use server"
 
 import { revalidatePath } from "next/cache"
+import { revalidateStockViews } from "@/lib/inventory/revalidate-stock-views"
 import { LedgerEntryType, LedgerSourceType, PaymentMethod, InvoiceStatus, Prisma } from "@prisma/client"
 
 import { prisma } from "@/lib/prisma"
@@ -498,6 +499,8 @@ export async function recordCustomerPayment(
     revalidatePath("/dashboard")
     revalidatePath("/billing")
     revalidatePath("/billing/kacha")
+    // The Parties list / panel show the net balance this payment moved.
+    revalidateStockViews({ stock: false })
 
     return { success: true, message: "Payment In recorded" }
   } catch (error) {
@@ -614,6 +617,7 @@ export async function recordPaymentOut(
       revalidatePath(`/customers/${vendorId}`)
       revalidatePath("/dashboard")
       revalidatePath("/purchases")
+      revalidateStockViews({ stock: false })
 
       return { success: true, message: "Payment Out recorded" }
     }

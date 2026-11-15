@@ -30,6 +30,7 @@ import { omitHiddenKeys } from "@/lib/sheet-features";
 import { getSheetFeatures } from "@/lib/sheet-features.server";
 import { parseLotDraw } from "@/lib/inventory/weight-lot";
 import { restoreToLot } from "@/lib/inventory/weight-lot.server";
+import { revalidateStockViews } from "@/lib/inventory/revalidate-stock-views";
 
 export type CreditNoteFormState = {
   success: boolean;
@@ -641,6 +642,8 @@ export async function createCreditNote(
     revalidatePath("/customers");
     revalidatePath(`/customers/${invoice.customerId}`);
     revalidatePath("/inventory/stock");
+    // Returned stock (incl. sold-by-weight lots) + the party's net balance.
+    revalidateStockViews();
 
     return {
       success: true,

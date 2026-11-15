@@ -1198,6 +1198,13 @@ export async function getInvoiceFormStockItems(includeInvoiceId?: string) {
   const claimedByThisInvoice = new Map<string, number>();
   for (const item of currentItems) {
     if (!item.inventoryStockId) continue;
+    // A lot is one row however many lines drew from it — counting each lot
+    // line as a piece would push a sold-out lot to quantity 2+, and
+    // stockSellsByWeight (quantity ≤ 1) would then stop treating it as a lot.
+    if (parseLotDraw(item.lotDraw)) {
+      claimedByThisInvoice.set(item.inventoryStockId, 1);
+      continue;
+    }
     claimedByThisInvoice.set(
       item.inventoryStockId,
       (claimedByThisInvoice.get(item.inventoryStockId) ?? 0) + Math.max(1, item.quantity || 1),
@@ -2185,6 +2192,24 @@ export async function setInvoiceDueDate(
   }
 }
 
+/**
+ * Why an invoice with returns can't be cancelled or edited, or null when it
+ * has none. A credit note has already put its lines' stock back (and posted
+ * its own refund); cancel / edit restore every line again from the invoice,
+ * so the returned pieces or lot weight would come back twice. Edit also
+ * recreates the lines, which the credit note's lines still point at.
+ */
+async function invoiceReturnsBlock(storeId: string, invoiceId: string, action: string): Promise<string | null> {
+  const notes = await prisma.creditNote.findMany({
+    where: { storeId, invoiceId },
+    select: { creditNoteNumber: true },
+    orderBy: { createdAt: "asc" },
+  });
+  if (!notes.length) return null;
+  const numbers = notes.map((note) => note.creditNoteNumber).join(", ");
+  return `Items on this invoice were returned (credit note${notes.length === 1 ? "" : "s"} ${numbers}), so it can't be ${action}. Record further changes as a return instead.`;
+}
+
 export async function updateInvoice(
   id: string,
   prevState: InvoiceFormState = initialState,
@@ -2212,6 +2237,9 @@ export async function updateInvoice(
         message: "Cancelled invoices can't be edited — create a replacement instead.",
       };
     }
+
+    const editReturnsBlock = await invoiceReturnsBlock(storeId, invoice.id, "edited");
+    if (editReturnsBlock) return { success: false, message: editReturnsBlock };
 
     const invoiceDateRaw = String(formData.get("invoiceDate") || "");
     const dueDateRaw = String(formData.get("dueDate") || "");
@@ -2814,6 +2842,9 @@ export async function updateInvoiceLineItem(
       };
     }
 
+    const lineReturnsBlock = await invoiceReturnsBlock(storeId, invoice.id, "edited");
+    if (lineReturnsBlock) return { success: false, message: lineReturnsBlock };
+
     const item = invoice.items.find((existing) => existing.id === itemId);
     if (!item) return { success: false, message: "Line item not found on this invoice" };
     // A piece of several metals/stones: its rows' rates (and a stone's
@@ -3195,6 +3226,9 @@ export async function cancelInvoice(
         message: "Only draft or partially-paid invoices can be cancelled.",
       };
     }
+
+    const cancelReturnsBlock = await invoiceReturnsBlock(storeId, invoice.id, "cancelled");
+    if (cancelReturnsBlock) return { success: false, message: cancelReturnsBlock };
 
     const cancellationReason = String(formData.get("cancellationReason") || "").trim() || null;
     const balanceAmount = Number(invoice.balanceAmount);

@@ -10,6 +10,7 @@ import { CustomerImportDialog } from "@/components/customers/customer-import-dia
 import { BulkDeleteButton } from "@/components/shared/bulk-delete-button"
 import { CustomerDetailPanel } from "@/components/customers/customer-detail-panel"
 import { PartyDetailDialog } from "@/components/customers/party-detail-dialog"
+import { useRecordDialog } from "@/components/shared/record-detail-dialog"
 import { Maximize2 } from "lucide-react"
 import { bulkDeleteCustomers, type Customer } from "@/lib/actions/customer-actions"
 
@@ -47,15 +48,13 @@ export function CustomersClient({
     customers[0]?.id ?? null,
   )
 
-  // The party in the full pop-up (name click / panel's expand icon); null = closed.
-  const [dialogCustomerId, setDialogCustomerId] = React.useState<string | null>(null)
+  // The party in the full pop-up (name click / panel's expand icon); null =
+  // closed. useRecordDialog closes it once the party leaves the list
+  // (archived / deleted from inside the pop-up).
+  const recordDialog = useRecordDialog(customers)
 
   React.useEffect(() => {
     setSelectedCustomerIds([])
-    // Archived / deleted from inside the pop-up → it left the list; close.
-    setDialogCustomerId((current) =>
-      current && customers.some((customer) => customer.id === current) ? current : null,
-    )
     setActiveCustomerId((current) => {
       if (current && customers.some((customer) => customer.id === current)) return current
       return customers[0]?.id ?? null
@@ -116,7 +115,7 @@ export function CustomersClient({
             onSelectionChange={setSelectedCustomerIds}
             activeCustomerId={activeCustomerId}
             onActivate={setActiveCustomerId}
-            onOpen={setDialogCustomerId}
+            onOpen={recordDialog.open}
           />
         </div>
 
@@ -129,7 +128,7 @@ export function CustomersClient({
                 variant="outline"
                 size="icon"
                 aria-label="Open in pop-up with full ledger"
-                onClick={() => setDialogCustomerId(activeCustomerId)}
+                onClick={() => recordDialog.open(activeCustomerId)}
               >
                 <Maximize2 className="h-4 w-4" />
               </Button>
@@ -139,11 +138,9 @@ export function CustomersClient({
       </div>
 
       <PartyDetailDialog
-        customerId={dialogCustomerId}
+        customerId={recordDialog.openId}
         states={states}
-        onOpenChange={(open) => {
-          if (!open) setDialogCustomerId(null)
-        }}
+        onOpenChange={recordDialog.dialogProps.onOpenChange}
       />
     </main>
   )

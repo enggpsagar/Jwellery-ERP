@@ -1325,11 +1325,14 @@ export async function convertQuotationToInvoice(
 
     const invoiceNumber = await generateInvoiceNumber(storeId);
 
-    // Lines on a sold-by-weight lot draw the quoted weight now — clamped to
-    // what's left, the same "a quotation reserves nothing" rule the piece
-    // path below follows. Each draw is stored on its invoice line (lotDraw)
-    // so cancelling/deleting the invoice gives back exactly that; a lot with
-    // nothing left gets a zero draw, never a piece-count restore.
+    // Lines on a sold-by-weight lot draw the quoted weight now. Unlike the
+    // piece path below (which clamps — a quotation reserves nothing), a lot
+    // that no longer holds the quoted weight refuses the conversion: the
+    // invoice line bills the quoted weight, and a smaller stored draw would
+    // leave billing and stock disagreeing (Edit Invoice, line re-weigh and
+    // cancel all trust lotDraw == the billed weight). The quotation can be
+    // edited down to what's left and converted then. Each draw is stored on
+    // its invoice line (lotDraw) so cancelling/deleting gives back exactly that.
     const quoteLots = await loadWeightLots(
       storeId,
       quotation.items
@@ -1346,11 +1349,14 @@ export async function convertQuotationToInvoice(
         (lot.status === InventoryStockStatus.IN_STOCK ? lot.weights : subtractLotWeights(lot.weights, lot.weights));
       const measure = lotMeasure(left);
       const quoted = measure ? Number(item[measure] ?? 0) : 0;
-      const plan = measure && quoted > 0 ? planLotDraw(left, Math.min(quoted, left[measure]), lot.label) : null;
-      const draw: LotDraw =
-        plan && plan.ok
-          ? plan.draw
-          : { ...subtractLotWeights(left, left), measure: measure ?? "netWeight" };
+      const plan = planLotDraw(left, quoted, lot.label);
+      if (!plan.ok) {
+        return {
+          success: false,
+          message: `${plan.error} Edit the quotation's weight for ${item.itemName} to what's left, then convert it.`,
+        };
+      }
+      const draw: LotDraw = plan.draw;
       lotDrawByItem.set(item.id, draw);
       lotLeft.set(lot.id, subtractLotWeights(left, draw));
     }
@@ -1464,20 +1470,17 @@ export async function convertQuotationToInvoice(
       for (const item of quotation.items) {
         if (!item.inventoryStockId) continue;
 
-        // A sold-by-weight lot gives up the weight planned above (nothing
-        // when it had none left).
+        // A sold-by-weight lot gives up the weight planned above.
         const lotDraw = lotDrawByItem.get(item.id);
         if (lotDraw) {
-          if (lotDraw[lotDraw.measure] > 0) {
-            await drawFromLot(tx, {
-              storeId,
-              stockId: item.inventoryStockId,
-              draw: lotDraw,
-              label: item.itemName,
-              referenceType: "Invoice",
-              referenceId: created.id,
-            });
-          }
+          await drawFromLot(tx, {
+            storeId,
+            stockId: item.inventoryStockId,
+            draw: lotDraw,
+            label: item.itemName,
+            referenceType: "Invoice",
+            referenceId: created.id,
+          });
           continue;
         }
 

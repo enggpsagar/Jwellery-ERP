@@ -22,6 +22,9 @@ export function KachaDetailPanel({ kachaInvoiceId }: { kachaInvoiceId: string | 
   const [kachaInvoice, setKachaInvoice] = useState<KachaInvoiceDetail | null>(null)
   const [oldGoldExchange, setOldGoldExchange] = useState<KachaOldGoldExchange>(null)
   const [loading, setLoading] = useState(false)
+  // Set once a fetch has finished without an estimate (not found / failed),
+  // so the panel says so instead of showing the skeleton forever.
+  const [missing, setMissing] = useState(false)
 
   useEffect(() => {
     if (!kachaInvoiceId) {
@@ -31,11 +34,18 @@ export function KachaDetailPanel({ kachaInvoiceId }: { kachaInvoiceId: string | 
 
     let cancelled = false
     setLoading(true)
+    setMissing(false)
     Promise.all([getKachaInvoiceById(kachaInvoiceId), getKachaOldGoldExchange(kachaInvoiceId)])
       .then(([invoiceResult, exchangeResult]) => {
         if (cancelled) return
         setKachaInvoice(invoiceResult)
         setOldGoldExchange(exchangeResult)
+        setMissing(!invoiceResult)
+      })
+      .catch(() => {
+        if (cancelled) return
+        setKachaInvoice(null)
+        setMissing(true)
       })
       .finally(() => {
         if (!cancelled) setLoading(false)
@@ -47,6 +57,10 @@ export function KachaDetailPanel({ kachaInvoiceId }: { kachaInvoiceId: string | 
   }, [kachaInvoiceId])
 
   if (!kachaInvoiceId) return null
+
+  if (!loading && missing) {
+    return <p className="text-sm text-muted-foreground">This estimate couldn&apos;t be loaded.</p>
+  }
 
   if (loading || !kachaInvoice) {
     return (

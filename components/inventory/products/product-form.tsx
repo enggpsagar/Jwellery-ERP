@@ -1052,7 +1052,7 @@ export function ProductForm({
           <p className="flex items-start gap-2">
             <Lock className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
             <span>
-              This product already has stock or bills, so its name, metal, purity, stone and category are locked.
+              This product already has stock or bills, so its name, metal, purity, stone, category and "Sold by weight" are locked.
               Weights, charges, HSN, GST, images and notes can still be edited.
             </span>
           </p>
@@ -1336,20 +1336,26 @@ export function ProductForm({
           )}
 
           <div className="flex items-start gap-3 rounded-lg border p-3 lg:col-span-3">
-            <Switch
-              id="soldByWeight"
-              className="mt-0.5"
-              checked={soldByWeight}
-              aria-describedby="soldByWeight-help"
-              onCheckedChange={(checked) => {
-                setSoldByWeightTouched(true);
-                setSoldByWeight(checked);
-              }}
-            />
+            <LockedField locked={identityLocked}>
+              <Switch
+                id="soldByWeight"
+                className="mt-0.5"
+                checked={soldByWeight}
+                disabled={identityLocked}
+                aria-describedby="soldByWeight-help"
+                onCheckedChange={(checked) => {
+                  if (identityLocked) return;
+                  setSoldByWeightTouched(true);
+                  setSoldByWeight(checked);
+                }}
+              />
+            </LockedField>
             <div className="space-y-0.5">
               <Label htmlFor="soldByWeight">Sold by weight</Label>
               <p id="soldByWeight-help" className="text-xs text-muted-foreground">
-                Bulk stock (loose stones, bars, bullion): sell part of a lot by weight
+                {identityLocked
+                  ? "Fixed once a product has stock or bills — its stock is already counted this way."
+                  : "Bulk stock (loose stones, bars, bullion): sell part of a lot by weight"}
               </p>
             </div>
             <input type="hidden" name="soldByWeight" value={soldByWeight ? "on" : ""} />

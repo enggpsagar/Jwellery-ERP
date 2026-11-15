@@ -155,14 +155,17 @@ test("a product with stock can't change its identity, only its other details", a
   await page.goto(`/inventory/products/${product.id}/edit`)
 
   // Identity fields are locked in the form, with a way out.
-  await expect(page.getByText(/its name, metal, purity, stone and category are locked/).first()).toBeVisible()
+  await expect(page.getByText(/its name, metal, purity, stone, category and "Sold by weight" are locked/).first()).toBeVisible()
   const name = page.locator('input[name="name"]').first()
   await expect(name).not.toBeEditable()
   await expect(page.getByRole("link", { name: "Create new product" })).toHaveAttribute(
     "href",
     new RegExp(`fromProductId=${product.id}`),
   )
+  // Sold by weight is fixed too: flipping it would re-read the existing
+  // lot as pieces (or pieces as lots).
   await expect(page.getByRole("switch", { name: "Sold by weight" })).toBeChecked()
+  await expect(page.getByRole("switch", { name: "Sold by weight" })).toBeDisabled()
 
   // The server refuses a renamed product even if the form is bypassed.
   await name.evaluate((input: HTMLInputElement) => {
@@ -175,6 +178,103 @@ test("a product with stock can't change its identity, only its other details", a
     page.getByText("This product already has stock or bills, so its name, metal, purity, stone and category can't change — create a new product instead.").first(),
   ).toBeVisible()
   expect((await db().product.findUniqueOrThrow({ where: { id: product.id } })).name).toBe(product.name)
+
+  expect(crashes).toEqual([])
+})
+
+test("a sold-by-weight product with stock refuses a Sold by weight switch even if the form is bypassed", async ({ page }) => {
+  const crashes = watchForPageCrash(page)
+  const { product } = await seedBarLot()
+
+  await page.goto(`/inventory/products/${product.id}/edit`)
+  // Bypass the disabled switch: drop the hidden field from the post (a
+  // missing field reads as "off"). Clearing its value doesn't work — React
+  // writes the controlled value back before the form submits.
+  // Let the form hydrate (its option lists load after the page) first.
+  await page.waitForLoadState("networkidle")
+  await expect(page.getByRole("switch", { name: "Sold by weight" })).toBeDisabled()
+  // The browser's own required-field checks aren't what's under test.
+  await page.locator('input[type="hidden"][name="soldByWeight"]').evaluate((input: HTMLInputElement) => {
+    input.removeAttribute("name")
+    input.form!.noValidate = true
+  })
+  await page.getByRole("button", { name: "Update Product" }).click()
+  await expect(page.getByText(/so "Sold by weight" can't be switched/).first()).toBeVisible()
+  expect((await db().product.findUniqueOrThrow({ where: { id: product.id } })).soldByWeight).toBe(true)
+
+  expect(crashes).toEqual([])
+})
+
+test("an invoice with a return can't be cancelled, so a returned lot isn't given back twice", async ({ page }) => {
+  const crashes = watchForPageCrash(page)
+  const { storeId, stock, product } = await seedBarLot()
+
+  const invoiceId = await sellFromLot(page, product.productCode, "30")
+  expect(await lot(stock.id)).toMatchObject({ net: 70 })
+
+  // A credit note on the invoice (its stock was already returned by it).
+  const invoice = await db().invoice.findUniqueOrThrow({ where: { id: invoiceId }, include: { items: true } })
+  const note = await db().creditNote.create({
+    data: {
+      storeId,
+      invoiceId,
+      customerId: invoice.customerId,
+      creditNoteNumber: `E2E-CN-LOT-${Date.now()}`,
+      items: {
+        create: {
+          invoiceItemId: invoice.items[0].id,
+          inventoryStockId: stock.id,
+          itemName: invoice.items[0].itemName,
+          quantity: 1,
+        },
+      },
+    },
+  })
+
+  await page.goto(`/billing/${invoiceId}`)
+  await page.getByRole("button", { name: "Cancel Invoice" }).click()
+  await page.getByRole("dialog").getByRole("button", { name: "Cancel Invoice" }).click()
+  await expect(page.getByText(new RegExp(`returned \\(credit note ${note.creditNoteNumber}\\), so it can't be cancelled`)).first()).toBeVisible()
+  expect((await db().invoice.findUniqueOrThrow({ where: { id: invoiceId } })).status).not.toBe("CANCELLED")
+  expect(await lot(stock.id)).toMatchObject({ net: 70 })
+
+  await db().creditNote.delete({ where: { id: note.id } })
+  expect(crashes).toEqual([])
+})
+
+test("a quotation for more weight than a lot has left isn't converted", async ({ page }) => {
+  const crashes = watchForPageCrash(page)
+  const { storeId, stock, product } = await seedBarLot()
+  const customer = await db().customer.findFirstOrThrow({ where: { storeId, name: { contains: "Ananya Kulkarni" } } })
+
+  const quotation = await db().quotation.create({
+    data: {
+      storeId,
+      customerId: customer.id,
+      quotationNumber: `E2E-QT-LOT-${Date.now()}`,
+      subtotal: 840000,
+      totalAmount: 840000,
+      items: {
+        create: {
+          itemName: product.name,
+          metalTypeId: product.metalTypeId,
+          quantity: 1,
+          grossWeight: 120,
+          netWeight: 120,
+          fineWeight: 120,
+          rate: 7000,
+          lineTotal: 840000,
+          inventoryStockId: stock.id,
+        },
+      },
+    },
+  })
+
+  await page.goto(`/quotations/${quotation.id}/convert`)
+  await page.getByRole("button", { name: "Convert to Invoice" }).click()
+  await expect(page.getByText(/Only 100 g is left of .* Edit the quotation's weight/).first()).toBeVisible()
+  expect((await db().quotation.findUniqueOrThrow({ where: { id: quotation.id } })).convertedToId).toBeNull()
+  expect(await lot(stock.id)).toMatchObject({ quantity: 1, status: "IN_STOCK", net: 100 })
 
   expect(crashes).toEqual([])
 })

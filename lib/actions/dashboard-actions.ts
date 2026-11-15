@@ -151,10 +151,12 @@ export async function getDashboardStats(): Promise<DashboardStat[]> {
   ] = await Promise.all([
     // Every party's ONE net balance (lib/party-balance.ts): opening +
     // sales/payments-out − purchases/payments-in/returns, from the ledger.
-    // Store-wide, not location-filtered: a party's balance (and its opening
-    // balance) belongs to the party, not to one counter — same figure the
-    // Parties list shows, so the two always agree.
-    getPartyNetBalances(storeId),
+    // Unrestricted users get the store-wide figure the Parties list shows.
+    // A location-restricted user gets only what was filed at their
+    // locations (no opening balances — those aren't tied to a counter), the
+    // same scoping every other money card here follows; before the one-
+    // ledger change their receivables card was location-filtered too.
+    getPartyNetBalances(storeId, undefined, scope.restricted ? { locationIds: scope.locationIds } : {}),
     // Bounded above unlike the sales queries this mirrors — a future-dated
     // purchase must not inflate "today" indefinitely.
     prisma.purchase.aggregate({
@@ -226,6 +228,7 @@ export async function getDashboardStats(): Promise<DashboardStat[]> {
   ]);
 
   const partyTotals = partyBalanceTotals(partyNets.values());
+  const atYourLocations = scope.restricted ? " (your locations)" : "";
   const netDirection = partyBalanceDirection(partyTotals.net);
   const inr = (value: number) => `₹${value.toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
   const parties = (count: number) => `${count} part${count === 1 ? "y" : "ies"}`;
@@ -256,7 +259,7 @@ export async function getDashboardStats(): Promise<DashboardStat[]> {
       value: inr(partyTotals.receivable),
       change: "",
       trend: partyTotals.receivable > 0 ? "down" : "up",
-      sub: `${parties(partyTotals.receivableCount)} owe you`,
+      sub: `${parties(partyTotals.receivableCount)} owe you${atYourLocations}`,
       icon: "wallet",
       tone: "outstanding",
     },
@@ -265,7 +268,7 @@ export async function getDashboardStats(): Promise<DashboardStat[]> {
       value: inr(partyTotals.payable),
       change: "",
       trend: partyTotals.payable > 0 ? "down" : "up",
-      sub: `you owe ${parties(partyTotals.payableCount)}`,
+      sub: `you owe ${parties(partyTotals.payableCount)}${atYourLocations}`,
       icon: "rupee",
       tone: "deposited",
     },

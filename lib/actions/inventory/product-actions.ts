@@ -1110,6 +1110,9 @@ async function productHasStockOrBills(storeId: string, productId: string): Promi
 const PRODUCT_IDENTITY_LOCKED_MESSAGE =
   "This product already has stock or bills, so its name, metal, purity, stone and category can't change — create a new product instead.";
 
+const PRODUCT_SOLD_BY_WEIGHT_LOCKED_MESSAGE =
+  "This product already has stock or bills, so \"Sold by weight\" can't be switched — its stock was recorded the current way. Create a new product instead.";
+
 /** Name compared the way a person reads it: trimmed, single-spaced, any case. */
 function identityName(value: string | null | undefined) {
   return String(value ?? "").normalize("NFKC").trim().replace(/\s+/g, " ").toLowerCase();
@@ -1856,6 +1859,7 @@ export async function updateProduct(
         defaultPurity: true,
         stoneOriginOptionId: true,
         hasStoneComponent: true,
+        soldByWeight: true,
         defaultStoneMetalTypeName: true,
         defaultStoneTypeNames: true,
         metalType: { select: { name: true, isGemstone: true } },
@@ -1944,6 +1948,15 @@ export async function updateProduct(
 
       if (identityChanged) {
         return { success: false, message: PRODUCT_IDENTITY_LOCKED_MESSAGE, errors: {} };
+      }
+
+      // Sold by weight decides what a stock row's quantity means (one lot
+      // of N grams vs N pieces). Flipping it on a product that already has
+      // stock re-reads every existing row the other way — a lot of ten
+      // coins would sell as one piece, a piece would start selling by
+      // partial weight — so it is fixed once stock or bills exist.
+      if (soldByWeight !== existing.soldByWeight) {
+        return { success: false, message: PRODUCT_SOLD_BY_WEIGHT_LOCKED_MESSAGE, errors: {} };
       }
     }
 
